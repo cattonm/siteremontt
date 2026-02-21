@@ -9,7 +9,6 @@
         body { font-family: -apple-system, sans-serif; padding: 20px; background: #fff; color: #000; padding-bottom: 90px; margin: 0; }
         .hidden { display: none !important; }
         
-        /* Гамбургер меню та Топ-бар */
         #top-bar {
             display: flex; justify-content: space-between; align-items: center;
             background: #f0f4f8; padding: 12px 15px; border-radius: 12px; margin-bottom: 20px;
@@ -32,21 +31,18 @@
         .menu-item { padding: 12px 20px; border-bottom: 1px solid #f9f9f9; font-weight: 500; color: #555; cursor: pointer; }
         .menu-item:active { background: #f0f8ff; color: #3390ec; }
 
-        /* Заголовки */
         .zone-badge { 
             display: inline-block; background: #f0f0f0; color: #888; 
             padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-bottom: 8px; text-transform: uppercase;
         }
         h3 { margin: 0 0 20px 0; font-size: 20px; font-weight: 700; line-height: 1.3; }
         
-        /* Ввід даних */
         label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 14px; color: #555; }
         input[type="text"], input[type="tel"], input[type="number"], select { 
             width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #ddd; 
             font-size: 16px; margin-bottom: 20px; box-sizing: border-box; background: #f9f9f9; 
         }
 
-        /* Сітка карток */
         .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .card { 
             border: 2px solid #eee; border-radius: 12px; padding: 10px; 
@@ -55,7 +51,6 @@
         }
         .card.selected { border-color: #3390ec; background: #eaf4ff; }
         
-        /* Картинки */
         .img-wrapper { position: relative; width: 100%; height: 110px; margin-bottom: 10px; }
         .card img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; background-color: #f0f0f0; }
         .zoom-icon {
@@ -64,7 +59,6 @@
             display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; z-index: 10;
         }
 
-        /* Кнопки рівня (S/C/P) */
         .tier-container { display: flex; gap: 5px; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
         .tier-btn {
             border: 1px solid #ccc; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: bold;
@@ -72,13 +66,11 @@
         }
         .tier-btn.active { background: #3390ec; color: #fff; border-color: #3390ec; }
 
-        /* Списки */
         .list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; }
         .list-left { display: flex; align-items: center; }
         .list-item input[type="checkbox"] { width: 22px; height: 22px; margin-right: 12px; accent-color: #3390ec; }
         .tier-select { padding: 5px; border-radius: 6px; border: 1px solid #ddd; background: #fff; font-size: 14px; }
 
-        /* Модальне вікно для фото */
         #imageModal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             background: rgba(0,0,0,0.9); z-index: 3000; display: none; 
@@ -87,13 +79,11 @@
         #imageModal img { max-width: 95%; max-height: 80%; border-radius: 8px; }
         #closeModal { color: #fff; margin-top: 20px; font-size: 18px; cursor: pointer; border: 1px solid #fff; padding: 10px 20px; border-radius: 20px; }
 
-        /* Інші екрани */
         #section-thankyou, #loading-screen { text-align: center; padding-top: 50px; }
         .check-icon { font-size: 60px; color: #3390ec; margin-bottom: 20px; }
         .measurement-box { background: #f9f9f9; padding: 15px; border-radius: 12px; border: 1px solid #eee; margin-bottom: 20px; }
         .measurement-box h4 { margin: 0 0 15px 0; color: #333; }
 
-        /* Навігація */
         .nav-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: #fff; padding: 15px; border-top: 1px solid #eee; display: flex; gap: 10px; box-sizing: border-box; z-index: 100; }
         .btn { flex: 1; padding: 15px; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; }
         .btn-back { background: #f0f0f0; color: #333; flex: 0.3; }
@@ -166,11 +156,7 @@
 </div>
 
 <div id="section-thankyou" class="hidden">
-    <div class="check-icon">✅</div>
-    <h3>Дякуємо!</h3>
-    <p>Вашу анкету успішно сформовано/оновлено.</p>
-    <p style="color:#888; font-size:14px;">Вікно закриється автоматично через <span id="timer">10</span> сек.</p>
-</div>
+    </div>
 
 <div class="nav-bar" id="navBar">
     <button class="btn btn-back" onclick="goBack()" id="btnBack" style="display:none;">←</button>
@@ -192,10 +178,6 @@
         editId = urlParams.get('edit_id');
         loadEditData();
     }
-
-    // ==========================================
-    // СТРУКТУРА ПИТАНЬ
-    // ==========================================
 
     const blockGeneral = [
         { id: "entrance_door", zone: "ЗАГАЛЬНІ", text: "Чи потрібна заміна вхідних дверей?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
@@ -224,7 +206,6 @@
         { id: "plumbing_done", zone: "ЗАГАЛЬНІ", text: "Чи розведена каналізація?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
         { id: "rooms_count", zone: "ЗАГАЛЬНІ", text: "Кількість житлових кімнат", type: "input_number", placeholder: "Введіть число" },
         { id: "baths_count", zone: "ЗАГАЛЬНІ", text: "Кількість санвузлів", type: "input_number", placeholder: "Введіть число" },
-        // 💥 НОВЕ ПИТАННЯ: Обираємо додаткові приміщення РАЗОМ
         { id: "aux_rooms", zone: "ЗАГАЛЬНІ", text: "Які додаткові приміщення будемо ремонтувати?", type: "cards_multiselect", options: [
             {label:"Передпокій",val:"Передпокій"},
             {label:"Кухня",val:"Кухня"},
@@ -233,12 +214,10 @@
             {label:"Підвал",val:"Підвал"},
             {label:"Горище",val:"Горище"}
         ]},
-        // Тепла підлога йде ПІСЛЯ списку приміщень
         { id: "warm_floor", zone: "ЗАГАЛЬНІ", text: "Встановлення теплої підлоги:", type: "multiselect_dynamic" }
     ];
 
     const blockHallway = [
-        // Питання чи потрібен передпокій видалено - бо це вже вирішено в aux_rooms
         { id: "hallway_floor", zone: "ПЕРЕДПОКІЙ", text: "Тип підлоги.", type: "cards", options: [
             {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"},
             {label:"Кварцвініл",val:"Кварцвініл",img:"img/kvarzvinil.webp"},
@@ -448,16 +427,12 @@
         ];
     }
 
-    // ==========================================
-    // ЛОГІКА ПРОПУСКУ ПИТАНЬ (Динамічна на основі aux_rooms)
-    // ==========================================
     function shouldSkip(q) {
         if (!q) return false;
         if (q.id === 'ceiling_shadow' && answers['ceiling'] === 'Ні') return true;
         
         const aux = answers['aux_rooms'] || [];
 
-        // Якщо питання належить до специфічної зони, і цю зону НЕ обрали в aux_rooms - пропускаємо
         if (q.id.startsWith('hallway_') && !aux.includes('Передпокій')) return true;
         if (q.id.startsWith('kitchen_') && !aux.includes('Кухня')) return true;
         if (q.id.startsWith('balcony_') && !aux.includes('Балкон')) return true;
@@ -491,9 +466,6 @@
         updateMenu();
     }
 
-    // ==========================================
-    // НАВІГАЦІЙНЕ МЕНЮ
-    // ==========================================
     function toggleMenu() {
         const menu = document.getElementById('side-menu');
         const overlay = document.getElementById('menu-overlay');
@@ -540,9 +512,6 @@
         list.appendChild(measItem);
     }
 
-    // ==========================================
-    // ЗАВАНТАЖЕННЯ ДЛЯ РЕДАГУВАННЯ
-    // ==========================================
     async function loadEditData() {
         document.getElementById('section-client').classList.add('hidden');
         document.getElementById('loading-screen').classList.remove('hidden');
@@ -562,7 +531,6 @@
             
             answers = data.answers || {};
 
-            // Відновлюємо aux_rooms зі старих заявок (для сумісності зі старими заявками в базі)
             if (!answers['aux_rooms']) {
                 answers['aux_rooms'] = [];
                 if (answers['hallway_needed'] === 'Так') answers['aux_rooms'].push('Передпокій');
@@ -659,7 +627,6 @@
         }
         else if (q.type === 'multiselect_dynamic') {
             const opts = [];
-            // Динамічно додаємо тільки ті приміщення, які були обрані на попередньому кроці!
             const aux = answers['aux_rooms'] || [];
             aux.forEach(a => opts.push(a));
             
@@ -670,7 +637,6 @@
             opts.push("Не потребується");
 
             if(!Array.isArray(answers[q.id])) answers[q.id] = [];
-            // Очищуємо "мертві" кімнати з пам'яті, якщо клієнт передумав і прибрав їх з aux_rooms
             answers[q.id] = answers[q.id].filter(val => opts.includes(val));
 
             opts.forEach(o => {
@@ -854,7 +820,6 @@
         const zones = [];
         const aux = answers['aux_rooms'] || [];
         
-        // Генеруємо поля для замірів тільки для обраних кімнат
         if (aux.includes('Передпокій')) zones.push({id: 'hallway', name: 'Передпокій'});
         if (aux.includes('Кухня')) zones.push({id: 'kitchen', name: 'Кухня'});
         if (aux.includes('Балкон')) zones.push({id: 'balcony', name: 'Балкон'});
@@ -966,10 +931,15 @@
         }
     }
 
-        function finishSurvey() {
+    // НОВИЙ ФІНАЛ: МИТТЄВЕ ЗАКРИТТЯ І ВІДПРАВКА БЕЗ ПАРОЛІВ
+    function finishSurvey() {
         document.getElementById('section-measurements').classList.add('hidden');
         document.getElementById('navBar').style.display = 'none';
-        document.getElementById('section-thankyou').classList.remove('hidden');
+        
+        // Показуємо екран завантаження без кнопок і таймерів
+        const thx = document.getElementById('section-thankyou');
+        thx.innerHTML = '<div class="check-icon">⏳</div><h3>Зберігаємо...</h3><p>Зачекайте мить.</p>';
+        thx.classList.remove('hidden');
         
         const aux = answers['aux_rooms'] || [];
         answers['hallway_needed'] = aux.includes('Передпокій') ? 'Так' : 'Ні';
@@ -981,7 +951,6 @@
 
         const data = {
             edit_id: editId, 
-            user_id: tg.initDataUnsafe?.user?.id, // ДОДАНО: передаємо ID менеджера
             client: {
                 name: document.getElementById('clientName').value,
                 phone: document.getElementById('clientPhone').value,
@@ -994,42 +963,25 @@
             answers: answers
         };
 
-        // НОВИЙ МЕХАНІЗМ ЗБЕРЕЖЕННЯ І ЗАКРИТТЯ
-        const sendAndClose = () => {
-            if (editId) {
-                // Режим редагування (звертаємось напряму до API бота)
-                fetch(`${BACKEND_URL}/api/save_order`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                }).then(() => {
-                    tg.close();
-                }).catch(() => {
-                    alert("Помилка збереження!");
-                    tg.close();
-                });
-            } else {
-                // Нова заявка (стандартний метод Telegram)
-                tg.sendData(JSON.stringify(data));
-            }
-        };
-
-        const closeBtn = document.createElement('button');
-        closeBtn.innerText = "Закрити зараз";
-        closeBtn.style.cssText = "margin-top:20px; padding:10px 20px; border:none; background:#eee; border-radius:8px; font-weight:bold;";
-        closeBtn.onclick = sendAndClose;
-        document.getElementById('section-thankyou').appendChild(closeBtn);
-
-        let timeLeft = 10;
-        const timerEl = document.getElementById('timer');
-        const interval = setInterval(() => {
-            timeLeft--;
-            timerEl.innerText = timeLeft;
-            if (timeLeft <= 0) {
-                clearInterval(interval);
-                sendAndClose();
-            }
-        }, 1000);
+        if (editId) {
+            // Режим редагування: відправляємо крипто-токен і одразу закриваємо
+            fetch(`${BACKEND_URL}/api/save_order`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-Telegram-Init-Data': tg.initData // БЕЗПЕКА
+                },
+                body: JSON.stringify(data)
+            }).then(() => {
+                tg.close(); // Вікно закриється блискавично
+            }).catch(() => {
+                alert("Помилка з'єднання з сервером.");
+                tg.close();
+            });
+        } else {
+            // Нова заявка
+            tg.sendData(JSON.stringify(data));
+        }
     }
 </script>
 </body>

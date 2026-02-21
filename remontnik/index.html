@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Анкета Об'єкту</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { font-family: -apple-system, sans-serif; padding: 20px; background: #fff; color: #000; padding-bottom: 90px; margin: 0; }
+        .hidden { display: none !important; }
+        
+        /* Гамбургер меню та Топ-бар */
+        #top-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #f0f4f8; padding: 12px 15px; border-radius: 12px; margin-bottom: 20px;
+        }
+        #menu-btn { font-size: 16px; font-weight: bold; cursor: pointer; color: #3390ec; display: flex; align-items: center; gap: 8px;}
+        #step-count { color: #888; font-size: 14px; font-weight: bold; }
+        
+        #menu-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 1999; display: none;
+        }
+        #side-menu {
+            position: fixed; top: 0; left: 0; width: 260px; height: 100%;
+            background: #fff; box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            z-index: 2000; transform: translateX(-100%); transition: transform 0.3s ease-in-out;
+            overflow-y: auto; padding-top: 20px;
+        }
+        #side-menu.open { transform: translateX(0); }
+        .menu-header { padding: 0 20px 10px 20px; font-size: 18px; font-weight: bold; border-bottom: 1px solid #eee; margin-bottom: 10px; color: #333;}
+        .menu-item { padding: 12px 20px; border-bottom: 1px solid #f9f9f9; font-weight: 500; color: #555; cursor: pointer; }
+        .menu-item:active { background: #f0f8ff; color: #3390ec; }
+
+        /* Заголовки */
+        .zone-badge { 
+            display: inline-block; background: #f0f0f0; color: #888; 
+            padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-bottom: 8px; text-transform: uppercase;
+        }
+        h3 { margin: 0 0 20px 0; font-size: 20px; font-weight: 700; line-height: 1.3; }
+        
+        /* Ввід даних */
+        label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 14px; color: #555; }
+        input[type="text"], input[type="tel"], input[type="number"], select { 
+            width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #ddd; 
+            font-size: 16px; margin-bottom: 20px; box-sizing: border-box; background: #f9f9f9; 
+        }
+
+        /* Сітка карток */
+        .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .card { 
+            border: 2px solid #eee; border-radius: 12px; padding: 10px; 
+            text-align: center; cursor: pointer; transition: 0.2s; position: relative;
+            background: #fff; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+        }
+        .card.selected { border-color: #3390ec; background: #eaf4ff; }
+        
+        /* Картинки */
+        .img-wrapper { position: relative; width: 100%; height: 110px; margin-bottom: 10px; }
+        .card img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; background-color: #f0f0f0; }
+        .zoom-icon {
+            position: absolute; bottom: 5px; right: 5px; background: rgba(0,0,0,0.6); 
+            color: #fff; border-radius: 50%; width: 32px; height: 32px; 
+            display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; z-index: 10;
+        }
+
+        /* Кнопки рівня (S/C/P) */
+        .tier-container { display: flex; gap: 5px; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
+        .tier-btn {
+            border: 1px solid #ccc; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: bold;
+            cursor: pointer; background: #fff; color: #555; min-width: 24px;
+        }
+        .tier-btn.active { background: #3390ec; color: #fff; border-color: #3390ec; }
+
+        /* Списки */
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; }
+        .list-left { display: flex; align-items: center; }
+        .list-item input[type="checkbox"] { width: 22px; height: 22px; margin-right: 12px; accent-color: #3390ec; }
+        .tier-select { padding: 5px; border-radius: 6px; border: 1px solid #ddd; background: #fff; font-size: 14px; }
+
+        /* Модальне вікно для фото */
+        #imageModal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.9); z-index: 3000; display: none; 
+            justify-content: center; align-items: center; flex-direction: column;
+        }
+        #imageModal img { max-width: 95%; max-height: 80%; border-radius: 8px; }
+        #closeModal { color: #fff; margin-top: 20px; font-size: 18px; cursor: pointer; border: 1px solid #fff; padding: 10px 20px; border-radius: 20px; }
+
+        /* Інші екрани */
+        #section-thankyou, #loading-screen { text-align: center; padding-top: 50px; }
+        .check-icon { font-size: 60px; color: #3390ec; margin-bottom: 20px; }
+        .measurement-box { background: #f9f9f9; padding: 15px; border-radius: 12px; border: 1px solid #eee; margin-bottom: 20px; }
+        .measurement-box h4 { margin: 0 0 15px 0; color: #333; }
+
+        /* Навігація */
+        .nav-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: #fff; padding: 15px; border-top: 1px solid #eee; display: flex; gap: 10px; box-sizing: border-box; z-index: 100; }
+        .btn { flex: 1; padding: 15px; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        .btn-back { background: #f0f0f0; color: #333; flex: 0.3; }
+        .btn-next { background: #3390ec; color: #fff; }
+    </style>
+</head>
+<body>
+
+<script>
+    const BACKEND_URL = "https://remontnikuav.onrender.com/"; 
+</script>
+
+<div id="imageModal" onclick="closeImage()">
+    <img id="modalImg" src="">
+    <div id="closeModal">Закрити</div>
+</div>
+
+<div id="menu-overlay" onclick="toggleMenu()"></div>
+<div id="side-menu">
+    <div class="menu-header">📋 Розділи анкети</div>
+    <div id="menu-list"></div>
+</div>
+
+<div id="loading-screen" class="hidden">
+    <h3>⏳ Завантаження...</h3>
+    <p style="color: #888;">Підтягуємо дані об'єкту.</p>
+</div>
+
+<div id="section-client">
+    <h3>👷 Інформація про об'єкт</h3>
+    <label>Ім'я клієнта</label> <input type="text" id="clientName" placeholder="Введіть ім'я">
+    <label>Телефон</label> <input type="tel" id="clientPhone" placeholder="+380...">
+    <label>Тип об'єкту</label>
+    <select id="objectType">
+        <option value="Квартира (Новобудова)">Квартира (Новобудова)</option>
+        <option value="Квартира (Вторинна)">Квартира (Вторинна)</option>
+        <option value="Будинок">Будинок</option>
+        <option value="Комерція">Комерція</option>
+    </select>
+    <label>Адреса</label> <input type="text" id="clientAddress" placeholder="Вулиця / ЖК">
+    <label>Загальна площа об'єкта (м²)</label> <input type="number" id="clientArea" placeholder="Наприклад: 65">
+    
+    <div style="display: flex; gap: 10px;">
+        <div style="flex: 1;">
+            <label>Поверх</label> <input type="number" id="clientFloor" placeholder="1" value="1">
+        </div>
+        <div style="flex: 1;">
+            <label>Ліфт</label>
+            <select id="clientElevator">
+                <option value="Вантажний">Вантажний</option>
+                <option value="Пасажирський">Пасажирський</option>
+                <option value="Немає">Немає</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div id="section-questions" class="hidden">
+    <div id="top-bar">
+        <div id="menu-btn" onclick="toggleMenu()">☰ Меню</div>
+        <div id="step-count">1/X</div>
+    </div>
+    <div id="question-container"></div>
+</div>
+
+<div id="section-measurements" class="hidden">
+    <h3>📏 Заміри приміщень</h3>
+    <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Введіть площу підлоги для обраних кімнат. Площа стін розрахується автоматично.</p>
+    <div id="measurements-container"></div>
+</div>
+
+<div id="section-thankyou" class="hidden">
+    <div class="check-icon">✅</div>
+    <h3>Дякуємо!</h3>
+    <p>Вашу анкету успішно сформовано/оновлено.</p>
+    <p style="color:#888; font-size:14px;">Вікно закриється автоматично через <span id="timer">10</span> сек.</p>
+</div>
+
+<div class="nav-bar" id="navBar">
+    <button class="btn btn-back" onclick="goBack()" id="btnBack" style="display:none;">←</button>
+    <button class="btn btn-next" onclick="goNext()" id="btnNext">Далі</button>
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    let answers = {};
+    let currentStep = -1;
+    let finalQuestions = [];
+    
+      // ПЕРЕВІРКА РЕЖИМУ РЕДАГУВАННЯ (Надійний метод через URL)
+    let editId = null;
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('edit_id')) {
+        editId = urlParams.get('edit_id');
+        loadEditData();
+    }
+
+
+    // ==========================================
+    // СТРУКТУРА ПИТАНЬ (Додано варіанти "Ні")
+    // ==========================================
+
+    const blockGeneral = [
+        { id: "entrance_door", zone: "ЗАГАЛЬНІ", text: "Чи потрібна заміна вхідних дверей?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "interior_door", zone: "ЗАГАЛЬНІ", text: "Тип міжкімнатних дверей.", type: "cards", options: [
+            {label:"Прихований монтаж",val:"Прихований монтаж",img:"img/hidemont.webp"},
+            {label:"Стандарт",val:"Стандарт",img:"img/standarddoor.webp"},
+            {label:"Ні / Залишаються",val:"Ні"} // НОВЕ
+        ]},
+        { id: "baseboard", zone: "ЗАГАЛЬНІ", text: "Тип підлогового плінтусу.", type: "cards", options: [
+            {label:"Прихований монтаж",val:"Прихований монтаж",img:"img/plinthidem.webp"},
+            {label:"Тіньовий шов",val:"Тіньовий шов",img:"img/shadowshow.webp"},
+            {label:"Стандартний",val:"Стандартний",img:"img/plintstandard.webp"}
+        ]},
+        { id: "ceiling", zone: "ЗАГАЛЬНІ", text: "Тип стелі.", type: "cards", options: [
+            {label:"Натяжна",val:"Натяжна"}, 
+            {label:"Гіпсокартон",val:"Гіпсокартон"},
+            {label:"Ні",val:"Ні"} // НОВЕ
+        ]},
+        { id: "ceiling_shadow", zone: "ЗАГАЛЬНІ", text: "Чи потрібен тіньовий шов для стелі?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "screed_done", zone: "ЗАГАЛЬНІ", text: "Чи є стяжка підлоги?", type: "cards", options: [
+            {label:"Є від забудовника",val:"Є від забудовника"},
+            {label:"Потрібна: Мокра",val:"Потрібна: Мокра"},
+            {label:"Потрібна: Напівсуха",val:"Потрібна: Напівсуха"}
+        ]},
+        { id: "electricity_done", zone: "ЗАГАЛЬНІ", text: "Чи розведена електрика?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "plumbing_done", zone: "ЗАГАЛЬНІ", text: "Чи розведена каналізація?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "rooms_count", zone: "ЗАГАЛЬНІ", text: "Кількість житлових кімнат", type: "input_number", placeholder: "Введіть число" },
+        { id: "baths_count", zone: "ЗАГАЛЬНІ", text: "Кількість санвузлів", type: "input_number", placeholder: "Введіть число" },
+        { id: "warm_floor", zone: "ЗАГАЛЬНІ", text: "Встановлення теплої підлоги:", type: "multiselect_dynamic" }
+    ];
+
+    const blockHallway = [
+        { id: "hallway_needed", zone: "ПЕРЕДПОКІЙ", text: "Передпокій", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "hallway_floor", zone: "ПЕРЕДПОКІЙ", text: "Тип підлоги.", type: "cards", options: [
+            {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"},
+            {label:"Кварцвініл",val:"Кварцвініл",img:"img/kvarzvinil.webp"},
+            {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}
+        ]},
+        { id: "hallway_walls", zone: "ПЕРЕДПОКІЙ", text: "Стіни.", type: "cards", options: [
+            {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"},
+            {label:"Декор - штукатурка",val:"Декор - штукатурка",img:"img/dekorstuk.webp"},
+            {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}
+        ]},
+        { id: "hallway_light", zone: "ПЕРЕДПОКІЙ", text: "Освітлення", type: "cards_multiselect", options: [
+            {label:"Декор підсвітка",val:"Декор підсвітка",img:"img/dekorpidsv.webp"},
+            {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"},
+            {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}
+        ]},
+        { id: "hallway_decor", zone: "ПЕРЕДПОКІЙ", text: "Декор", type: "cards", options: [
+            {label:"ДСП панелі",val:"ДСП панелі",img:"img/dsppaneli.webp"},
+            {label:"Дзеркало с підсвіткою",val:"Дзеркало с підсвіткою",img:"img/dzerkalopidsv.webp"},
+            {label:"Ні",val:"Ні"}
+        ]}
+    ];
+
+    const blockKitchen = [
+        { id: "kitchen_needed", zone: "КУХНЯ", text: "Кухня", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "kitchen_walls", zone: "КУХНЯ", text: "Стіни.", type: "cards", options: [
+            {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"},
+            {label:"Штукатурка",val:"Штукатурка",img:"img/dekorstuk.webp"},
+            {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}
+        ]},
+        { id: "kitchen_light", zone: "КУХНЯ", text: "Освітлення", type: "cards_multiselect", options: [
+            {label:"Декор підсвітка",val:"Декор підсвітка",img:"img/dekorpidsv.webp"},
+            {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"},
+            {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}
+        ]},
+        { id: "kitchen_floor", zone: "КУХНЯ", text: "Підлога.", type: "cards", options: [
+            {label:"Керамограніт",val:"Керамограніт",img:"img/kitchenkeramo.webp"},
+            {label:"Кварц-вініл",val:"Кварц-вініл",img:"img/kitchenkvarzv.webp"}
+        ]},
+        { id: "kitchen_apron", zone: "КУХНЯ", text: "Фартук.", type: "cards", options: [
+            {label:"Керамограніт",val:"Керамограніт",img:"img/fartukkeramo.webp"},
+            {label:"Матеріал стільниці",val:"Матеріал стільниці",img:"img/fartukstiln.jpeg"}
+        ]},
+        { id: "kitchen_other", zone: "КУХНЯ", text: "Інші потреби", type: "multiselect_complex", hasOther: true, options: [
+            {label:"Підсвітка робочої поверхні", tier: false}, 
+            {label:"Посудомийна машина", tier: false},
+            {label:"Осмос", tier: false}, 
+            {label:"Подрібнювач відходів", tier: false},
+            {label:"Мікрохвильова піч", tier: false}, 
+            {label:"Духова шафа", tier: false},
+            {label:"Радіатор", tier: false}
+        ]}
+    ];
+
+    const blockBalcony = [
+        { id: "balcony_needed", zone: "БАЛКОН", text: "Балкон", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "balcony_floor", zone: "БАЛКОН", text: "Тип підлоги.", type: "cards", options: [
+            {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"},
+            {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"},
+            {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}
+        ]},
+        { id: "balcony_walls", zone: "БАЛКОН", text: "Стіни", type: "cards", options: [
+            {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"},
+            {label:"Штукатурка",val:"Штукатурка",img:"img/dekorstuk.webp"},
+            {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}
+        ]},
+        { id: "balcony_light", zone: "БАЛКОН", text: "Освітлення", type: "cards_multiselect", options: [
+            {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"},
+            {label:"Люстра",val:"Люстра",img:"img/lustra.webp"},
+            {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledpidsv.webp"}
+        ]},
+        { id: "balcony_other", zone: "БАЛКОН", text: "Облаштування балкону", type: "multiselect_complex", hasOther: true, options: [
+            {label:"Утеплення", tier: false}, {label:"Робоче місце", tier: false}
+        ]}
+    ];
+
+    const blockWardrobe = [
+        { id: "wardrobe_needed", zone: "ГАРДЕРОБ", text: "Гардероб", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "wardrobe_floor", zone: "ГАРДЕРОБ", text: "Тип підлоги", type: "cards", options: [
+            {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"},
+            {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"},
+            {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}
+        ]},
+        { id: "wardrobe_walls", zone: "ГАРДЕРОБ", text: "Стіни", type: "cards", options: [
+            {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"},
+            {label:"Штукатурка",val:"Штукатурка",img:"img/dekorstuk.webp"},
+            {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"},
+            {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування",img:"img/gruntovka.webp"}
+        ]},
+        { id: "wardrobe_light", zone: "ГАРДЕРОБ", text: "Освітлення", type: "cards_multiselect", options: [
+            {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"},
+            {label:"Люстра",val:"Люстра",img:"img/lustra.webp"},
+            {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledgarderob.webp"}
+        ]}
+    ];
+
+    const blockBasement = [
+        { id: "basement_needed", zone: "ПІДВАЛ", text: "Підвал", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "basement_floor", zone: "ПІДВАЛ", text: "Тип підлоги", type: "cards", options: [
+            {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"},
+            {label:"Лінолеум",val:"Лінолеум",img:"img/linoleum.webp"}
+        ]},
+        { id: "basement_walls", zone: "ПІДВАЛ", text: "Стіни", type: "cards", options: [
+            {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"},
+            {label:"Штукатурка",val:"Штукатурка",img:"img/dekorstuk.webp"},
+            {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}
+        ]},
+        { id: "basement_ceiling", zone: "ПІДВАЛ", text: "Тип стелі", type: "cards", options: [
+            {label:"Натяжна",val:"Натяжна"},
+            {label:"Гіпсокартон",val:"Гіпсокартон"},
+            {label:"Побілка",val:"Побілка"}
+        ]},
+        { id: "basement_light", zone: "ПІДВАЛ", text: "Освітлення", type: "cards_multiselect", options: [
+            {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"},
+            {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}
+        ]}
+    ];
+
+    const blockAttic = [
+        { id: "attic_needed", zone: "ГОРИЩЕ", text: "Горище", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "attic_walls", zone: "ГОРИЩЕ", text: "Стіни", type: "cards", options: [
+            {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"},
+            {label:"Обшивка деревʼяними рейками",val:"Обшивка деревʼяними рейками",img:"img/obshivkaderev.webp"},
+            {label:"Фарбування стіни із гіпсокартону",val:"Фарбування стіни із гіпсокартону",img:"img/farbzgipso.webp"},
+            {label:"ні",val:"ні"}
+        ]},
+        { id: "attic_floor", zone: "ГОРИЩЕ", text: "Тип підлоги", type: "cards", options: [
+            {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"},
+            {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"},
+            {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"},
+            {label:"Інше",val:"Інше"}
+        ]},
+        { id: "attic_light", zone: "ГОРИЩЕ", text: "Освітлення", type: "cards_multiselect", options: [
+            {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"},
+            {label:"Люстра",val:"Люстра",img:"img/lustra.webp"},
+            {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledpidsv.webp"}
+        ]}
+    ];
+
+    function getBathQuestions(index) {
+        return [
+            { id: `bath_${index}_floor_type`, zone: `САНВУЗОЛ ${index}`, text: "Тип підлоги", type: "cards_with_tier", options: [
+                { label: "Плитка", val: "Плитка", img: "img/plitkamozaika.webp", variants: ["Мозаїка", "60*60", "40*40"] },
+                { label: "Керамограніт", val: "Керамограніт", img: "img/keram12060.webp", variants: ["120*60", "60*60", "40*40"] }
+            ]},
+            { id: `bath_${index}_shower`, zone: `САНВУЗОЛ ${index}`, text: "Душ.", type: "cards_multiselect", options: [
+                {label:"Піддон",val:"Піддон",img:"img/piddon.webp"},
+                {label:"Плитка",val:"Плитка",img:"img/plitkadush.webp"},
+                {label:"Скляна шторка",val:"Скляна шторка",img:"img/sklodush.webp"},
+                {label:"Текстиль шторка",val:"Текстиль шторка",img:"img/tekstildush.webp"},
+                {label:"Скляна конструкція з дверима",val:"Скляна конструкція з дверима",img:"img/sklodveridush.webp"},
+                {label:"Не обладнувати",val:"Не обладнувати"}
+            ]},
+            { id: `bath_${index}_tub`, zone: `САНВУЗОЛ ${index}`, text: "Ванна", type: "cards_with_tier", options: [
+                {label:"Акрил",val:"Акрил",img:"img/vanaakril.webp"},
+                {label:"Гідро масаж",val:"Гідро масаж",img:"img/vanagidromas.webp"},
+                {label:"Окремостояча",val:"Окремостояча",img:"img/okremavana.webp"},
+                {label:"Не обладнувати",val:"Не обладнувати"}
+            ]},
+            { id: `bath_${index}_plumbing`, zone: `САНВУЗОЛ ${index}`, text: "Сантехніка", type: "cards", options: [
+                {label:"Хром",val:"Хром",img:"img/santchrome.webp"},
+                {label:"Чорний",val:"Чорний",img:"img/santblack.webp"}
+            ]},
+            { id: `bath_${index}_toilet`, zone: `САНВУЗОЛ ${index}`, text: "Унітаз", type: "cards_with_tier", options: [
+                {label:"Окремостоячий",val:"Окремостоячий",img:"img/unitazokremo.webp"},
+                {label:"Інсталяція",val:"Інсталяція",img:"img/installunitaz.webp"}
+            ]},
+            { id: `bath_${index}_other`, zone: `САНВУЗОЛ ${index}`, text: "Інші потреби", type: "multiselect_complex", hasOther:true, options: [
+                {label:"Гігієнічний душ",tier:true}, {label:"Пральна машина",tier:false}, {label:"Сушильна машина",tier:false},
+                {label:"Дзеркало з підігрівом",tier:false}, {label:"Бойлер",tier:true},
+                {label:"Умивальник з тумбою",tier:false}, {label:"Дзеркало з підсвіткою",tier:false}, {label:"Дзеркало",tier:true},
+                {label:"Витяжка",tier:false}, {label:"Рушникосушка",tier:true},
+                {label:"Рукомийка",tier:true, customTiers: ["Звичайні", "Прихованого монтажу"]}
+            ]}
+        ];
+    }
+
+    function getRoomQuestions(index) {
+        return [
+            { id: `room_${index}_floor`, zone: `КІМНАТА ${index}`, text: "Тип підлоги.", type: "cards", options: [
+                {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"},
+                {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"},
+                {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}, 
+                {label:"Паркет",val:"Паркет",img:"img/parket.jpeg"}
+            ]},
+            { id: `room_${index}_walls`, zone: `КІМНАТА ${index}`, text: "Стіни.", type: "cards", options: [
+                {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"},
+                {label:"Штукатурка",val:"Штукатурка",img:"img/dekorstuk.webp"},
+                {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}
+            ]},
+            { id: `room_${index}_light`, zone: `КІМНАТА ${index}`, text: "Освітлення.", type: "cards_multiselect", options: [
+                {label:"Підсвітка бра",val:"Підсвітка бра",img:"img/brapidsv.webp"},
+                {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"},
+                {label:"Люстра",val:"Люстра",img:"img/lustra.webp"},
+                {label:"led підсвітка",val:"led підсвітка",img:"img/ledpidsv.webp"}
+            ]},
+            { id: `room_${index}_sills`, zone: `КІМНАТА ${index}`, text: "Підвіконня.", type: "cards", options: [
+                {label:"Пластик",val:"Пластик",img:"img/plastikpidv.webp"},
+                {label:"Дерево",val:"Дерево",img:"img/derevopidv.webp"},
+                {label:"Штучний камінь",val:"Штучний камінь",img:"img/kaminpidv.webp"},
+                {label:"Не потребується",val:"Не потребується"}
+            ]},
+            { id: `room_${index}_decor`, zone: `КІМНАТА ${index}`, text: "Декор.", type: "cards", options: [
+                {label:"Панелі гіпсові",val:"Панелі гіпсові",img:"img/gipspankimn.webp"},
+                {label:"Панелі ДСП",val:"Панелі ДСП",img:"img/dsppaneli.webp"},
+                {label:"ні",val:"ні"}
+            ]},
+            { id: `room_${index}_other`, zone: `КІМНАТА ${index}`, text: "Інші потреби", type: "multiselect_complex", hasOther:true, options: [
+                {label:"Дзеркало з підсвіткою",tier:false}, {label:"Зона телевізору",tier:false},
+                {label:"Штори",tier:false}, {label:"Тюль",tier:false}, {label:"Радіатор",tier:false},
+                {label:"Кондиціонер", tier:true}, {label:"Вентиляція", tier:false}, {label:"Звукоізоляція", tier:false}
+            ]}
+        ];
+    }
+
+    // ==========================================
+    // ЛОГІКА ПРОПУСКУ ПИТАНЬ
+    // ==========================================
+    function shouldSkip(q) {
+        if (!q) return false;
+        if (q.id === 'ceiling_shadow' && answers['ceiling'] === 'Ні') return true;
+        if (q.id.startsWith('hallway_') && q.id !== 'hallway_needed' && answers['hallway_needed'] === 'Ні') return true;
+        if (q.id.startsWith('kitchen_') && q.id !== 'kitchen_needed' && answers['kitchen_needed'] === 'Ні') return true;
+        if (q.id.startsWith('balcony_') && q.id !== 'balcony_needed' && answers['balcony_needed'] === 'Ні') return true;
+        if (q.id.startsWith('wardrobe_') && q.id !== 'wardrobe_needed' && answers['wardrobe_needed'] === 'Ні') return true;
+        if (q.id.startsWith('basement_') && q.id !== 'basement_needed' && answers['basement_needed'] === 'Ні') return true;
+        if (q.id.startsWith('attic_') && q.id !== 'attic_needed' && answers['attic_needed'] === 'Ні') return true;
+        return false;
+    }
+
+    function buildFullQuestionsList() {
+        const bathsCount = answers['baths_count'] || 0;
+        const roomsCount = answers['rooms_count'] || 0;
+        
+        const bathsQ = [];
+        for(let i=1; i<=bathsCount; i++) bathsQ.push(...getBathQuestions(i));
+        const roomsQ = [];
+        for(let i=1; i<=roomsCount; i++) roomsQ.push(...getRoomQuestions(i));
+
+        finalQuestions = [
+            ...blockGeneral,
+            ...blockHallway,
+            ...bathsQ,
+            ...blockKitchen,
+            ...roomsQ,
+            ...blockBalcony,
+            ...blockWardrobe,
+            ...blockBasement,
+            ...blockAttic
+        ];
+        updateMenu();
+    }
+
+    // ==========================================
+    // НАВІГАЦІЙНЕ МЕНЮ
+    // ==========================================
+    function toggleMenu() {
+        const menu = document.getElementById('side-menu');
+        const overlay = document.getElementById('menu-overlay');
+        if (menu.classList.contains('open')) {
+            menu.classList.remove('open');
+            overlay.classList.remove('open');
+        } else {
+            menu.classList.add('open');
+            overlay.classList.add('open');
+        }
+    }
+
+    function updateMenu() {
+        const list = document.getElementById('menu-list');
+        list.innerHTML = '';
+        
+        let lastZone = "";
+        finalQuestions.forEach((q, index) => {
+            if (shouldSkip(q)) return;
+            if (q.zone && q.zone !== lastZone) {
+                lastZone = q.zone;
+                const item = document.createElement('div');
+                item.className = 'menu-item';
+                item.innerText = q.zone;
+                item.onclick = () => {
+                    currentStep = index;
+                    toggleMenu();
+                    document.getElementById('section-measurements').classList.add('hidden');
+                    document.getElementById('section-questions').classList.remove('hidden');
+                    document.getElementById('navBar').style.display = 'flex';
+                    renderQuestion();
+                };
+                list.appendChild(item);
+            }
+        });
+        
+        const measItem = document.createElement('div');
+        measItem.className = 'menu-item';
+        measItem.innerHTML = '<b>📏 ЗАМІРИ</b>';
+        measItem.onclick = () => {
+            toggleMenu();
+            renderMeasurements();
+        };
+        list.appendChild(measItem);
+    }
+
+    // ==========================================
+    // ЗАВАНТАЖЕННЯ ДЛЯ РЕДАГУВАННЯ
+    // ==========================================
+    async function loadEditData() {
+        document.getElementById('section-client').classList.add('hidden');
+        document.getElementById('loading-screen').classList.remove('hidden');
+        
+        try {
+            const res = await fetch(`${BACKEND_URL}/api/get_order?id=${editId}`);
+            if (!res.ok) throw new Error("Server response wasn't OK");
+            const data = await res.json();
+            
+            // Заповнення існуючих даних
+            document.getElementById('clientName').value = data.client.name || "";
+            document.getElementById('clientPhone').value = data.client.phone || "";
+            document.getElementById('objectType').value = data.client.object_type || "Квартира (Новобудова)";
+            document.getElementById('clientAddress').value = data.client.address || "";
+            document.getElementById('clientArea').value = data.client.area || "";
+            document.getElementById('clientFloor').value = data.client.floor || "1";
+            document.getElementById('clientElevator').value = data.client.elevator || "Немає";
+            
+            answers = data.answers || {};
+            
+            buildFullQuestionsList();
+            currentStep = 0;
+            
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('section-questions').classList.remove('hidden');
+            document.getElementById('btnBack').style.display = 'block';
+            renderQuestion();
+        } catch(e) {
+            alert("Помилка завантаження заявки. Можливо невірно вказано BACKEND_URL у скрипті.");
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('section-client').classList.remove('hidden');
+        }
+    }
+
+
+    function openImage(src, event) {
+        event.stopPropagation();
+        const modal = document.getElementById('imageModal');
+        const modalImg = document.getElementById('modalImg');
+        modalImg.src = src;
+        modal.style.display = 'flex';
+    }
+
+    function closeImage() {
+        document.getElementById('imageModal').style.display = 'none';
+    }
+
+    function renderQuestion() {
+        const q = finalQuestions[currentStep];
+        document.getElementById('step-count').innerText = `${currentStep + 1}/${finalQuestions.length}`;
+        const container = document.getElementById('question-container');
+        container.innerHTML = '';
+
+        if(q.zone) {
+            const badge = document.createElement('div');
+            badge.className = 'zone-badge';
+            badge.innerText = q.zone;
+            container.appendChild(badge);
+        }
+
+        const title = document.createElement('h3');
+        title.innerText = q.text;
+        container.appendChild(title);
+
+        if (q.type === 'cards') {
+            const grid = document.createElement('div');
+            grid.className = 'card-grid';
+            q.options.forEach(opt => {
+                const card = document.createElement('div');
+                card.className = `card ${answers[q.id] === opt.val ? 'selected' : ''}`;
+                
+                if(opt.img) {
+                    const imgWrap = document.createElement('div');
+                    imgWrap.className = "img-wrapper";
+                    imgWrap.innerHTML = `
+                        <img src="${opt.img}" onerror="this.style.display='none'">
+                        <div class="zoom-icon" onclick="openImage('${opt.img}', event)">🔍</div>
+                    `;
+                    card.appendChild(imgWrap);
+                }
+                
+                const label = document.createElement('div');
+                label.innerText = opt.label;
+                card.appendChild(label);
+
+                card.onclick = () => { 
+                    answers[q.id] = opt.val; 
+                    if (q.id === 'rooms_count' || q.id === 'baths_count') buildFullQuestionsList();
+                    renderQuestion(); 
+                };
+                grid.appendChild(card);
+            });
+            container.appendChild(grid);
+        }
+        else if (q.type === 'input_number') {
+            const inp = document.createElement('input');
+            inp.type = "number";
+            inp.placeholder = q.placeholder;
+            inp.value = answers[q.id] || '';
+            inp.oninput = (e) => {
+                answers[q.id] = parseInt(e.target.value) || 0;
+                if (q.id === 'rooms_count' || q.id === 'baths_count') buildFullQuestionsList();
+            }
+            container.appendChild(inp);
+        }
+        else if (q.type === 'multiselect_dynamic') {
+            const opts = ["Передпокій", "Кухня", "Балкон"];
+            const rooms = answers['rooms_count'] || 0;
+            const baths = answers['baths_count'] || 0;
+            for(let i=1; i<=rooms; i++) opts.push(`Кімната ${i}`);
+            for(let i=1; i<=baths; i++) opts.push(`Санвузол ${i}`);
+            opts.push("Не потребується");
+            if(!Array.isArray(answers[q.id])) answers[q.id] = [];
+            opts.forEach(o => {
+                const btn = document.createElement('div');
+                const isSel = answers[q.id].includes(o);
+                btn.className = `card ${isSel ? 'selected' : ''}`;
+                btn.style.padding = "10px"; btn.style.marginBottom="5px"; btn.innerText = o;
+                btn.onclick = () => {
+                    if(o === "Не потребується") answers[q.id] = ["Не потребується"];
+                    else {
+                        answers[q.id] = answers[q.id].filter(x => x!=="Не потребується");
+                        if(answers[q.id].includes(o)) answers[q.id] = answers[q.id].filter(x=>x!==o);
+                        else answers[q.id].push(o);
+                    }
+                    renderQuestion();
+                };
+                container.appendChild(btn);
+            });
+        }
+        else if (q.type === 'cards_with_tier') {
+            const grid = document.createElement('div');
+            grid.className = 'card-grid';
+            if(typeof answers[q.id] !== 'object') answers[q.id] = {type:"", tier:""};
+            q.options.forEach(opt => {
+                const card = document.createElement('div');
+                const isSel = answers[q.id].type === opt.val;
+                card.className = `card ${isSel ? 'selected' : ''}`;
+                
+                if(opt.img) {
+                    const imgWrap = document.createElement('div');
+                    imgWrap.className = "img-wrapper";
+                    imgWrap.innerHTML = `
+                        <img src="${opt.img}" onerror="this.style.display='none'">
+                        <div class="zoom-icon" onclick="openImage('${opt.img}', event)">🔍</div>
+                    `;
+                    card.appendChild(imgWrap);
+                }
+
+                const label = document.createElement('div');
+                label.innerText = opt.label;
+                card.appendChild(label);
+
+                if(isSel && opt.val !== "Не обладнувати" && opt.val !== "Не потребується") {
+                    const tiers = document.createElement('div');
+                    tiers.className = "tier-container";
+                    const variantsList = opt.variants ? opt.variants : ['Standard', 'Comfort', 'Premium'];
+                    variantsList.forEach(v => {
+                        const btn = document.createElement('div');
+                        let btnText = v;
+                        if(v==='Standard') btnText='S'; if(v==='Comfort') btnText='C'; if(v==='Premium') btnText='P';
+                        btn.className = `tier-btn ${answers[q.id].tier === v ? 'active' : ''}`;
+                        btn.innerText = btnText;
+                        btn.onclick = (e) => { e.stopPropagation(); answers[q.id].tier = v; renderQuestion(); };
+                        tiers.appendChild(btn);
+                    });
+                    card.appendChild(tiers);
+                }
+                card.onclick = () => {
+                     if(answers[q.id].type !== opt.val) {
+                         const firstVar = opt.variants ? opt.variants[0] : "Standard";
+                         answers[q.id] = {type: opt.val, tier: (opt.val.startsWith("Не") ? "-" : firstVar)};
+                         renderQuestion();
+                     }
+                };
+                grid.appendChild(card);
+            });
+            container.appendChild(grid);
+        }
+        else if (q.type === 'multiselect_complex') {
+            if(typeof answers[q.id] !== 'object') answers[q.id] = {};
+            const list = document.createElement('div');
+            q.options.forEach(opt => {
+                const item = document.createElement('div');
+                item.className = 'list-item';
+                const left = document.createElement('div');
+                left.className = 'list-left';
+                const chk = document.createElement('input');
+                chk.type = "checkbox";
+                chk.checked = !!answers[q.id][opt.label];
+                chk.onchange = (e) => {
+                    if(e.target.checked) answers[q.id][opt.label] = opt.tier ? (opt.customTiers ? opt.customTiers[0] : "Standard") : "Так";
+                    else delete answers[q.id][opt.label];
+                    renderQuestion();
+                };
+                left.appendChild(chk);
+                left.appendChild(document.createTextNode(opt.label));
+                item.appendChild(left);
+                
+                if(answers[q.id][opt.label] && opt.tier) {
+                    const sel = document.createElement('select');
+                    sel.className = 'tier-select';
+                    const variants = opt.customTiers ? opt.customTiers : ['Standard', 'Comfort', 'Premium'];
+                    variants.forEach(t => {
+                        const op = document.createElement('option');
+                        op.value=t; op.innerText=t;
+                        if(answers[q.id][opt.label]===t) op.selected=true;
+                        sel.appendChild(op);
+                    });
+                    sel.onchange = (e) => answers[q.id][opt.label] = e.target.value;
+                    item.appendChild(sel);
+                }
+                list.appendChild(item);
+            });
+            if (q.hasOther) {
+                const otherInput = document.createElement('input');
+                otherInput.placeholder = "Інше (впишіть вручну)...";
+                otherInput.style.marginTop = "10px";
+                otherInput.value = answers[q.id]['Other'] || '';
+                otherInput.oninput = (e) => {
+                   if(e.target.value) answers[q.id]['Other'] = e.target.value;
+                   else delete answers[q.id]['Other'];
+                };
+                list.appendChild(otherInput);
+            }
+            container.appendChild(list);
+        }
+        else if (q.type === 'cards_multiselect') {
+             const grid = document.createElement('div');
+             grid.className = 'card-grid';
+             if (!Array.isArray(answers[q.id])) answers[q.id] = [];
+             q.options.forEach(opt => {
+                 const card = document.createElement('div');
+                 const isSel = answers[q.id].includes(opt.val);
+                 card.className = `card ${isSel ? 'selected' : ''}`;
+                 
+                 if(opt.img) {
+                    const imgWrap = document.createElement('div');
+                    imgWrap.className = "img-wrapper";
+                    imgWrap.innerHTML = `
+                        <img src="${opt.img}" onerror="this.style.display='none'">
+                        <div class="zoom-icon" onclick="openImage('${opt.img}', event)">🔍</div>
+                    `;
+                    card.appendChild(imgWrap);
+                 }
+
+                 const label = document.createElement('div');
+                 label.innerText = opt.label;
+                 card.appendChild(label);
+                 
+                 card.onclick = () => {
+                     if(opt.val.startsWith("Не") || opt.val === "ні") {
+                         answers[q.id] = [opt.val];
+                     } else {
+                         answers[q.id] = answers[q.id].filter(v => !v.startsWith("Не") && v !== "ні");
+                         if(answers[q.id].includes(opt.val)) answers[q.id] = answers[q.id].filter(v=>v!==opt.val);
+                         else answers[q.id].push(opt.val);
+                     }
+                     renderQuestion();
+                 };
+                 grid.appendChild(card);
+             });
+             container.appendChild(grid);
+        }
+        
+        const btn = document.getElementById('btnNext');
+        btn.innerText = 'Далі';
+    }
+
+    function renderMeasurements() {
+        document.getElementById('section-questions').classList.add('hidden');
+        document.getElementById('section-measurements').classList.remove('hidden');
+        
+        const btnNext = document.getElementById('btnNext');
+        btnNext.innerText = editId ? '✅ Зберегти зміни' : '✅ Завершити';
+        btnNext.onclick = finishSurvey;
+
+        const btnBack = document.getElementById('btnBack');
+        btnBack.onclick = () => {
+            document.getElementById('section-measurements').classList.add('hidden');
+            document.getElementById('section-questions').classList.remove('hidden');
+            btnNext.innerText = 'Далі';
+            btnNext.onclick = goNext;
+            btnBack.onclick = goBack;
+            renderQuestion();
+        };
+
+        const container = document.getElementById('measurements-container');
+        container.innerHTML = '';
+        answers.measurements = answers.measurements || {};
+
+        const zones = [];
+        if (answers['hallway_needed'] !== 'Ні') zones.push({id: 'hallway', name: 'Передпокій'});
+        if (answers['kitchen_needed'] !== 'Ні') zones.push({id: 'kitchen', name: 'Кухня'});
+        if (answers['balcony_needed'] !== 'Ні') zones.push({id: 'balcony', name: 'Балкон'});
+        if (answers['wardrobe_needed'] !== 'Ні') zones.push({id: 'wardrobe', name: 'Гардероб'});
+        if (answers['basement_needed'] !== 'Ні') zones.push({id: 'basement', name: 'Підвал'});
+        if (answers['attic_needed'] !== 'Ні') zones.push({id: 'attic', name: 'Горище'});
+        
+        const roomsCount = answers['rooms_count'] || 0;
+        for(let i=1; i<=roomsCount; i++) zones.push({id: `room_${i}`, name: `Кімната ${i}`});
+        
+        const bathsCount = answers['baths_count'] || 0;
+        for(let i=1; i<=bathsCount; i++) zones.push({id: `bath_${i}`, name: `Санвузол ${i}`});
+
+        if (zones.length === 0) {
+            container.innerHTML = '<p>Немає вибраних приміщень для замірів.</p>';
+            return;
+        }
+
+        zones.forEach(zone => {
+            if(!answers.measurements[zone.id]) answers.measurements[zone.id] = {floor: '', walls: ''};
+            
+            const box = document.createElement('div');
+            box.className = 'measurement-box';
+
+            const title = document.createElement('h4');
+            title.innerText = zone.name;
+            box.appendChild(title);
+
+            const lblFloor = document.createElement('label');
+            lblFloor.innerText = 'Площа підлоги (м²)';
+            const inpFloor = document.createElement('input');
+            inpFloor.type = 'number';
+            inpFloor.placeholder = '0';
+            inpFloor.value = answers.measurements[zone.id].floor;
+            
+            const lblWalls = document.createElement('label');
+            lblWalls.innerText = 'Площа стін (м²)';
+            const inpWalls = document.createElement('input');
+            inpWalls.type = 'number';
+            inpWalls.placeholder = '0';
+            inpWalls.value = answers.measurements[zone.id].walls;
+
+            inpFloor.oninput = (e) => {
+                const val = parseFloat(e.target.value) || 0;
+                answers.measurements[zone.id].floor = val;
+                const calculatedWalls = (val * 2.5).toFixed(1);
+                inpWalls.value = calculatedWalls;
+                answers.measurements[zone.id].walls = calculatedWalls;
+            };
+
+            inpWalls.oninput = (e) => {
+                answers.measurements[zone.id].walls = parseFloat(e.target.value) || 0;
+            };
+
+            box.appendChild(lblFloor);
+            box.appendChild(inpFloor);
+            box.appendChild(lblWalls);
+            box.appendChild(inpWalls);
+
+            container.appendChild(box);
+        });
+    }
+
+    // НОВА ДИНАМІЧНА ЛОГІКА ПЕРЕХОДІВ
+    function goNext() {
+        if (currentStep === -1) {
+            const name = document.getElementById('clientName').value;
+            const area = document.getElementById('clientArea').value;
+            if (!name) return tg.showAlert("Введіть ім'я!");
+            if (!area) return tg.showAlert("Введіть загальну площу!");
+            
+            buildFullQuestionsList(); // Генеруємо повний масив питань
+            
+            document.getElementById('section-client').classList.add('hidden');
+            document.getElementById('section-questions').classList.remove('hidden');
+            document.getElementById('btnBack').style.display = 'block';
+            
+            currentStep = 0;
+            renderQuestion();
+            return;
+        }
+
+        let nextStep = currentStep + 1;
+        // Пропускаємо всі питання, які не потрібні
+        while(nextStep < finalQuestions.length && shouldSkip(finalQuestions[nextStep])) {
+            nextStep++;
+        }
+
+        if (nextStep < finalQuestions.length) {
+            currentStep = nextStep;
+            renderQuestion();
+        } else {
+            renderMeasurements();
+        }
+    }
+
+    function goBack() {
+        let prevStep = currentStep - 1;
+        // Шукаємо попереднє валідне питання
+        while(prevStep >= 0 && shouldSkip(finalQuestions[prevStep])) {
+            prevStep--;
+        }
+
+        if (prevStep >= 0) {
+            currentStep = prevStep;
+            renderQuestion();
+        } else {
+            currentStep = -1;
+            document.getElementById('section-client').classList.remove('hidden');
+            document.getElementById('section-questions').classList.add('hidden');
+            document.getElementById('btnBack').style.display = 'none';
+        }
+    }
+
+    function finishSurvey() {
+        document.getElementById('section-measurements').classList.add('hidden');
+        document.getElementById('navBar').style.display = 'none';
+        document.getElementById('section-thankyou').classList.remove('hidden');
+        
+        const data = {
+            edit_id: editId, // Якщо це редагування, тут буде номер рядка
+            client: {
+                name: document.getElementById('clientName').value,
+                phone: document.getElementById('clientPhone').value,
+                object_type: document.getElementById('objectType').value,
+                address: document.getElementById('clientAddress').value,
+                area: document.getElementById('clientArea').value,
+                floor: document.getElementById('clientFloor').value,
+                elevator: document.getElementById('clientElevator').value
+            },
+            answers: answers
+        };
+
+        const closeBtn = document.createElement('button');
+        closeBtn.innerText = "Закрити зараз";
+        closeBtn.style.cssText = "margin-top:20px; padding:10px 20px; border:none; background:#eee; border-radius:8px; font-weight:bold;";
+        closeBtn.onclick = () => tg.sendData(JSON.stringify(data));
+        document.getElementById('section-thankyou').appendChild(closeBtn);
+
+        let timeLeft = 10;
+        const timerEl = document.getElementById('timer');
+        const interval = setInterval(() => {
+            timeLeft--;
+            timerEl.innerText = timeLeft;
+            if (timeLeft <= 0) {
+                clearInterval(interval);
+                tg.sendData(JSON.stringify(data));
+            }
+        }, 1000);
+    }
+</script>
+</body>
+</html>

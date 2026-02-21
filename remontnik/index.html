@@ -185,7 +185,7 @@
     let currentStep = -1;
     let finalQuestions = [];
     
-      // ПЕРЕВІРКА РЕЖИМУ РЕДАГУВАННЯ (Надійний метод через URL)
+    // ПЕРЕВІРКА РЕЖИМУ РЕДАГУВАННЯ
     let editId = null;
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('edit_id')) {
@@ -193,9 +193,8 @@
         loadEditData();
     }
 
-
     // ==========================================
-    // СТРУКТУРА ПИТАНЬ (Додано варіанти "Ні")
+    // СТРУКТУРА ПИТАНЬ
     // ==========================================
 
     const blockGeneral = [
@@ -203,7 +202,7 @@
         { id: "interior_door", zone: "ЗАГАЛЬНІ", text: "Тип міжкімнатних дверей.", type: "cards", options: [
             {label:"Прихований монтаж",val:"Прихований монтаж",img:"img/hidemont.webp"},
             {label:"Стандарт",val:"Стандарт",img:"img/standarddoor.webp"},
-            {label:"Ні / Залишаються",val:"Ні"} // НОВЕ
+            {label:"Ні / Залишаються",val:"Ні"}
         ]},
         { id: "baseboard", zone: "ЗАГАЛЬНІ", text: "Тип підлогового плінтусу.", type: "cards", options: [
             {label:"Прихований монтаж",val:"Прихований монтаж",img:"img/plinthidem.webp"},
@@ -213,7 +212,7 @@
         { id: "ceiling", zone: "ЗАГАЛЬНІ", text: "Тип стелі.", type: "cards", options: [
             {label:"Натяжна",val:"Натяжна"}, 
             {label:"Гіпсокартон",val:"Гіпсокартон"},
-            {label:"Ні",val:"Ні"} // НОВЕ
+            {label:"Ні",val:"Ні"}
         ]},
         { id: "ceiling_shadow", zone: "ЗАГАЛЬНІ", text: "Чи потрібен тіньовий шов для стелі?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
         { id: "screed_done", zone: "ЗАГАЛЬНІ", text: "Чи є стяжка підлоги?", type: "cards", options: [
@@ -225,11 +224,21 @@
         { id: "plumbing_done", zone: "ЗАГАЛЬНІ", text: "Чи розведена каналізація?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
         { id: "rooms_count", zone: "ЗАГАЛЬНІ", text: "Кількість житлових кімнат", type: "input_number", placeholder: "Введіть число" },
         { id: "baths_count", zone: "ЗАГАЛЬНІ", text: "Кількість санвузлів", type: "input_number", placeholder: "Введіть число" },
+        // 💥 НОВЕ ПИТАННЯ: Обираємо додаткові приміщення РАЗОМ
+        { id: "aux_rooms", zone: "ЗАГАЛЬНІ", text: "Які додаткові приміщення будемо ремонтувати?", type: "cards_multiselect", options: [
+            {label:"Передпокій",val:"Передпокій"},
+            {label:"Кухня",val:"Кухня"},
+            {label:"Балкон",val:"Балкон"},
+            {label:"Гардероб",val:"Гардероб"},
+            {label:"Підвал",val:"Підвал"},
+            {label:"Горище",val:"Горище"}
+        ]},
+        // Тепла підлога йде ПІСЛЯ списку приміщень
         { id: "warm_floor", zone: "ЗАГАЛЬНІ", text: "Встановлення теплої підлоги:", type: "multiselect_dynamic" }
     ];
 
     const blockHallway = [
-        { id: "hallway_needed", zone: "ПЕРЕДПОКІЙ", text: "Передпокій", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        // Питання чи потрібен передпокій видалено - бо це вже вирішено в aux_rooms
         { id: "hallway_floor", zone: "ПЕРЕДПОКІЙ", text: "Тип підлоги.", type: "cards", options: [
             {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"},
             {label:"Кварцвініл",val:"Кварцвініл",img:"img/kvarzvinil.webp"},
@@ -253,7 +262,6 @@
     ];
 
     const blockKitchen = [
-        { id: "kitchen_needed", zone: "КУХНЯ", text: "Кухня", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
         { id: "kitchen_walls", zone: "КУХНЯ", text: "Стіни.", type: "cards", options: [
             {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"},
             {label:"Штукатурка",val:"Штукатурка",img:"img/dekorstuk.webp"},
@@ -284,7 +292,6 @@
     ];
 
     const blockBalcony = [
-        { id: "balcony_needed", zone: "БАЛКОН", text: "Балкон", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
         { id: "balcony_floor", zone: "БАЛКОН", text: "Тип підлоги.", type: "cards", options: [
             {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"},
             {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"},
@@ -306,7 +313,6 @@
     ];
 
     const blockWardrobe = [
-        { id: "wardrobe_needed", zone: "ГАРДЕРОБ", text: "Гардероб", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
         { id: "wardrobe_floor", zone: "ГАРДЕРОБ", text: "Тип підлоги", type: "cards", options: [
             {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"},
             {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"},
@@ -326,7 +332,6 @@
     ];
 
     const blockBasement = [
-        { id: "basement_needed", zone: "ПІДВАЛ", text: "Підвал", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
         { id: "basement_floor", zone: "ПІДВАЛ", text: "Тип підлоги", type: "cards", options: [
             {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"},
             {label:"Лінолеум",val:"Лінолеум",img:"img/linoleum.webp"}
@@ -348,7 +353,6 @@
     ];
 
     const blockAttic = [
-        { id: "attic_needed", zone: "ГОРИЩЕ", text: "Горище", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
         { id: "attic_walls", zone: "ГОРИЩЕ", text: "Стіни", type: "cards", options: [
             {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"},
             {label:"Обшивка деревʼяними рейками",val:"Обшивка деревʼяними рейками",img:"img/obshivkaderev.webp"},
@@ -445,17 +449,22 @@
     }
 
     // ==========================================
-    // ЛОГІКА ПРОПУСКУ ПИТАНЬ
+    // ЛОГІКА ПРОПУСКУ ПИТАНЬ (Динамічна на основі aux_rooms)
     // ==========================================
     function shouldSkip(q) {
         if (!q) return false;
         if (q.id === 'ceiling_shadow' && answers['ceiling'] === 'Ні') return true;
-        if (q.id.startsWith('hallway_') && q.id !== 'hallway_needed' && answers['hallway_needed'] === 'Ні') return true;
-        if (q.id.startsWith('kitchen_') && q.id !== 'kitchen_needed' && answers['kitchen_needed'] === 'Ні') return true;
-        if (q.id.startsWith('balcony_') && q.id !== 'balcony_needed' && answers['balcony_needed'] === 'Ні') return true;
-        if (q.id.startsWith('wardrobe_') && q.id !== 'wardrobe_needed' && answers['wardrobe_needed'] === 'Ні') return true;
-        if (q.id.startsWith('basement_') && q.id !== 'basement_needed' && answers['basement_needed'] === 'Ні') return true;
-        if (q.id.startsWith('attic_') && q.id !== 'attic_needed' && answers['attic_needed'] === 'Ні') return true;
+        
+        const aux = answers['aux_rooms'] || [];
+
+        // Якщо питання належить до специфічної зони, і цю зону НЕ обрали в aux_rooms - пропускаємо
+        if (q.id.startsWith('hallway_') && !aux.includes('Передпокій')) return true;
+        if (q.id.startsWith('kitchen_') && !aux.includes('Кухня')) return true;
+        if (q.id.startsWith('balcony_') && !aux.includes('Балкон')) return true;
+        if (q.id.startsWith('wardrobe_') && !aux.includes('Гардероб')) return true;
+        if (q.id.startsWith('basement_') && !aux.includes('Підвал')) return true;
+        if (q.id.startsWith('attic_') && !aux.includes('Горище')) return true;
+
         return false;
     }
 
@@ -543,7 +552,6 @@
             if (!res.ok) throw new Error("Server response wasn't OK");
             const data = await res.json();
             
-            // Заповнення існуючих даних
             document.getElementById('clientName').value = data.client.name || "";
             document.getElementById('clientPhone').value = data.client.phone || "";
             document.getElementById('objectType').value = data.client.object_type || "Квартира (Новобудова)";
@@ -553,6 +561,17 @@
             document.getElementById('clientElevator').value = data.client.elevator || "Немає";
             
             answers = data.answers || {};
+
+            // Відновлюємо aux_rooms зі старих заявок (для сумісності зі старими заявками в базі)
+            if (!answers['aux_rooms']) {
+                answers['aux_rooms'] = [];
+                if (answers['hallway_needed'] === 'Так') answers['aux_rooms'].push('Передпокій');
+                if (answers['kitchen_needed'] === 'Так') answers['aux_rooms'].push('Кухня');
+                if (answers['balcony_needed'] === 'Так') answers['aux_rooms'].push('Балкон');
+                if (answers['wardrobe_needed'] === 'Так') answers['aux_rooms'].push('Гардероб');
+                if (answers['basement_needed'] === 'Так') answers['aux_rooms'].push('Підвал');
+                if (answers['attic_needed'] === 'Так') answers['aux_rooms'].push('Горище');
+            }
             
             buildFullQuestionsList();
             currentStep = 0;
@@ -562,12 +581,11 @@
             document.getElementById('btnBack').style.display = 'block';
             renderQuestion();
         } catch(e) {
-            alert("Помилка завантаження заявки. Можливо невірно вказано BACKEND_URL у скрипті.");
+            alert("Помилка завантаження заявки. Перевірте з'єднання з ботом.");
             document.getElementById('loading-screen').classList.add('hidden');
             document.getElementById('section-client').classList.remove('hidden');
         }
     }
-
 
     function openImage(src, event) {
         event.stopPropagation();
@@ -640,13 +658,21 @@
             container.appendChild(inp);
         }
         else if (q.type === 'multiselect_dynamic') {
-            const opts = ["Передпокій", "Кухня", "Балкон"];
-            const rooms = answers['rooms_count'] || 0;
-            const baths = answers['baths_count'] || 0;
+            const opts = [];
+            // Динамічно додаємо тільки ті приміщення, які були обрані на попередньому кроці!
+            const aux = answers['aux_rooms'] || [];
+            aux.forEach(a => opts.push(a));
+            
+            const rooms = parseInt(answers['rooms_count']) || 0;
+            const baths = parseInt(answers['baths_count']) || 0;
             for(let i=1; i<=rooms; i++) opts.push(`Кімната ${i}`);
             for(let i=1; i<=baths; i++) opts.push(`Санвузол ${i}`);
             opts.push("Не потребується");
+
             if(!Array.isArray(answers[q.id])) answers[q.id] = [];
+            // Очищуємо "мертві" кімнати з пам'яті, якщо клієнт передумав і прибрав їх з aux_rooms
+            answers[q.id] = answers[q.id].filter(val => opts.includes(val));
+
             opts.forEach(o => {
                 const btn = document.createElement('div');
                 const isSel = answers[q.id].includes(o);
@@ -826,12 +852,15 @@
         answers.measurements = answers.measurements || {};
 
         const zones = [];
-        if (answers['hallway_needed'] !== 'Ні') zones.push({id: 'hallway', name: 'Передпокій'});
-        if (answers['kitchen_needed'] !== 'Ні') zones.push({id: 'kitchen', name: 'Кухня'});
-        if (answers['balcony_needed'] !== 'Ні') zones.push({id: 'balcony', name: 'Балкон'});
-        if (answers['wardrobe_needed'] !== 'Ні') zones.push({id: 'wardrobe', name: 'Гардероб'});
-        if (answers['basement_needed'] !== 'Ні') zones.push({id: 'basement', name: 'Підвал'});
-        if (answers['attic_needed'] !== 'Ні') zones.push({id: 'attic', name: 'Горище'});
+        const aux = answers['aux_rooms'] || [];
+        
+        // Генеруємо поля для замірів тільки для обраних кімнат
+        if (aux.includes('Передпокій')) zones.push({id: 'hallway', name: 'Передпокій'});
+        if (aux.includes('Кухня')) zones.push({id: 'kitchen', name: 'Кухня'});
+        if (aux.includes('Балкон')) zones.push({id: 'balcony', name: 'Балкон'});
+        if (aux.includes('Гардероб')) zones.push({id: 'wardrobe', name: 'Гардероб'});
+        if (aux.includes('Підвал')) zones.push({id: 'basement', name: 'Підвал'});
+        if (aux.includes('Горище')) zones.push({id: 'attic', name: 'Горище'});
         
         const roomsCount = answers['rooms_count'] || 0;
         for(let i=1; i<=roomsCount; i++) zones.push({id: `room_${i}`, name: `Кімната ${i}`});
@@ -889,7 +918,6 @@
         });
     }
 
-    // НОВА ДИНАМІЧНА ЛОГІКА ПЕРЕХОДІВ
     function goNext() {
         if (currentStep === -1) {
             const name = document.getElementById('clientName').value;
@@ -897,7 +925,7 @@
             if (!name) return tg.showAlert("Введіть ім'я!");
             if (!area) return tg.showAlert("Введіть загальну площу!");
             
-            buildFullQuestionsList(); // Генеруємо повний масив питань
+            buildFullQuestionsList(); 
             
             document.getElementById('section-client').classList.add('hidden');
             document.getElementById('section-questions').classList.remove('hidden');
@@ -909,7 +937,6 @@
         }
 
         let nextStep = currentStep + 1;
-        // Пропускаємо всі питання, які не потрібні
         while(nextStep < finalQuestions.length && shouldSkip(finalQuestions[nextStep])) {
             nextStep++;
         }
@@ -924,7 +951,6 @@
 
     function goBack() {
         let prevStep = currentStep - 1;
-        // Шукаємо попереднє валідне питання
         while(prevStep >= 0 && shouldSkip(finalQuestions[prevStep])) {
             prevStep--;
         }
@@ -945,8 +971,18 @@
         document.getElementById('navBar').style.display = 'none';
         document.getElementById('section-thankyou').classList.remove('hidden');
         
+        // ХИТРОЩІ ДЛЯ PYTHON БЕКЕНДУ: 
+        // Відновлюємо старі змінні, щоб калькулятор у main.py продовжував ідеально працювати!
+        const aux = answers['aux_rooms'] || [];
+        answers['hallway_needed'] = aux.includes('Передпокій') ? 'Так' : 'Ні';
+        answers['kitchen_needed'] = aux.includes('Кухня') ? 'Так' : 'Ні';
+        answers['balcony_needed'] = aux.includes('Балкон') ? 'Так' : 'Ні';
+        answers['wardrobe_needed'] = aux.includes('Гардероб') ? 'Так' : 'Ні';
+        answers['basement_needed'] = aux.includes('Підвал') ? 'Так' : 'Ні';
+        answers['attic_needed'] = aux.includes('Горище') ? 'Так' : 'Ні';
+
         const data = {
-            edit_id: editId, // Якщо це редагування, тут буде номер рядка
+            edit_id: editId, 
             client: {
                 name: document.getElementById('clientName').value,
                 phone: document.getElementById('clientPhone').value,

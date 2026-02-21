@@ -966,13 +966,11 @@
         }
     }
 
-    function finishSurvey() {
+        function finishSurvey() {
         document.getElementById('section-measurements').classList.add('hidden');
         document.getElementById('navBar').style.display = 'none';
         document.getElementById('section-thankyou').classList.remove('hidden');
         
-        // ХИТРОЩІ ДЛЯ PYTHON БЕКЕНДУ: 
-        // Відновлюємо старі змінні, щоб калькулятор у main.py продовжував ідеально працювати!
         const aux = answers['aux_rooms'] || [];
         answers['hallway_needed'] = aux.includes('Передпокій') ? 'Так' : 'Ні';
         answers['kitchen_needed'] = aux.includes('Кухня') ? 'Так' : 'Ні';
@@ -983,6 +981,7 @@
 
         const data = {
             edit_id: editId, 
+            user_id: tg.initDataUnsafe?.user?.id, // ДОДАНО: передаємо ID менеджера
             client: {
                 name: document.getElementById('clientName').value,
                 phone: document.getElementById('clientPhone').value,
@@ -995,10 +994,30 @@
             answers: answers
         };
 
+        // НОВИЙ МЕХАНІЗМ ЗБЕРЕЖЕННЯ І ЗАКРИТТЯ
+        const sendAndClose = () => {
+            if (editId) {
+                // Режим редагування (звертаємось напряму до API бота)
+                fetch(`${BACKEND_URL}/api/save_order`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                }).then(() => {
+                    tg.close();
+                }).catch(() => {
+                    alert("Помилка збереження!");
+                    tg.close();
+                });
+            } else {
+                // Нова заявка (стандартний метод Telegram)
+                tg.sendData(JSON.stringify(data));
+            }
+        };
+
         const closeBtn = document.createElement('button');
         closeBtn.innerText = "Закрити зараз";
         closeBtn.style.cssText = "margin-top:20px; padding:10px 20px; border:none; background:#eee; border-radius:8px; font-weight:bold;";
-        closeBtn.onclick = () => tg.sendData(JSON.stringify(data));
+        closeBtn.onclick = sendAndClose;
         document.getElementById('section-thankyou').appendChild(closeBtn);
 
         let timeLeft = 10;
@@ -1008,7 +1027,7 @@
             timerEl.innerText = timeLeft;
             if (timeLeft <= 0) {
                 clearInterval(interval);
-                tg.sendData(JSON.stringify(data));
+                sendAndClose();
             }
         }, 1000);
     }

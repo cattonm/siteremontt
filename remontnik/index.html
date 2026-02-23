@@ -109,7 +109,6 @@
     let finalQuestions = [];
     let editId = null;
     
-    // --- СТРУКТУРА ПИТАНЬ ---
     const blockGeneral = [
         { id: "entrance_door", zone: "ЗАГАЛЬНІ", text: "Чи потрібна заміна вхідних дверей?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
         { id: "interior_door", zone: "ЗАГАЛЬНІ", text: "Тип міжкімнатних дверей.", type: "cards", options: [{label:"Прихований монтаж",val:"Прихований монтаж",img:"img/hidemont.webp"},{label:"Стандарт",val:"Стандарт",img:"img/standarddoor.webp"},{label:"Ні / Залишаються",val:"Ні"}] },
@@ -293,7 +292,7 @@
         if (prevStep >= 0) { currentStep = prevStep; renderQuestion(); } else { currentStep = -1; document.getElementById('section-client').classList.remove('hidden'); document.getElementById('section-questions').classList.add('hidden'); document.getElementById('btnBack').style.display = 'none'; }
     }
 
-    // --- ОФЛАЙН ЧЕРГА ТА ВІДПРАВКА ---
+    // --- ВІДПРАВКА ДАНИХ ТА ЧЕРГА ---
     function finishSurvey() {
         localStorage.removeItem('remont_draft_' + (editId || 'new'));
         document.getElementById('section-measurements').classList.add('hidden'); document.getElementById('navBar').style.display = 'none';
@@ -309,19 +308,25 @@
             answers: answers
         };
 
-        if (navigator.onLine) {
-            fetch(`${BACKEND_URL}/api/save_order`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify(data) })
-            .then(res => { if (res.status === 403) throw new Error("Відмовлено в доступі"); tg.close(); })
-            .catch(() => queueOffline(data));
+        if (editId) {
+            // Режим редагування: йдемо через API, бо є tg.initData
+            if (navigator.onLine) {
+                fetch(`${BACKEND_URL}/api/save_order`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify(data) })
+                .then(res => { if (!res.ok) throw new Error("Помилка сервера"); tg.close(); })
+                .catch(() => queueOffline(data));
+            } else {
+                queueOffline(data);
+            }
         } else {
-            queueOffline(data);
+            // Нова заявка: йдемо через стандартний метод Телеграму
+            tg.sendData(JSON.stringify(data));
         }
     }
 
     function queueOffline(data) {
         let q = JSON.parse(localStorage.getItem('remont_offline_q') || '[]'); q.push(data);
         localStorage.setItem('remont_offline_q', JSON.stringify(q));
-        tg.showAlert("📡 Немає інтернету! Заявку збережено на телефоні. Вона відправиться автоматично, коли з'явиться мережа.");
+        tg.showAlert("📡 Немає інтернету! Редагування збережено на телефоні. Дані відправляться автоматично, коли з'явиться мережа.");
         tg.close();
     }
 
@@ -330,15 +335,17 @@
         let q = JSON.parse(localStorage.getItem('remont_offline_q') || '[]'); if (q.length === 0) return;
         let remaining = [];
         for (let obj of q) {
-            try { await fetch(`${BACKEND_URL}/api/save_order`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify(obj) }); } 
+            try { 
+                const res = await fetch(`${BACKEND_URL}/api/save_order`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify(obj) }); 
+                if (!res.ok) throw new Error("Fail");
+            } 
             catch(e) { remaining.push(obj); }
         }
-        if (remaining.length < q.length) tg.showAlert("✅ Зв'язок відновлено. Відкладені заявки успішно відправлені на сервер!");
+        if (remaining.length < q.length) tg.showAlert("✅ Зв'язок відновлено. Відкладені редагування відправлені на сервер!");
         localStorage.setItem('remont_offline_q', JSON.stringify(remaining));
     }
     window.addEventListener('online', syncOfflineQueue);
 
-    // --- АВТОЗБЕРЕЖЕННЯ ---
     function saveDraft() {
         if (!document.getElementById('section-thankyou').classList.contains('hidden')) return;
         const draftData = { currentStep: currentStep, answers: answers, client: { name: document.getElementById('clientName').value, phone: document.getElementById('clientPhone').value, object_type: document.getElementById('objectType').value, address: document.getElementById('clientAddress').value, area: document.getElementById('clientArea').value, floor: document.getElementById('clientFloor').value, elevator: document.getElementById('clientElevator').value } };
@@ -346,7 +353,6 @@
     }
     setInterval(saveDraft, 2000);
 
-    // --- ЗАВАНТАЖЕННЯ ДАНИХ (Блокування одночасного редагування) ---
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('edit_id')) {
         editId = urlParams.get('edit_id');
@@ -357,7 +363,7 @@
             });
         } else { loadEditData(); }
     } else {
-        syncOfflineQueue(); // Пробуємо відправити чергу, якщо відкрили нову
+        syncOfflineQueue(); 
         const savedDraft = localStorage.getItem('remont_draft_new');
         if (savedDraft) { tg.showConfirm("У вас є незбережена чернетка. Відновити?", function(restored) { if(restored) applyDraft(savedDraft); else localStorage.removeItem('remont_draft_new'); }); }
     }
@@ -375,7 +381,7 @@
         document.getElementById('section-client').classList.add('hidden'); document.getElementById('loading-screen').classList.remove('hidden');
         try {
             const res = await fetch(`${BACKEND_URL}/api/get_order?id=${editId}`, {
-                headers: { 'X-Telegram-Init-Data': tg.initData } // БЕЗПЕКА І ЗАПИТ НА БЛОКУВАННЯ
+                headers: { 'X-Telegram-Init-Data': tg.initData } 
             });
             if (res.status === 423) { const err = await res.json(); tg.showAlert(err.error); tg.close(); return; }
             if (!res.ok) throw new Error("Server error");

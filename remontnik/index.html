@@ -41,8 +41,6 @@
         .btn { flex: 1; padding: 15px; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; }
         .btn-back { background: #f0f0f0; color: #333; flex: 0.3; }
         .btn-next { background: #3390ec; color: #fff; }
-
-        /* ЖИВИЙ КОШИК */
         #live-cart { position: fixed; bottom: 75px; left: 10px; right: 10px; background: rgba(33, 43, 54, 0.95); color: #fff; padding: 12px 15px; border-radius: 12px; box-shadow: 0 -2px 15px rgba(0,0,0,0.2); z-index: 99; display: flex; justify-content: space-between; align-items: center; font-size: 14px; cursor: pointer; backdrop-filter: blur(5px); transition: opacity 0.3s; opacity: 0; pointer-events: none;}
         #live-cart.visible { opacity: 1; pointer-events: auto; }
         #live-cart div { display: flex; flex-direction: column; }
@@ -54,9 +52,7 @@
     </style>
 </head>
 <body>
-
 <script> const BACKEND_URL = "https://remontnikuav.onrender.com"; </script>
-
 <div id="imageModal" onclick="closeImage()"><img id="modalImg" src=""><div id="closeModal">Закрити</div></div>
 <div id="menu-overlay" onclick="toggleMenu()"></div>
 <div id="side-menu"><div class="menu-header">📋 Розділи анкети</div><div id="menu-list"></div></div>
@@ -102,59 +98,61 @@
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
-
-    let answers = {};
-    let currentStep = -1;
-    let finalQuestions = [];
-    let editId = null;
-    let calcTimeout = null;
+    let answers = {}; let currentStep = -1; let finalQuestions = []; let editId = null; let calcTimeout = null;
     
     const blockGeneral = [
         { id: "rooms_count", zone: "ЗАГАЛЬНІ", text: "Скільки ЖИТЛОВИХ кімнат?", type: "input_number", placeholder: "Введіть число" },
         { id: "baths_count", zone: "ЗАГАЛЬНІ", text: "Скільки САНВУЗЛІВ?", type: "input_number", placeholder: "Введіть число" },
         { id: "aux_rooms", zone: "ЗАГАЛЬНІ", text: "Які ДОДАТКОВІ приміщення ремонтуємо?", type: "cards_multiselect", options: [{label:"Передпокій",val:"Передпокій"}, {label:"Кухня",val:"Кухня"}, {label:"Балкон",val:"Балкон"},{label:"Гардероб",val:"Гардероб"}, {label:"Підвал",val:"Підвал"}, {label:"Горище",val:"Горище"}] },
+        
+        { id: "rough_plaster_done", zone: "ЗАГАЛЬНІ", text: "Чи потрібна машинна штукатурка стін (чорнова)?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "screed_done", zone: "ЗАГАЛЬНІ", text: "Чи є стяжка підлоги?", type: "cards", options: [{label:"Є від забудовника",val:"Є від забудовника"},{label:"Потрібна: Мокра",val:"Потрібна: Мокра"},{label:"Потрібна: Напівсуха",val:"Потрібна: Напівсуха"}] },
+        { id: "electricity_done", zone: "ЗАГАЛЬНІ", text: "Чи розведена електрика (чорнова)?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "plumbing_done", zone: "ЗАГАЛЬНІ", text: "Чи розведена каналізація/вода?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        
+        { id: "warm_floor_type", zone: "ЗАГАЛЬНІ", text: "Тип теплої підлоги", type: "cards", options: [{label:"Електрична",val:"Електрична"},{label:"Водяна",val:"Водяна"},{label:"Немає",val:"Немає"}] },
+        { id: "warm_floor_zones", zone: "ЗАГАЛЬНІ", text: "Де встановлюємо теплу підлогу?", type: "multiselect_dynamic" },
+
         { id: "entrance_door", zone: "ЗАГАЛЬНІ", text: "Чи потрібна заміна вхідних дверей?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
         { id: "interior_door", zone: "ЗАГАЛЬНІ", text: "Тип міжкімнатних дверей.", type: "cards", options: [{label:"Прихований монтаж",val:"Прихований монтаж",img:"img/hidemont.webp"},{label:"Стандарт",val:"Стандарт",img:"img/standarddoor.webp"},{label:"Ні / Залишаються",val:"Ні"}] },
         { id: "baseboard", zone: "ЗАГАЛЬНІ", text: "Тип підлогового плінтусу.", type: "cards", options: [{label:"Прихований монтаж",val:"Прихований монтаж",img:"img/plinthidem.webp"},{label:"Тіньовий шов",val:"Тіньовий шов",img:"img/shadowshow.webp"},{label:"Стандартний",val:"Стандартний",img:"img/plintstandard.webp"}] },
         { id: "ceiling", zone: "ЗАГАЛЬНІ", text: "Тип стелі.", type: "cards", options: [{label:"Натяжна",val:"Натяжна"}, {label:"Гіпсокартон",val:"Гіпсокартон"},{label:"Ні",val:"Ні"}] },
-        { id: "ceiling_shadow", zone: "ЗАГАЛЬНІ", text: "Чи потрібен тіньовий шов для стелі?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
-        { id: "screed_done", zone: "ЗАГАЛЬНІ", text: "Чи є стяжка підлоги?", type: "cards", options: [{label:"Є від забудовника",val:"Є від забудовника"},{label:"Потрібна: Мокра",val:"Потрібна: Мокра"},{label:"Потрібна: Напівсуха",val:"Потрібна: Напівсуха"}] },
-        { id: "electricity_done", zone: "ЗАГАЛЬНІ", text: "Чи розведена електрика?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
-        { id: "plumbing_done", zone: "ЗАГАЛЬНІ", text: "Чи розведена каналізація?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
-        { id: "warm_floor", zone: "ЗАГАЛЬНІ", text: "Встановлення теплої підлоги:", type: "multiselect_dynamic" }
+        { id: "ceiling_shadow", zone: "ЗАГАЛЬНІ", text: "Чи потрібен тіньовий шов для стелі?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] }
     ];
 
-    const blockHallway = [{ id: "hallway_floor", zone: "ПЕРЕДПОКІЙ", text: "Тип підлоги.", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Кварцвініл",val:"Кварцвініл",img:"img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"} ]},{ id: "hallway_walls", zone: "ПЕРЕДПОКІЙ", text: "Стіни.", type: "cards", options: [{label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декор - штукатурка",val:"Декор - штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}]},{ id: "hallway_light", zone: "ПЕРЕДПОКІЙ", text: "Освітлення", type: "cards_multiselect", options: [{label:"Декор підсвітка",val:"Декор підсвітка",img:"img/dekorpidsv.webp"}, {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}]},{ id: "hallway_decor", zone: "ПЕРЕДПОКІЙ", text: "Декор", type: "cards", options: [{label:"ДСП панелі",val:"ДСП панелі",img:"img/dsppaneli.webp"}, {label:"Дзеркало с підсвіткою",val:"Дзеркало с підсвіткою",img:"img/dzerkalopidsv.webp"}, {label:"Ні",val:"Ні"}]}];
-    const blockKitchen = [{ id: "kitchen_walls", zone: "КУХНЯ", text: "Стіни.", type: "cards", options: [{label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Штукатурка",val:"Штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}]},{ id: "kitchen_light", zone: "КУХНЯ", text: "Освітлення", type: "cards_multiselect", options: [{label:"Декор підсвітка",val:"Декор підсвітка",img:"img/dekorpidsv.webp"}, {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}]},{ id: "kitchen_floor", zone: "КУХНЯ", text: "Підлога.", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/kitchenkeramo.webp"}, {label:"Кварц-вініл",val:"Кварц-вініл",img:"img/kitchenkvarzv.webp"}]},{ id: "kitchen_apron", zone: "КУХНЯ", text: "Фартук.", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/fartukkeramo.webp"}, {label:"Матеріал стільниці",val:"Матеріал стільниці",img:"img/fartukstiln.jpeg"}]},{ id: "kitchen_other", zone: "КУХНЯ", text: "Інші потреби", type: "multiselect_complex", hasOther: true, options: [{label:"Підсвітка робочої поверхні", tier: false}, {label:"Посудомийна машина", tier: false}, {label:"Осмос", tier: false}, {label:"Подрібнювач відходів", tier: false}, {label:"Мікрохвильова піч", tier: false}, {label:"Духова шафа", tier: false}, {label:"Радіатор", tier: false}]}];
-    const blockBalcony = [{ id: "balcony_floor", zone: "БАЛКОН", text: "Тип підлоги.", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}]},{ id: "balcony_walls", zone: "БАЛКОН", text: "Стіни", type: "cards", options: [{label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Штукатурка",val:"Штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}]},{ id: "balcony_light", zone: "БАЛКОН", text: "Освітлення", type: "cards_multiselect", options: [{label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledpidsv.webp"}]},{ id: "balcony_other", zone: "БАЛКОН", text: "Облаштування балкону", type: "multiselect_complex", hasOther: true, options: [{label:"Утеплення", tier: false}, {label:"Робоче місце", tier: false}]}];
-    const blockWardrobe = [{ id: "wardrobe_floor", zone: "ГАРДЕРОБ", text: "Тип підлоги", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}]},{ id: "wardrobe_walls", zone: "ГАРДЕРОБ", text: "Стіни", type: "cards", options: [{label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Штукатурка",val:"Штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування",img:"img/gruntovka.webp"}]},{ id: "wardrobe_light", zone: "ГАРДЕРОБ", text: "Освітлення", type: "cards_multiselect", options: [{label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledgarderob.webp"}]}];
-    const blockBasement = [{ id: "basement_floor", zone: "ПІДВАЛ", text: "Тип підлоги", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Лінолеум",val:"Лінолеум",img:"img/linoleum.webp"}]},{ id: "basement_walls", zone: "ПІДВАЛ", text: "Стіни", type: "cards", options: [{label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Штукатурка",val:"Штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}]},{ id: "basement_ceiling", zone: "ПІДВАЛ", text: "Тип стелі", type: "cards", options: [{label:"Натяжна",val:"Натяжна"}, {label:"Гіпсокартон",val:"Гіпсокартон"}, {label:"Побілка",val:"Побілка"}]},{ id: "basement_light", zone: "ПІДВАЛ", text: "Освітлення", type: "cards_multiselect", options: [{label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}]}];
-    const blockAttic = [{ id: "attic_walls", zone: "ГОРИЩЕ", text: "Стіни", type: "cards", options: [{label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Обшивка деревʼяними рейками",val:"Обшивка деревʼяними рейками",img:"img/obshivkaderev.webp"}, {label:"Фарбування стіни із гіпсокартону",val:"Фарбування стіни із гіпсокартону",img:"img/farbzgipso.webp"}, {label:"ні",val:"ні"}]},{ id: "attic_floor", zone: "ГОРИЩЕ", text: "Тип підлоги", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}, {label:"Інше",val:"Інше"}]},{ id: "attic_light", zone: "ГОРИЩЕ", text: "Освітлення", type: "cards_multiselect", options: [{label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledpidsv.webp"}]}];
+    const blockHallway = [{ id: "hallway_floor", zone: "ПЕРЕДПОКІЙ", text: "Тип підлоги.", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Кварцвініл",val:"Кварцвініл",img:"img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"} ]},{ id: "hallway_walls", zone: "ПЕРЕДПОКІЙ", text: "Стіни (Фініш)", type: "cards", options: [{label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}]},{ id: "hallway_light", zone: "ПЕРЕДПОКІЙ", text: "Освітлення", type: "cards_multiselect", options: [{label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"Трек / Лінія",val:"Трек / Лінія"}, {label:"Декор підсвітка",val:"Декор підсвітка",img:"img/dekorpidsv.webp"}]},{ id: "hallway_decor", zone: "ПЕРЕДПОКІЙ", text: "Декор", type: "cards", options: [{label:"ДСП панелі",val:"ДСП панелі",img:"img/dsppaneli.webp"}, {label:"Ні",val:"Ні"}]}];
+    const blockKitchen = [{ id: "kitchen_walls", zone: "КУХНЯ", text: "Стіни (Фініш).", type: "cards", options: [{label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}]},{ id: "kitchen_light", zone: "КУХНЯ", text: "Освітлення", type: "cards_multiselect", options: [{label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"Трек / Лінія",val:"Трек / Лінія"}, {label:"Декор підсвітка",val:"Декор підсвітка",img:"img/dekorpidsv.webp"}]},{ id: "kitchen_floor", zone: "КУХНЯ", text: "Підлога.", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/kitchenkeramo.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"img/kitchenkvarzv.webp"}]},{ id: "kitchen_apron", zone: "КУХНЯ", text: "Фартух.", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/fartukkeramo.webp"}, {label:"Матеріал стільниці",val:"Матеріал стільниці",img:"img/fartukstiln.jpeg"}]},{ id: "kitchen_mixer_std", zone: "КУХНЯ", text: "Кількість звичайних змішувачів (шт)", type: "input_number", placeholder: "0" },{ id: "kitchen_mixer_hidden", zone: "КУХНЯ", text: "Змішувачі прихованого монтажу (шт)", type: "input_number", placeholder: "0" },{ id: "kitchen_sills", zone: "КУХНЯ", text: "Підвіконня.", type: "cards", options: [{label:"Пластик",val:"Пластик",img:"img/plastikpidv.webp"}, {label:"Дерево",val:"Дерево",img:"img/derevopidv.webp"}, {label:"Штучний камінь",val:"Штучний камінь",img:"img/kaminpidv.webp"}, {label:"Не потребується",val:"Не потребується"}] },{ id: "kitchen_other", zone: "КУХНЯ", text: "Інші потреби", type: "multiselect_complex", hasOther: true, options: [{label:"Підсвітка робочої поверхні", tier: false}, {label:"Посудомийна машина", tier: true}, {label:"Осмос", tier: true}, {label:"Подрібнювач відходів", tier: true}, {label:"Мікрохвильова піч", tier: true}, {label:"Духова шафа", tier: true}, {label:"Радіатор", tier: true}]}];
+    const blockBalcony = [{ id: "balcony_floor", zone: "БАЛКОН", text: "Тип підлоги.", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}]},{ id: "balcony_walls", zone: "БАЛКОН", text: "Стіни (Фініш)", type: "cards", options: [{label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}]},{ id: "balcony_light", zone: "БАЛКОН", text: "Освітлення", type: "cards_multiselect", options: [{label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledpidsv.webp"}]},{ id: "balcony_other", zone: "БАЛКОН", text: "Облаштування балкону", type: "multiselect_complex", hasOther: true, options: [{label:"Утеплення", tier: false}, {label:"Робоче місце", tier: false}]}];
+    const blockWardrobe = [{ id: "wardrobe_floor", zone: "ГАРДЕРОБ", text: "Тип підлоги", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}]},{ id: "wardrobe_walls", zone: "ГАРДЕРОБ", text: "Стіни (Фініш)", type: "cards", options: [{label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування",img:"img/gruntovka.webp"}]},{ id: "wardrobe_light", zone: "ГАРДЕРОБ", text: "Освітлення", type: "cards_multiselect", options: [{label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledgarderob.webp"}]}];
+    const blockBasement = [{ id: "basement_floor", zone: "ПІДВАЛ", text: "Тип підлоги", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Лінолеум",val:"Лінолеум",img:"img/linoleum.webp"}]},{ id: "basement_walls", zone: "ПІДВАЛ", text: "Стіни (Фініш)", type: "cards", options: [{label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}]},{ id: "basement_ceiling", zone: "ПІДВАЛ", text: "Тип стелі", type: "cards", options: [{label:"Натяжна",val:"Натяжна"}, {label:"Гіпсокартон",val:"Гіпсокартон"}, {label:"Побілка",val:"Побілка"}]},{ id: "basement_light", zone: "ПІДВАЛ", text: "Освітлення", type: "cards_multiselect", options: [{label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}]}];
+    const blockAttic = [{ id: "attic_walls", zone: "ГОРИЩЕ", text: "Стіни", type: "cards", options: [{label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Обшивка деревʼяними рейками",val:"Обшивка деревʼяними рейками",img:"img/obshivkaderev.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbzgipso.webp"}, {label:"ні",val:"ні"}]},{ id: "attic_floor", zone: "ГОРИЩЕ", text: "Тип підлоги", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}, {label:"Інше",val:"Інше"}]},{ id: "attic_light", zone: "ГОРИЩЕ", text: "Освітлення", type: "cards_multiselect", options: [{label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledpidsv.webp"}]}];
 
     function getBathQuestions(index) {
         return [
             { id: `bath_${index}_floor_type`, zone: `САНВУЗОЛ ${index}`, text: "Тип підлоги", type: "cards_with_tier", options: [{ label: "Плитка", val: "Плитка", img: "img/plitkamozaika.webp", variants: ["Мозаїка", "60*60", "40*40"] }, { label: "Керамограніт", val: "Керамограніт", img: "img/keram12060.webp", variants: ["120*60", "60*60", "40*40"] }]},
-            { id: `bath_${index}_shower`, zone: `САНВУЗОЛ ${index}`, text: "Душ.", type: "cards_multiselect", options: [{label:"Піддон",val:"Піддон",img:"img/piddon.webp"}, {label:"Плитка",val:"Плитка",img:"img/plitkadush.webp"}, {label:"Скляна шторка",val:"Скляна шторка",img:"img/sklodush.webp"}, {label:"Текстиль шторка",val:"Текстиль шторка",img:"img/tekstildush.webp"}, {label:"Скляна конструкція з дверима",val:"Скляна конструкція з дверима",img:"img/sklodveridush.webp"}, {label:"Не обладнувати",val:"Не обладнувати"}]},
+            { id: `bath_${index}_shower`, zone: `САНВУЗОЛ ${index}`, text: "Душ.", type: "cards_multiselect", options: [{label:"Піддон (акрил/камінь)",val:"Піддон (акрил/камінь)",img:"img/piddon.webp"}, {label:"Душовий трап (з плитки)",val:"Душовий трап (з плитки)",img:"img/plitkadush.webp"}, {label:"Скляна перегородка",val:"Скляна перегородка",img:"img/sklodush.webp"}, {label:"Скляна конструкція з дверима",val:"Скляна конструкція з дверима",img:"img/sklodveridush.webp"}, {label:"Не обладнувати",val:"Не обладнувати"}]},
             { id: `bath_${index}_tub`, zone: `САНВУЗОЛ ${index}`, text: "Ванна", type: "cards_with_tier", options: [{label:"Акрил",val:"Акрил",img:"img/vanaakril.webp"}, {label:"Гідро масаж",val:"Гідро масаж",img:"img/vanagidromas.webp"}, {label:"Окремостояча",val:"Окремостояча",img:"img/okremavana.webp"}, {label:"Не обладнувати",val:"Не обладнувати"}]},
-            { id: `bath_${index}_plumbing`, zone: `САНВУЗОЛ ${index}`, text: "Сантехніка", type: "cards", options: [{label:"Хром",val:"Хром",img:"img/santchrome.webp"}, {label:"Чорний",val:"Чорний",img:"img/santblack.webp"}]},
             { id: `bath_${index}_toilet`, zone: `САНВУЗОЛ ${index}`, text: "Унітаз", type: "cards_with_tier", options: [{label:"Окремостоячий",val:"Окремостоячий",img:"img/unitazokremo.webp"}, {label:"Інсталяція",val:"Інсталяція",img:"img/installunitaz.webp"}]},
-            { id: `bath_${index}_other`, zone: `САНВУЗОЛ ${index}`, text: "Інші потреби", type: "multiselect_complex", hasOther:true, options: [{label:"Гігієнічний душ",tier:true}, {label:"Пральна машина",tier:true}, {label:"Сушильна машина",tier:true}, {label:"Дзеркало з підігрівом",tier:true}, {label:"Бойлер",tier:true}, {label:"Умивальник з тумбою",tier:true}, {label:"Дзеркало з підсвіткою",tier:true}, {label:"Дзеркало",tier:true}, {label:"Витяжка",tier:true}, {label:"Рушникосушка",tier:true}, {label:"Рукомийка",tier:true, customTiers: ["Звичайні", "Прихованого монтажу"]}]}
+            { id: `bath_${index}_mixer_std`, zone: `САНВУЗОЛ ${index}`, text: "Кількість звичайних змішувачів (шт)", type: "input_number", placeholder: "0" },
+            { id: `bath_${index}_mixer_hidden`, zone: `САНВУЗОЛ ${index}`, text: "Змішувачі прихованого монтажу (шт)", type: "input_number", placeholder: "0" },
+            { id: `bath_${index}_other`, zone: `САНВУЗОЛ ${index}`, text: "Інші потреби", type: "multiselect_complex", hasOther:true, options: [{label:"Гігієнічний душ",tier:true}, {label:"Пральна машина",tier:true}, {label:"Сушильна машина",tier:true}, {label:"Дзеркало з підігрівом",tier:true}, {label:"Бойлер",tier:true}, {label:"Умивальник з тумбою",tier:true}, {label:"Дзеркало з підсвіткою",tier:true}, {label:"Дзеркало",tier:true}, {label:"Витяжка",tier:false}, {label:"Рушникосушка",tier:true}]}
         ];
     }
     function getRoomQuestions(index) {
         return [
             { id: `room_${index}_floor`, zone: `КІМНАТА ${index}`, text: "Тип підлоги.", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}, {label:"Паркет",val:"Паркет",img:"img/parket.jpeg"}]},
-            { id: `room_${index}_walls`, zone: `КІМНАТА ${index}`, text: "Стіни.", type: "cards", options: [{label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Штукатурка",val:"Штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}]},
-            { id: `room_${index}_light`, zone: `КІМНАТА ${index}`, text: "Освітлення.", type: "cards_multiselect", options: [{label:"Підсвітка бра",val:"Підсвітка бра",img:"img/brapidsv.webp"}, {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"led підсвітка",val:"led підсвітка",img:"img/ledpidsv.webp"}]},
+            { id: `room_${index}_walls`, zone: `КІМНАТА ${index}`, text: "Стіни (Фініш).", type: "cards", options: [{label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}]},
+            { id: `room_${index}_light`, zone: `КІМНАТА ${index}`, text: "Освітлення.", type: "cards_multiselect", options: [{label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"Трек / Лінія",val:"Трек / Лінія"}, {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledpidsv.webp"}]},
             { id: `room_${index}_sills`, zone: `КІМНАТА ${index}`, text: "Підвіконня.", type: "cards", options: [{label:"Пластик",val:"Пластик",img:"img/plastikpidv.webp"}, {label:"Дерево",val:"Дерево",img:"img/derevopidv.webp"}, {label:"Штучний камінь",val:"Штучний камінь",img:"img/kaminpidv.webp"}, {label:"Не потребується",val:"Не потребується"}]},
             { id: `room_${index}_decor`, zone: `КІМНАТА ${index}`, text: "Декор.", type: "cards", options: [{label:"Панелі гіпсові",val:"Панелі гіпсові",img:"img/gipspankimn.webp"}, {label:"Панелі ДСП",val:"Панелі ДСП",img:"img/dsppaneli.webp"}, {label:"ні",val:"ні"}]},
-            { id: `room_${index}_other`, zone: `КІМНАТА ${index}`, text: "Інші потреби", type: "multiselect_complex", hasOther:true, options: [{label:"Дзеркало з підсвіткою",tier:false}, {label:"Зона телевізору",tier:false}, {label:"Штори",tier:false}, {label:"Тюль",tier:false}, {label:"Радіатор",tier:true}, {label:"Кондиціонер", tier:true}, {label:"Вентиляція", tier:true}, {label:"Звукоізоляція", tier:false}]}
+            { id: `room_${index}_other`, zone: `КІМНАТА ${index}`, text: "Інші потреби", type: "multiselect_complex", hasOther:true, options: [{label:"Дзеркало з підсвіткою",tier:false}, {label:"Зона телевізору",tier:false}, {label:"Штори",tier:false}, {label:"Тюль",tier:false}, {label:"Радіатор",tier:true}, {label:"Кондиціонер", tier:true}, {label:"Вентиляція", tier:false}, {label:"Звукоізоляція", tier:false}]}
         ];
     }
 
     function shouldSkip(q) {
         if (!q) return false;
         if (q.id === 'ceiling_shadow' && answers['ceiling'] === 'Ні') return true;
+        if (q.id === 'warm_floor_zones' && answers['warm_floor_type'] === 'Немає') return true;
         const aux = answers['aux_rooms'] || [];
         if (q.id.startsWith('hallway_') && !aux.includes('Передпокій')) return true;
         if (q.id.startsWith('kitchen_') && !aux.includes('Кухня')) return true;
@@ -190,7 +188,6 @@
     function openImage(src, event) { event.stopPropagation(); document.getElementById('modalImg').src = src; document.getElementById('imageModal').style.display = 'flex'; }
     function closeImage() { document.getElementById('imageModal').style.display = 'none'; }
 
-    // --- ЖИВИЙ КАЛЬКУЛЯТОР (ОНОВЛЕННЯ) ---
     function triggerLiveCalc() { clearTimeout(calcTimeout); calcTimeout = setTimeout(fetchLiveCalc, 500); }
     
     async function fetchLiveCalc() {
@@ -207,21 +204,13 @@
             }
         } catch(e) {}
     }
-    
-    function findQuestionText(id) {
-        let q = finalQuestions.find(x => x.id === id);
-        return q ? q.text.replace('.', '') : id;
-    }
 
     function openCartModal() {
         const list = document.getElementById('cart-list-content');
         list.innerHTML = '';
-        
-        // Групування по зонах
         let grouped = {};
         for(const [key, val] of Object.entries(answers)) {
-            if(key === 'measurements' || key === 'aux_rooms' || key === 'rooms_count' || key === 'baths_count' || !val || val === "Ні" || (Array.isArray(val) && val.length===0)) continue;
-            
+            if(key === 'measurements' || key === 'aux_rooms' || key === 'rooms_count' || key === 'baths_count' || !val || val === "Ні" || (Array.isArray(val) && val.length===0) || val === 0 || val === "0") continue;
             let q = finalQuestions.find(x => x.id === key);
             let zone = q ? q.zone : "ЗАГАЛЬНІ";
             let label = q ? q.text.replace('.', '') : key;
@@ -234,8 +223,7 @@
                     for(let [k, v] of Object.entries(val)) parts.push(`${k} ${v && v!=='Так' ? '('+v+')' : ''}`);
                     valStr = parts.join(', ');
                 }
-            } else if (Array.isArray(val)) {
-                valStr = val.join(', ');
+            } else if (Array.isArray(val)) { valStr = val.join(', ');
             } else { valStr = val; }
             
             if(!grouped[zone]) grouped[zone] = [];
@@ -318,7 +306,7 @@
     }
 
     function renderMeasurements() {
-        document.getElementById('live-cart').classList.add('visible'); // ЗАЛИШАЄМО КОШИК ВИДИМИМ
+        document.getElementById('live-cart').classList.add('visible'); 
         document.getElementById('section-questions').classList.add('hidden'); document.getElementById('section-measurements').classList.remove('hidden');
         const btnNext = document.getElementById('btnNext'); btnNext.innerText = editId ? '✅ Зберегти зміни' : '✅ Завершити'; btnNext.onclick = finishSurvey;
         const btnBack = document.getElementById('btnBack'); btnBack.onclick = () => { document.getElementById('section-measurements').classList.add('hidden'); document.getElementById('section-questions').classList.remove('hidden'); btnNext.innerText = 'Далі'; btnNext.onclick = goNext; btnBack.onclick = goBack; renderQuestion(); };
@@ -339,7 +327,7 @@
             inpWalls.oninput = (e) => { answers.measurements[zone.id].walls = parseFloat(e.target.value) || 0; triggerLiveCalc(); };
             container.appendChild(box);
         });
-        triggerLiveCalc(); // Примусово оновлюємо ціну при відкритті екрану замірів
+        triggerLiveCalc(); 
     }
 
     function goNext() {
@@ -363,25 +351,13 @@
         document.getElementById('section-measurements').classList.add('hidden'); document.getElementById('navBar').style.display = 'none'; document.getElementById('live-cart').style.display = 'none';
         const thx = document.getElementById('section-thankyou');
         thx.innerHTML = '<div class="check-icon">⏳</div><h3>Зберігаємо...</h3><p>Зачекайте мить.</p>'; thx.classList.remove('hidden');
-        
-        const data = {
-            edit_id: editId, 
-            client: { name: document.getElementById('clientName').value, phone: document.getElementById('clientPhone').value, object_type: document.getElementById('objectType').value, address: document.getElementById('clientAddress').value, area: document.getElementById('clientArea').value, floor: document.getElementById('clientFloor').value, elevator: document.getElementById('clientElevator').value },
-            answers: answers
-        };
-
+        const data = { edit_id: editId, client: { name: document.getElementById('clientName').value, phone: document.getElementById('clientPhone').value, object_type: document.getElementById('objectType').value, address: document.getElementById('clientAddress').value, area: document.getElementById('clientArea').value, floor: document.getElementById('clientFloor').value, elevator: document.getElementById('clientElevator').value }, answers: answers };
         if (editId) {
-            if (navigator.onLine) {
-                fetch(`${BACKEND_URL}/api/save_order`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify(data) })
-                .then(res => { if (!res.ok) throw new Error("Помилка сервера"); tg.close(); }).catch(() => queueOffline(data));
-            } else { queueOffline(data); }
+            if (navigator.onLine) { fetch(`${BACKEND_URL}/api/save_order`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify(data) }).then(res => { if (!res.ok) throw new Error("Помилка сервера"); tg.close(); }).catch(() => queueOffline(data)); } else { queueOffline(data); }
         } else { tg.sendData(JSON.stringify(data)); }
     }
 
-    function queueOffline(data) {
-        let q = JSON.parse(localStorage.getItem('remont_offline_q') || '[]'); q.push(data); localStorage.setItem('remont_offline_q', JSON.stringify(q));
-        tg.showAlert("📡 Немає інтернету! Дані збережено на телефоні. Вони відправляться автоматично, коли з'явиться мережа."); tg.close();
-    }
+    function queueOffline(data) { let q = JSON.parse(localStorage.getItem('remont_offline_q') || '[]'); q.push(data); localStorage.setItem('remont_offline_q', JSON.stringify(q)); tg.showAlert("📡 Немає інтернету! Дані збережено на телефоні. Вони відправляться автоматично, коли з'явиться мережа."); tg.close(); }
 
     async function syncOfflineQueue() {
         if (!navigator.onLine) return;
@@ -429,9 +405,7 @@
             document.getElementById('clientName').value = data.client.name || ""; document.getElementById('clientPhone').value = data.client.phone || ""; document.getElementById('objectType').value = data.client.object_type || "Квартира (Новобудова)"; document.getElementById('clientAddress').value = data.client.address || ""; document.getElementById('clientArea').value = data.client.area || ""; document.getElementById('clientFloor').value = data.client.floor || "1"; document.getElementById('clientElevator').value = data.client.elevator || "Немає";
             answers = data.answers || {}; buildFullQuestionsList(); currentStep = 0;
             document.getElementById('loading-screen').classList.add('hidden'); document.getElementById('section-questions').classList.remove('hidden'); document.getElementById('btnBack').style.display = 'block'; triggerLiveCalc(); renderQuestion();
-        } catch(e) {
-            alert("Помилка з'єднання."); document.getElementById('loading-screen').classList.add('hidden'); document.getElementById('section-client').classList.remove('hidden');
-        }
+        } catch(e) { alert("Помилка з'єднання."); document.getElementById('loading-screen').classList.add('hidden'); document.getElementById('section-client').classList.remove('hidden'); }
     }
 </script>
 </body>

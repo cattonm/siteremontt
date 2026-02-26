@@ -126,27 +126,83 @@
     const blockBasement = [{ id: "basement_floor", zone: "ПІДВАЛ", text: "Тип підлоги.", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Лінолеум",val:"Лінолеум",img:"img/linoleum.webp"}]},{ id: "basement_walls", zone: "ПІДВАЛ", text: "Стіни.", type: "cards", options: [{label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}]},{ id: "basement_ceiling", zone: "ПІДВАЛ", text: "Тип стелі.", type: "cards", options: [{label:"Натяжна",val:"Натяжна"}, {label:"Гіпсокартон",val:"Гіпсокартон"}, {label:"Побілка",val:"Побілка"}]},{ id: "basement_light", zone: "ПІДВАЛ", text: "Освітлення", type: "cards_multiselect", options: [{label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}]}];
     const blockAttic = [{ id: "attic_walls", zone: "ГОРИЩЕ", text: "Стіни.", type: "cards", options: [{label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Обшивка деревʼяними рейками",val:"Обшивка деревʼяними рейками",img:"img/obshivkaderev.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbzgipso.webp"}, {label:"ні",val:"ні"}]},{ id: "attic_floor", zone: "ГОРИЩЕ", text: "Тип підлоги.", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}, {label:"Інше",val:"Інше"}]},{ id: "attic_light", zone: "ГОРИЩЕ", text: "Освітлення", type: "cards_multiselect", options: [{label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledpidsv.webp"}]}];
 
-    function getBathQuestions(index) {
-        return [
-            { id: `bath_${index}_floor_type`, zone: `САНВУЗОЛ ${index}`, text: "Тип підлоги.", type: "cards_with_tier", options: [{ label: "Плитка", val: "Плитка", img: "img/plitkamozaika.webp", variants: ["Мозаїка", "60*60", "40*40"] }, { label: "Керамограніт", val: "Керамограніт", img: "img/keram12060.webp", variants: ["120*60", "60*60", "40*40"] }]},
-            { id: `bath_${index}_shower`, zone: `САНВУЗОЛ ${index}`, text: "Душ.", type: "cards_multiselect", options: [{label:"Піддон (акрил/камінь)",val:"Піддон (акрил/камінь)",img:"img/piddon.webp"}, {label:"Душовий трап (з плитки)",val:"Душовий трап (з плитки)",img:"img/plitkadush.webp"}, {label:"Скляна перегородка",val:"Скляна перегородка",img:"img/sklodush.webp"}, {label:"Скляна конструкція з дверима",val:"Скляна конструкція з дверима",img:"img/sklodveridush.webp"}, {label:"Не обладнувати",val:"Не обладнувати"}]},
-            { id: `bath_${index}_tub`, zone: `САНВУЗОЛ ${index}`, text: "Ванна", type: "cards_with_tier", options: [{label:"Акрил",val:"Акрил",img:"img/vanaakril.webp"}, {label:"Гідро масаж",val:"Гідро масаж",img:"img/vanagidromas.webp"}, {label:"Окремостояча",val:"Окремостояча",img:"img/okremavana.webp"}, {label:"Не обладнувати",val:"Не обладнувати"}]},
-            { id: `bath_${index}_toilet`, zone: `САНВУЗОЛ ${index}`, text: "Унітаз.", type: "cards_with_tier", options: [{label:"Окремостоячий",val:"Окремостоячий",img:"img/unitazokremo.webp"}, {label:"Інсталяція",val:"Інсталяція",img:"img/installunitaz.webp"}]},
-            { id: `bath_${index}_mixer_std`, zone: `САНВУЗОЛ ${index}`, text: "Кількість звичайних змішувачів (шт)", type: "input_number", placeholder: "0" },
-            { id: `bath_${index}_mixer_hidden`, zone: `САНВУЗОЛ ${index}`, text: "Змішувачі прихованого монтажу (шт)", type: "input_number", placeholder: "0" },
-            { id: `bath_${index}_other`, zone: `САНВУЗОЛ ${index}`, text: "Інші потреби", type: "multiselect_complex", hasOther:true, options: [{label:"Гігієнічний душ",tier:true}, {label:"Пральна машина",tier:true}, {label:"Сушильна машина",tier:true}, {label:"Дзеркало з підігрівом",tier:true}, {label:"Бойлер",tier:true}, {label:"Умивальник з тумбою",tier:true}, {label:"Дзеркало з підсвіткою",tier:true}, {label:"Дзеркало",tier:true}, {label:"Витяжка",tier:false}, {label:"Рушникосушка",tier:true}]}
-        ];
-    }
-    function getRoomQuestions(index) {
-        return [
-            { id: `room_${index}_floor`, zone: `КІМНАТА ${index}`, text: "Тип підлоги.", type: "cards", options: [{label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}, {label:"Паркет",val:"Паркет",img:"img/parket.jpeg"}]},
-            { id: `room_${index}_walls`, zone: `КІМНАТА ${index}`, text: "Стіни.", type: "cards", options: [{label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}]},
-            { id: `room_${index}_light`, zone: `КІМНАТА ${index}`, text: "Освітлення.", type: "cards_multiselect", options: [{label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"Трек / Лінія",val:"Трек / Лінія"}, {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledpidsv.webp"}]},
-            { id: `room_${index}_sills`, zone: `КІМНАТА ${index}`, text: "Підвіконня.", type: "cards", options: [{label:"Пластик",val:"Пластик",img:"img/plastikpidv.webp"}, {label:"Дерево",val:"Дерево",img:"img/derevopidv.webp"}, {label:"Штучний камінь",val:"Штучний камінь",img:"img/kaminpidv.webp"}, {label:"Не потребується",val:"Не потребується"}]},
-            { id: `room_${index}_decor`, zone: `КІМНАТА ${index}`, text: "Декор.", type: "cards", options: [{label:"Панелі гіпсові",val:"Панелі гіпсові",img:"img/gipspankimn.webp"}, {label:"Панелі ДСП",val:"Панелі ДСП",img:"img/dsppaneli.webp"}, {label:"ні",val:"ні"}]},
-            { id: `room_${index}_other`, zone: `КІМНАТА ${index}`, text: "Інші потреби", type: "multiselect_complex", hasOther:true, options: [{label:"Дзеркало з підсвіткою",tier:false}, {label:"Зона телевізору",tier:false}, {label:"Штори",tier:false}, {label:"Тюль",tier:false}, {label:"Радіатор",tier:true}, {label:"Кондиціонер", tier:true}, {label:"Вентиляція", tier:false}, {label:"Звукоізоляція", tier:false}]}
-        ];
-    }
+   function getBathQuestions(index) {
+    return [
+        { id: `bath_${index}_floor`, zone: `САНВУЗОЛ ${index}`, text: "Плитка на підлогу (формат)", type: "cards_with_tier", options: [
+            { label: "Мозаїка", val: "Мозаїка", img: "img/plitkamozaika.webp" },
+            { label: "Плитка до 120*60", val: "Керамограніт/Плитка до 120*60", img: "img/keram12060.webp" },
+            { label: "Великоформат", val: "Великоформатний керамограніт", img: "img/keram12060.webp" }
+        ]},
+        { id: `bath_${index}_wall_tile`, zone: `САНВУЗОЛ ${index}`, text: "Плитка на стіни (формат)", type: "cards_with_tier", options: [
+            { label: "Мозаїка", val: "Мозаїка", img: "img/plitkamozaika.webp" },
+            { label: "Плитка до 120*60", val: "Керамограніт/Плитка до 120*60", img: "img/keram12060.webp" },
+            { label: "Великоформат", val: "Великоформатний керамограніт", img: "img/keram12060.webp" }
+        ]},
+        { id: `bath_${index}_shower`, zone: `САНВУЗОЛ ${index}`, text: "Душ.", type: "cards_multiselect", options: [
+            {label:"Піддон (акрил/камінь)",val:"Піддон (акрил/камінь)",img:"img/piddon.webp"}, 
+            {label:"Душовий трап (з плитки)",val:"Душовий трап (з плитки)",img:"img/plitkadush.webp"}, 
+            {label:"Скляна перегородка",val:"Скляна перегородка",img:"img/sklodush.webp"}, 
+            {label:"Скляна конструкція з дверима",val:"Скляна конструкція з дверима",img:"img/sklodveridush.webp"}, 
+            {label:"Не обладнувати",val:"Не обладнувати"}
+        ]},
+        { id: `bath_${index}_tub`, zone: `САНВУЗОЛ ${index}`, text: "Ванна", type: "cards_with_tier", options: [
+            {label:"Акрил",val:"Акрил",img:"img/vanaakril.webp"}, 
+            {label:"Гідро масаж",val:"Гідро масаж",img:"img/vanagidromas.webp"}, 
+            {label:"Окремостояча",val:"Окремостояча",img:"img/okremavana.webp"}, 
+            {label:"Не обладнувати",val:"Не обладнувати"}
+        ]},
+        { id: `bath_${index}_toilet`, zone: `САНВУЗОЛ ${index}`, text: "Унітаз.", type: "cards_with_tier", options: [
+            {label:"Окремостоячий",val:"Окремостоячий",img:"img/unitazokremo.webp"}, 
+            {label:"Інсталяція",val:"Інсталяція",img:"img/installunitaz.webp"}
+        ]},
+        { id: `bath_${index}_mixer_std`, zone: `САНВУЗОЛ ${index}`, text: "Кількість звичайних змішувачів (шт)", type: "input_number", placeholder: "0" },
+        { id: `bath_${index}_mixer_hidden`, zone: `САНВУЗОЛ ${index}`, text: "Змішувачі прихованого монтажу (шт)", type: "input_number", placeholder: "0" },
+        { id: `bath_${index}_other`, zone: `САНВУЗОЛ ${index}`, text: "Інші потреби", type: "multiselect_complex", hasOther:true, options: [
+            {label:"Гігієнічний душ",tier:true}, {label:"Пральна машина",tier:true}, {label:"Сушильна машина",tier:true}, 
+            {label:"Дзеркало з підігрівом",tier:true}, {label:"Бойлер",tier:true}, {label:"Умивальник з тумбою",tier:true}, 
+            {label:"Дзеркало з підсвіткою",tier:true}, {label:"Дзеркало",tier:true}, {label:"Витяжка",tier:false}, {label:"Рушникосушка",tier:true}
+        ]}
+    ];
+}
+   function getRoomQuestions(index) {
+    return [
+        { id: `room_${index}_floor`, zone: `КІМНАТА ${index}`, text: "Тип підлоги.", type: "cards", options: [
+            { label: "Ламінат", val: "Ламінат", img: "img/laminat.jpeg" },
+            { label: "Паркет", val: "Паркет", img: "img/parket.jpeg" },
+            { label: "Кварцвініл", val: "Кварц вініл", img: "img/kvarzvinil.webp" },
+            { label: "Мозаїка", val: "Мозаїка", img: "img/plitkamozaika.webp" },
+            { label: "Плитка до 120*60", val: "Керамограніт/Плитка до 120*60", img: "img/keramogranit.webp" },
+            { label: "Великоформат", val: "Великоформатний керамограніт", img: "img/keram12060.webp" }
+        ]},
+        { id: `room_${index}_walls`, zone: `КІМНАТА ${index}`, text: "Стіни.", type: "cards", options: [
+            {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, 
+            {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, 
+            {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}
+        ]},
+        { id: `room_${index}_light`, zone: `КІМНАТА ${index}`, text: "Освітлення.", type: "cards_multiselect", options: [
+            {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, 
+            {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, 
+            {label:"Трек / Лінія",val:"Трек / Лінія"}, 
+            {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledpidsv.webp"}
+        ]},
+        { id: `room_${index}_sills`, zone: `КІМНАТА ${index}`, text: "Підвіконня.", type: "cards", options: [
+            {label:"Пластик",val:"Пластик",img:"img/plastikpidv.webp"}, 
+            {label:"Дерево",val:"Дерево",img:"img/derevopidv.webp"}, 
+            {label:"Штучний камінь",val:"Штучний камінь",img:"img/kaminpidv.webp"}, 
+            {label:"Не потребується",val:"Не потребується"}
+        ]},
+        { id: `room_${index}_decor`, zone: `КІМНАТА ${index}`, text: "Декор.", type: "cards", options: [
+            {label:"Панелі гіпсові",val:"Панелі гіпсові",img:"img/gipspankimn.webp"}, 
+            {label:"Панелі ДСП",val:"Панелі ДСП",img:"img/dsppaneli.webp"}, 
+            {label:"ні",val:"ні"}
+        ]},
+        { id: `room_${index}_other`, zone: `КІМНАТА ${index}`, text: "Інші потреби", type: "multiselect_complex", hasOther:true, options: [
+            {label:"Дзеркало з підсвіткою",tier:false}, {label:"Зона телевізору",tier:false}, {label:"Штори",tier:false}, 
+            {label:"Тюль",tier:false}, {label:"Радіатор",tier:true}, {label:"Кондиціонер", tier:true}, 
+            {label:"Вентиляція", tier:false}, {label:"Звукоізоляція", tier:false}
+        ]}
+    ];
+}
 
     function shouldSkip(q) {
         if (!q) return false;

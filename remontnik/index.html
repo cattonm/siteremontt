@@ -277,12 +277,13 @@
         ];
     }
 
-    function getRoomQuestions(index) {
+        function getRoomQuestions(index) {
         return [
             { id: `room_${index}_floor`, zone: `КІМНАТА ${index}`, text: "Тип підлоги.", type: "cards", options: [
-                { label: "Ламінат", val: "Ламінат", img: "img/laminat.jpeg" }, { label: "Паркет", val: "Паркет", img: "img/parket.jpeg" },
-                { label: "Кварцвініл", val: "Кварц вініл", img: "img/kvarzvinil.webp" }, { label: "Мозаїка", val: "Мозаїка" },
-                { label: "Плитка до 120*60", val: "Керамограніт/Плитка до 120*60" }, { label: "Великоформат", val: "Великоформатний керамограніт" }
+                { label: "Ламінат", val: "Ламінат", img: "img/laminat.jpeg" }, 
+                { label: "Паркет", val: "Паркет", img: "img/parket.jpeg" },
+                { label: "Кварц вініл", val: "Кварц вініл", img: "img/kvarzvinil.webp" }, 
+                { label: "Керамограніт", val: "Керамограніт", img: "img/keramogranit.webp" }
             ]},
             { id: `room_${index}_walls`, zone: `КІМНАТА ${index}`, text: "Стіни.", type: "cards", options: [
                 {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}

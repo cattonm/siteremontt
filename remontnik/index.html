@@ -181,10 +181,6 @@
         ]},
         { id: "kitchen_mixer_std", zone: "КУХНЯ", text: "Кількість звичайних змішувачів (шт)", type: "input_number", placeholder: "0" },
         { id: "kitchen_mixer_hidden", zone: "КУХНЯ", text: "Змішувачі прихованого монтажу (шт)", type: "input_number", placeholder: "0" },
-        { id: "kitchen_sills", zone: "КУХНЯ", text: "Підвіконня.", type: "cards", options: [
-            {label:"Пластик",val:"Пластик",img:"img/plastikpidv.webp"}, {label:"Дерево",val:"Дерево",img:"img/derevopidv.webp"},
-            {label:"Штучний камінь",val:"Штучний камінь",img:"img/kaminpidv.webp"}, {label:"Не потребується",val:"Не потребується"}
-        ]},
         { id: "kitchen_other", zone: "КУХНЯ", text: "Інші потреби", type: "multiselect_complex", hasOther: false, options: [
             {label:"Підсвітка робочої поверхні", tier: false}, {label:"Посудомийна машина", tier: true}, {label:"Осмос", tier: true},
             {label:"Подрібнювач відходів", tier: true}, {label:"Мікрохвильова піч", tier: true}, {label:"Духова шафа", tier: true}, {label:"Радіатор", tier: true}
@@ -277,13 +273,11 @@
         ];
     }
 
-        function getRoomQuestions(index) {
+    function getRoomQuestions(index) {
         return [
             { id: `room_${index}_floor`, zone: `КІМНАТА ${index}`, text: "Тип підлоги.", type: "cards", options: [
-                { label: "Ламінат", val: "Ламінат", img: "img/laminat.jpeg" }, 
-                { label: "Паркет", val: "Паркет", img: "img/parket.jpeg" },
-                { label: "Кварц вініл", val: "Кварц вініл", img: "img/kvarzvinil.webp" }, 
-                { label: "Керамограніт", val: "Керамограніт", img: "img/keramogranit.webp" }
+                { label: "Ламінат", val: "Ламінат", img: "img/laminat.jpeg" }, { label: "Паркет", val: "Паркет", img: "img/parket.jpeg" },
+                { label: "Кварц вініл", val: "Кварц вініл", img: "img/kvarzvinil.webp" }, { label: "Керамограніт", val: "Керамограніт", img: "img/keramogranit.webp" }
             ]},
             { id: `room_${index}_walls`, zone: `КІМНАТА ${index}`, text: "Стіни.", type: "cards", options: [
                 {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}
@@ -293,8 +287,8 @@
                 {label:"Трек / Лінія",val:"Трек / Лінія"}, {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledpidsv.webp"}
             ]},
             { id: `room_${index}_sills`, zone: `КІМНАТА ${index}`, text: "Підвіконня.", type: "cards", options: [
-                {label:"Пластик",val:"Пластик",img:"img/plastikpidv.webp"}, {label:"Дерево",val:"Дерево",img:"img/derevopidv.webp"}, 
-                {label:"Штучний камінь",val:"Штучний камінь",img:"img/kaminpidv.webp"}, {label:"Не потребується",val:"Не потребується"}
+                {label:"Пластик",val:"Пластик"}, {label:"Дерево",val:"Дерево"}, 
+                {label:"Штучний камінь",val:"Штучний камінь"}, {label:"Не потребується",val:"Не потребується"}
             ]},
             { id: `room_${index}_decor`, zone: `КІМНАТА ${index}`, text: "Декор.", type: "cards", options: [
                 {label:"Панелі гіпсові",val:"Панелі гіпсові",img:"img/gipspankimn.webp"}, {label:"Панелі ДСП",val:"Панелі ДСП",img:"img/dsppaneli.webp"}, {label:"ні",val:"ні"}
@@ -433,7 +427,7 @@
                 const labelDiv = document.createElement('div'); labelDiv.innerText = opt.label; card.appendChild(labelDiv);
                 card.onclick = (e) => {
                     e.preventDefault(); answers[q.id] = opt.val; 
-                    if (q.id === 'rooms_count' || q.id === 'baths_count' || q.id === 'aux_rooms') { cleanupOldAnswers(); buildFullQuestionsList(); }
+                    if (q.id === 'rooms_count' || q.id === 'baths_count') { cleanupOldAnswers(); buildFullQuestionsList(); }
                     triggerLiveCalc(); renderQuestion(); 
                 }; grid.appendChild(card);
             }); container.appendChild(grid);
@@ -471,7 +465,7 @@
                     zoom.innerText = '🔍'; zoom.onclick = (e) => openImage(opt.img, e); imgWrapper.appendChild(zoom); card.appendChild(imgWrapper);
                 }
                 const labelDiv = document.createElement('div'); labelDiv.innerText = opt.label; card.appendChild(labelDiv);
-                if(isSel && opt.val !== "Не обладнувати" && opt.val !== "Не потребується") {
+                if(isSel && opt.val !== "Не обладнувати" && opt.val !== "Не потребується" && opt.val !== "Ні" && opt.val !== "Ні / Залишаються") {
                     const tiers = document.createElement('div'); tiers.className = "tier-container"; const variantsList = opt.variants ? opt.variants : ['Standard', 'Comfort', 'Premium'];
                     variantsList.forEach(v => { 
                         const btn = document.createElement('div'); let btnText = v; if(v==='Standard') btnText='S'; if(v==='Comfort') btnText='C'; if(v==='Premium') btnText='P'; 
@@ -479,7 +473,7 @@
                         btn.onclick = (e) => { e.stopPropagation(); answers[q.id].tier = v; triggerLiveCalc(); renderQuestion(); }; tiers.appendChild(btn); 
                     }); card.appendChild(tiers);
                 }
-                card.onclick = (e) => { e.preventDefault(); if(answers[q.id].type !== opt.val) { const firstVar = opt.variants ? opt.variants[0] : "Standard"; answers[q.id] = {type: opt.val, tier: (opt.val.startsWith("Не") ? "-" : firstVar)}; triggerLiveCalc(); renderQuestion(); } }; grid.appendChild(card);
+                card.onclick = (e) => { e.preventDefault(); if(answers[q.id].type !== opt.val) { const firstVar = opt.variants ? opt.variants[0] : "Standard"; answers[q.id] = {type: opt.val, tier: (opt.val.startsWith("Не") || opt.val.startsWith("Ні") ? "-" : firstVar)}; triggerLiveCalc(); renderQuestion(); } }; grid.appendChild(card);
             }); container.appendChild(grid);
         } 
         else if (q.type === 'multiselect_complex') {
@@ -512,7 +506,15 @@
                 }
                 const labelDiv = document.createElement('div'); labelDiv.innerText = opt.label; card.appendChild(labelDiv);
                 card.onclick = (e) => {
-                    e.preventDefault(); if(opt.val.startsWith("Не") || opt.val === "ні") { answers[q.id] = [opt.val]; } else { answers[q.id] = answers[q.id].filter(v => !v.startsWith("Не") && v !== "ні"); if(answers[q.id].includes(opt.val)) answers[q.id] = answers[q.id].filter(v=>v!==opt.val); else answers[q.id].push(opt.val); } 
+                    e.preventDefault(); 
+                    if(opt.val.startsWith("Не") || opt.val === "ні") { 
+                        answers[q.id] = [opt.val]; 
+                    } else { 
+                        answers[q.id] = answers[q.id].filter(v => !v.startsWith("Не") && v !== "ні"); 
+                        if(answers[q.id].includes(opt.val)) answers[q.id] = answers[q.id].filter(v=>v!==opt.val); 
+                        else answers[q.id].push(opt.val); 
+                    } 
+                    if (q.id === 'aux_rooms') { cleanupOldAnswers(); buildFullQuestionsList(); } else { updateMenu(); }
                     triggerLiveCalc(); renderQuestion(); 
                 }; grid.appendChild(card);
             }); container.appendChild(grid);

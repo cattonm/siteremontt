@@ -202,7 +202,7 @@
             {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledpidsv.webp"}
         ]},
         { id: "balcony_other", zone: "БАЛКОН", text: "Облаштування балкону", type: "multiselect_complex", hasOther: false, options: [
-            {label:"Утеплення", tier: false}
+            {label:"Утеплення", tier: false}, {label:"Робоче місце", tier: false}
         ]}
     ];
 
@@ -272,7 +272,7 @@
             { id: `bath_${index}_other`, zone: `САНВУЗОЛ ${index}`, text: "Інші потреби", type: "multiselect_complex", hasOther:false, options: [
                 {label:"Гігієнічний душ",tier:true}, {label:"Пральна машина",tier:true}, {label:"Сушильна машина",tier:true}, 
                 {label:"Дзеркало з підігрівом",tier:true}, {label:"Бойлер",tier:true}, {label:"Умивальник з тумбою",tier:true}, 
-                {label:"Дзеркало з підсвіткою",tier:true}, {label:"Дзеркало",tier:true}, {label:"Рушникосушка",tier:true}
+                {label:"Дзеркало",tier:true}, {label:"Рушникосушка",tier:true}
             ]}
         ];
     }
@@ -299,7 +299,7 @@
                 {label:"Панелі гіпсові",val:"Панелі гіпсові",img:"img/gipspankimn.webp"}, {label:"Панелі ДСП",val:"Панелі ДСП",img:"img/dsppaneli.webp"}, {label:"ні",val:"ні"}
             ]},
             { id: `room_${index}_other`, zone: `КІМНАТА ${index}`, text: "Інші потреби", type: "multiselect_complex", hasOther:false, options: [
-                {label:"Дзеркало з підсвіткою",tier:false}, {label:"Штори",tier:false}, {label:"Радіатор",tier:true}, {label:"Кондиціонер", tier:true}, {label:"Звукоізоляція", tier:false}
+                {label:"Радіатор",tier:true}, {label:"Кондиціонер", tier:true}, {label:"Звукоізоляція", tier:false}
             ]}
         ];
     }

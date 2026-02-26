@@ -303,18 +303,17 @@
         ]}
     ];
 
-    // Функції для динамічних блоків (санвузли, кімнати)
     function getBathQuestions(index) {
         return [
-            { id: `bath_${index}_floor`, zone: `САНВУЗОЛ ${index}`, text: "Плитка на підлогу (формат)", type: "cards_with_tier", options: [
-                { label: "Мозаїка", val: "Мозаїка", img: "img/plitkamozaika.webp", variants: ['Standard', 'Comfort', 'Premium'] },
-                { label: "Плитка до 120*60", val: "Керамограніт/Плитка до 120*60", img: "img/keram12060.webp", variants: ['Standard', 'Comfort', 'Premium'] },
-                { label: "Великоформатний", val: "Великоформатний керамограніт", img: "img/keram12060.webp", variants: ['Standard', 'Comfort', 'Premium'] }
+            { id: `bath_${index}_floor`, zone: `САНВУЗОЛ ${index}`, text: "Плитка на підлогу (формат)", type: "cards", options: [
+                { label: "Мозаїка", val: "Мозаїка", img: "img/plitkamozaika.webp" },
+                { label: "Плитка до 120*60", val: "Керамограніт/Плитка до 120*60", img: "img/keram12060.webp" },
+                { label: "Великоформатний", val: "Великоформатний керамограніт", img: "img/keram12060.webp" }
             ]},
-            { id: `bath_${index}_wall_tile`, zone: `САНВУЗОЛ ${index}`, text: "Плитка на стіни (формат)", type: "cards_with_tier", options: [
-                { label: "Мозаїка", val: "Мозаїка", img: "img/plitkamozaika.webp", variants: ['Standard', 'Comfort', 'Premium'] },
-                { label: "Плитка до 120*60", val: "Керамограніт/Плитка до 120*60", img: "img/keram12060.webp", variants: ['Standard', 'Comfort', 'Premium'] },
-                { label: "Великоформатний", val: "Великоформатний керамограніт", img: "img/keram12060.webp", variants: ['Standard', 'Comfort', 'Premium'] }
+            { id: `bath_${index}_wall_tile`, zone: `САНВУЗОЛ ${index}`, text: "Плитка на стіни (формат)", type: "cards", options: [
+                { label: "Мозаїка", val: "Мозаїка", img: "img/plitkamozaika.webp" },
+                { label: "Плитка до 120*60", val: "Керамограніт/Плитка до 120*60", img: "img/keram12060.webp" },
+                { label: "Великоформатний", val: "Великоформатний керамограніт", img: "img/keram12060.webp" }
             ]},
             { id: `bath_${index}_shower`, zone: `САНВУЗОЛ ${index}`, text: "Душ.", type: "cards_multiselect", options: [
                 {label:"Піддон (акрил/камінь)",val:"Піддон (акрил/камінь)",img:"img/piddon.webp"}, 
@@ -713,9 +712,6 @@
                     if(answers[q.id].type !== opt.val) { 
                         const firstVar = opt.variants ? opt.variants[0] : "Standard"; 
                         answers[q.id] = {type: opt.val, tier: (opt.val.startsWith("Не") ? "-" : firstVar)}; 
-                        if (q.id === 'entrance_door') {
-                            // Можна додати специфічну логіку, якщо потрібно
-                        }
                         triggerLiveCalc(); 
                         renderQuestion(); 
                     } 
@@ -883,7 +879,6 @@
                 e.preventDefault();
                 const val = parseFloat(e.target.value) || 0; 
                 answers.measurements[zone.id].floor = val; 
-                // Автоматично заповнюємо стіни тільки якщо поле порожнє
                 if (inpWalls.value === '' || parseFloat(inpWalls.value) === 0) {
                     const calculatedWalls = (val * 2.5).toFixed(1); 
                     inpWalls.value = calculatedWalls; 
@@ -1124,7 +1119,7 @@
             triggerLiveCalc(); 
             renderQuestion();
         } catch(e) { 
-            console.error('Load edit data error:', e);
+            console.error('Load edit data error:', e); 
             alert("Помилка з'єднання."); 
             document.getElementById('loading-screen').classList.add('hidden'); 
             document.getElementById('section-client').classList.remove('hidden'); 

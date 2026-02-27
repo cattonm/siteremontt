@@ -599,10 +599,10 @@
                 
                 // Оновлюємо стіни ТІЛЬКИ якщо людина не вписувала їх вручну
                 if (inpWalls.dataset.manual === "false" || inpWalls.value === '') { 
-                    const calculatedWalls = (val * 2.5).toFixed(1); 
-                    inpWalls.value = calculatedWalls; 
-                    answers.measurements[zone.id].walls = parseFloat(calculatedWalls) || 0; 
-                } 
+    const calculatedWalls = (val * 3).toFixed(1); // ЗМІНЕНО 2.5 НА 3
+    inpWalls.value = calculatedWalls; 
+    answers.measurements[zone.id].walls = parseFloat(calculatedWalls) || 0; 
+             }  
                 triggerLiveCalc(); 
             };
             

@@ -382,21 +382,73 @@
         } catch(e) {}
     }
 
-    function openCartModal() {
-        const list = document.getElementById('cart-list-content'); list.innerHTML = ''; let grouped = {};
+        function openCartModal() {
+        const list = document.getElementById('cart-list-content'); 
+        list.innerHTML = ''; 
+        
+        let html = '';
+
+        // 1. БЛОК ЗАГАЛЬНОЇ ІНФОРМАЦІЇ ТА ЗАМІРІВ
+        html += `<div class="cart-zone-title">📐 БАЗОВІ ДАНІ ТА ЗАМІРИ</div>`;
+        if (answers['rooms_count']) html += `• <b>Кількість кімнат:</b> ${answers['rooms_count']}<br>`;
+        if (answers['baths_count']) html += `• <b>Кількість санвузлів:</b> ${answers['baths_count']}<br>`;
+        
+        const aux = answers['aux_rooms'] || [];
+        if (aux.length > 0) html += `• <b>Додаткові приміщення:</b> ${aux.join(', ')}<br>`;
+
+        // Виводимо точні заміри, якщо вони є
+        if (answers.measurements) {
+            const zoneNames = {
+                'hallway': 'Передпокій', 'kitchen': 'Кухня', 'balcony': 'Балкон', 
+                'wardrobe': 'Гардероб', 'basement': 'Підвал', 'attic': 'Горище'
+            };
+            for (const [zoneId, meas] of Object.entries(answers.measurements)) {
+                let displayName = zoneNames[zoneId] || zoneId;
+                if (zoneId.startsWith('room_')) displayName = `Кімната ${zoneId.split('_')[1]}`;
+                if (zoneId.startsWith('bath_')) displayName = `Санвузол ${zoneId.split('_')[1]}`;
+                
+                if (meas.floor > 0 || meas.walls > 0) {
+                    html += `• <b>${displayName}:</b> Підлога ${meas.floor} м² | Стіни ${meas.walls} м²<br>`;
+                }
+            }
+        }
+        html += `<br>`;
+
+        // 2. БЛОК ВИБРАНИХ ОПЦІЙ ПО ЗОНАХ
+        let grouped = {};
         for(const [key, val] of Object.entries(answers)) {
+            // Пропускаємо службові ключі, бо ми їх вже вивели вище
             if(key === 'measurements' || key === 'aux_rooms' || key === 'rooms_count' || key === 'baths_count' || !val || val === "Ні" || (Array.isArray(val) && val.length===0) || val === 0 || val === "0") continue;
-            let q = finalQuestions.find(x => x.id === key); let zone = q ? q.zone : "ЗАГАЛЬНІ"; let label = q ? q.text.replace('.', '') : key;
+            
+            let q = finalQuestions.find(x => x.id === key); 
+            let zone = q ? q.zone : "ІНШЕ"; 
+            let label = q ? q.text.replace('.', '') : key;
+            
             let valStr = "";
             if (typeof val === 'object' && val !== null) {
                 if (val.type) valStr = `${val.type} ${val.tier && val.tier !== '-' ? '('+val.tier+')' : ''}`;
-                else { let parts = []; for(let [k, v] of Object.entries(val)) parts.push(`${k} ${v && v!=='Так' ? '('+v+')' : ''}`); valStr = parts.join(', '); }
-            } else if (Array.isArray(val)) { valStr = val.join(', '); } else { valStr = val; }
-            if(!grouped[zone]) grouped[zone] = []; grouped[zone].push(`• <b>${label}:</b> ${valStr}`);
+                else { 
+                    let parts = []; 
+                    for(let [k, v] of Object.entries(val)) parts.push(`${k} ${v && v!=='Так' ? '('+v+')' : ''}`); 
+                    valStr = parts.join(', '); 
+                }
+            } else if (Array.isArray(val)) { 
+                valStr = val.join(', '); 
+            } else { 
+                valStr = val; 
+            }
+            
+            if(!grouped[zone]) grouped[zone] = []; 
+            grouped[zone].push(`• <b>${label}:</b> ${valStr}`);
         }
-        let html = '';
-        for(const [zone, items] of Object.entries(grouped)) { html += `<div class="cart-zone-title">${zone}</div>`; html += items.join('<br>') + '<br>'; }
-        list.innerHTML = html || '<i>Поки що нічого не вибрано...</i>'; document.getElementById('cart-modal').style.display = 'flex';
+
+        for(const [zone, items] of Object.entries(grouped)) { 
+            html += `<div class="cart-zone-title">${zone}</div>`; 
+            html += items.join('<br>') + '<br>'; 
+        }
+        
+        list.innerHTML = html || '<i>Поки що нічого не вибрано...</i>'; 
+        document.getElementById('cart-modal').style.display = 'flex';
     }
     function closeCartModal() { document.getElementById('cart-modal').style.display = 'none'; }
 

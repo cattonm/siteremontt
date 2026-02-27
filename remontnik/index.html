@@ -147,18 +147,13 @@
 
     const blockHallway = [
         { id: "hallway_floor", zone: "ПЕРЕДПОКІЙ", text: "Тип підлоги.", type: "cards", options: [
-            {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"},
-            {label:"Кварцвініл",val:"Кварцвініл",img:"img/kvarzvinil.webp"},
-            {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}
+            {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Кварцвініл",val:"Кварцвініл",img:"img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}
         ]},
         { id: "hallway_walls", zone: "ПЕРЕДПОКІЙ", text: "Стіни.", type: "cards", options: [
-            {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"},
-            {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"},
-            {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}
+            {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}
         ]},
         { id: "hallway_light", zone: "ПЕРЕДПОКІЙ", text: "Освітлення", type: "cards_multiselect", options: [
-            {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"},
-            {label:"Трек / Лінія",val:"Трек / Лінія"}, {label:"Декор підсвітка",val:"Декор підсвітка",img:"img/dekorpidsv.webp"}
+            {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"Трек / Лінія",val:"Трек / Лінія"}, {label:"Декор підсвітка",val:"Декор підсвітка",img:"img/dekorpidsv.webp"}
         ]},
         { id: "hallway_decor", zone: "ПЕРЕДПОКІЙ", text: "Декор", type: "cards", options: [
             {label:"ДСП панелі",val:"ДСП панелі",img:"img/dsppaneli.webp"}, {label:"Ні",val:"Ні"}
@@ -170,8 +165,7 @@
             {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}
         ]},
         { id: "kitchen_light", zone: "КУХНЯ", text: "Освітлення", type: "cards_multiselect", options: [
-            {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"},
-            {label:"Трек / Лінія",val:"Трек / Лінія"}, {label:"Декор підсвітка",val:"Декор підсвітка",img:"img/dekorpidsv.webp"}
+            {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"Трек / Лінія",val:"Трек / Лінія"}, {label:"Декор підсвітка",val:"Декор підсвітка",img:"img/dekorpidsv.webp"}
         ]},
         { id: "kitchen_floor", zone: "КУХНЯ", text: "Підлога.", type: "cards", options: [
             {label:"Керамограніт",val:"Керамограніт",img:"img/kitchenkeramo.webp"}, {label:"Кварц-вініл",val:"Кварц-вініл",img:"img/kitchenkvarzv.webp"}
@@ -256,8 +250,7 @@
             { id: `bath_${index}_tub`, zone: `САНВУЗОЛ ${index}`, text: "Ванна", type: "cards_with_tier", options: [
                 {label:"Акрил",val:"Акрил",img:"img/vanaakril.webp", variants: ['Standard', 'Comfort', 'Premium']}, 
                 {label:"Гідро масаж",val:"Гідро масаж",img:"img/vanagidromas.webp", variants: ['Standard', 'Comfort', 'Premium']}, 
-                {label:"Окремостояча",val:"Окремостояча",img:"img/okremavana.webp", variants: ['Standard', 'Comfort', 'Premium']}, 
-                {label:"Не обладнувати",val:"Не обладнувати"}
+                {label:"Окремостояча",val:"Окремостояча",img:"img/okremavana.webp", variants: ['Standard', 'Comfort', 'Premium']}, {label:"Не обладнувати",val:"Не обладнувати"}
             ]},
             { id: `bath_${index}_toilet`, zone: `САНВУЗОЛ ${index}`, text: "Унітаз.", type: "cards_with_tier", options: [
                 {label:"Окремостоячий",val:"Окремостоячий",img:"img/unitazokremo.webp", variants: ['Standard', 'Comfort', 'Premium']}, 
@@ -427,7 +420,7 @@
                 const labelDiv = document.createElement('div'); labelDiv.innerText = opt.label; card.appendChild(labelDiv);
                 card.onclick = (e) => {
                     e.preventDefault(); answers[q.id] = opt.val; 
-                    if (q.id === 'rooms_count' || q.id === 'baths_count') { cleanupOldAnswers(); buildFullQuestionsList(); }
+                    if (q.id === 'rooms_count' || q.id === 'baths_count' || q.id === 'aux_rooms') { cleanupOldAnswers(); buildFullQuestionsList(); }
                     triggerLiveCalc(); renderQuestion(); 
                 }; grid.appendChild(card);
             }); container.appendChild(grid);
@@ -531,14 +524,45 @@
         const roomsCount = answers['rooms_count'] || 0; for(let i=1; i<=roomsCount; i++) zones.push({id: `room_${i}`, name: `Кімната ${i}`});
         const bathsCount = answers['baths_count'] || 0; for(let i=1; i<=bathsCount; i++) zones.push({id: `bath_${i}`, name: `Санвузол ${i}`});
         if (zones.length === 0) { container.innerHTML = '<p>Немає вибраних приміщень для замірів.</p>'; return; }
+        
         zones.forEach(zone => {
             if(!answers.measurements[zone.id]) answers.measurements[zone.id] = {floor: '', walls: ''};
             const box = document.createElement('div'); box.className = 'measurement-box';
-            box.innerHTML = `<h4>${zone.name}</h4><label>Площа підлоги (м²)</label><input type="number" placeholder="0" value="${answers.measurements[zone.id].floor}" class="inp-floor"><label>Площа стін (м²)</label><input type="number" placeholder="0" value="${answers.measurements[zone.id].walls}" class="inp-walls">`;
-            const inpFloor = box.querySelector('.inp-floor'); const inpWalls = box.querySelector('.inp-walls');
-            inpFloor.oninput = (e) => { e.preventDefault(); const val = parseFloat(e.target.value) || 0; answers.measurements[zone.id].floor = val; if (inpWalls.value === '' || parseFloat(inpWalls.value) === 0) { const calculatedWalls = (val * 2.5).toFixed(1); inpWalls.value = calculatedWalls; answers.measurements[zone.id].walls = parseFloat(calculatedWalls) || 0; } triggerLiveCalc(); };
-            inpWalls.oninput = (e) => { e.preventDefault(); answers.measurements[zone.id].walls = parseFloat(e.target.value) || 0; triggerLiveCalc(); }; container.appendChild(box);
-        }); triggerLiveCalc(); 
+            box.innerHTML = `<h4>${zone.name}</h4>
+                <label>Площа підлоги (м²)</label>
+                <input type="number" placeholder="0" value="${answers.measurements[zone.id].floor}" class="inp-floor">
+                <label>Площа стін (м²)</label>
+                <input type="number" placeholder="0" value="${answers.measurements[zone.id].walls}" class="inp-walls">`;
+            
+            const inpFloor = box.querySelector('.inp-floor'); 
+            const inpWalls = box.querySelector('.inp-walls');
+            
+            // Фікс: Відслідковуємо, чи було поле стін заповнено вручну
+            inpWalls.dataset.manual = answers.measurements[zone.id].walls ? "true" : "false";
+
+            inpFloor.oninput = (e) => { 
+                e.preventDefault(); 
+                const val = parseFloat(e.target.value) || 0; 
+                answers.measurements[zone.id].floor = val; 
+                
+                // Оновлюємо стіни ТІЛЬКИ якщо людина не вписувала їх вручну
+                if (inpWalls.dataset.manual === "false" || inpWalls.value === '') { 
+                    const calculatedWalls = (val * 2.5).toFixed(1); 
+                    inpWalls.value = calculatedWalls; 
+                    answers.measurements[zone.id].walls = parseFloat(calculatedWalls) || 0; 
+                } 
+                triggerLiveCalc(); 
+            };
+            
+            inpWalls.oninput = (e) => { 
+                e.preventDefault(); 
+                answers.measurements[zone.id].walls = parseFloat(e.target.value) || 0; 
+                inpWalls.dataset.manual = "true"; // Блокуємо автооновлення
+                triggerLiveCalc(); 
+            }; 
+            container.appendChild(box);
+        }); 
+        triggerLiveCalc(); 
     }
 
     function goNext() {

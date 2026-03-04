@@ -1090,7 +1090,8 @@
         }
     }
 
-    function renderSummary() {
+        function renderSummary() {
+        document.getElementById('live-cart').classList.remove('visible'); 
         showSection('section-summary');
         
         const btnNext = document.getElementById('btnNext'); 
@@ -1101,8 +1102,12 @@
         const btnBack = document.getElementById('btnBack'); 
         btnBack.onclick = goBack; 
 
-        const container = document.getElementById('summary-container'); container.innerHTML = ''; let html = '';
+        const container = document.getElementById('summary-container');
+        container.innerHTML = '';
         
+        let html = '';
+        
+        // 1. ІНФОРМАЦІЯ ПРО КЛІЄНТА
         html += `<div class="summary-box">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
                 <div class="cart-zone-title" style="margin-top:0; border:none; padding:0;">👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ</div>
@@ -1111,8 +1116,10 @@
         html += `<div class="summary-item"><span>Ім'я:</span> <b>${document.getElementById('clientName').value || '-'}</b></div>`;
         html += `<div class="summary-item"><span>Телефон:</span> <b>${document.getElementById('clientPhone').value || '-'}</b></div>`;
         html += `<div class="summary-item"><span>Площа:</span> <b>${document.getElementById('clientArea').value || '0'} м²</b></div>`;
-        html += `<div class="summary-item"><span>Тип:</span> <b>${document.getElementById('objectType').value}</b></div></div>`;
+        html += `<div class="summary-item"><span>Тип:</span> <b>${document.getElementById('objectType').value}</b></div>`;
+        html += `</div>`;
 
+        // 2. СТРУКТУРА ОБ'ЄКТУ
         let idxRooms = finalQuestions.findIndex(q => q.id === 'rooms_count');
         let idxBaths = finalQuestions.findIndex(q => q.id === 'baths_count');
         let idxAux = finalQuestions.findIndex(q => q.id === 'aux_rooms');
@@ -1124,55 +1131,102 @@
         if (idxRooms > -1) html += `<div class="summary-item"><span>Кімнат:</span> <div style="display:flex; align-items:center; gap:10px;"><b>${answers['rooms_count'] || 0}</b> <div class="edit-btn" onclick="editStep(${idxRooms})">✏️</div></div></div>`;
         if (idxBaths > -1) html += `<div class="summary-item"><span>Санвузлів:</span> <div style="display:flex; align-items:center; gap:10px;"><b>${answers['baths_count'] || 0}</b> <div class="edit-btn" onclick="editStep(${idxBaths})">✏️</div></div></div>`;
         if (idxAux > -1) {
-            const aux = answers['aux_rooms'] || []; let auxStr = aux.length > 0 ? aux.join(', ') : 'Немає';
+            const aux = answers['aux_rooms'] || [];
+            let auxStr = aux.length > 0 ? aux.join(', ') : 'Немає';
             html += `<div class="summary-item"><span>Додатково:</span> <div style="display:flex; align-items:center; gap:10px; text-align:right;"><b style="max-width:150px; word-wrap:break-word;">${auxStr}</b> <div class="edit-btn" onclick="editStep(${idxAux})">✏️</div></div></div>`;
-        } html += `</div>`;
+        }
+        html += `</div>`;
 
+        // 3. ЗАМІРИ ПРИМІЩЕНЬ
         if (answers.measurements) {
             let measIndex = finalQuestions.findIndex(q => q.type === 'trigger_meas');
-            html += `<div class="summary-box"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
-                        <div class="cart-zone-title" style="margin-top:0; border:none; padding:0;">📏 ТОЧНІ ЗАМІРИ</div>
-                        <div class="edit-btn" onclick="editStep(${measIndex})">✏️ Змінити</div>
-                     </div>`;
+            html += `<div class="summary-box">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+                            <div class="cart-zone-title" style="margin-top:0; border:none; padding:0;">📏 ТОЧНІ ЗАМІРИ</div>
+                            <div class="edit-btn" onclick="editStep(${measIndex})">✏️ Змінити</div>
+                        </div>`;
             const zoneNames = { 'hallway': 'Передпокій', 'kitchen': 'Кухня', 'balcony': 'Балкон', 'wardrobe': 'Гардероб', 'basement': 'Підвал', 'attic': 'Горище' };
             for (const [zoneId, meas] of Object.entries(answers.measurements)) {
                 let displayName = zoneNames[zoneId] || (zoneId.startsWith('room_') ? `Кімната ${zoneId.split('_')[1]}` : `Санвузол ${zoneId.split('_')[1]}`);
-                if (meas.floor > 0 || meas.walls > 0) html += `<div class="summary-item" style="font-size: 14px;"><span>${displayName}:</span> <span style="text-align:right;">Підлога: ${meas.floor} м²<br>Стіни: ${meas.walls} м²</span></div>`;
-            } html += `</div>`;
+                if (meas.floor > 0 || meas.walls > 0) {
+                    html += `<div class="summary-item" style="font-size: 14px;"><span>${displayName}:</span> <span style="text-align:right;">Підлога: ${meas.floor} м²<br>Стіни: ${meas.walls} м²</span></div>`;
+                }
+            }
+            html += `</div>`;
         }
 
+        // 4. ІНШІ РОЗДІЛИ (Перебираємо всі питання, щоб показати навіть пропущені)
         let grouped = {};
-        for(const [key, val] of Object.entries(answers)) {
-            if(key === 'measurements' || key === 'aux_rooms' || key === 'rooms_count' || key === 'baths_count' || !val || val === "Ні" || (Array.isArray(val) && val.length===0) || val === 0 || val === "0") continue;
-            let qIndex = finalQuestions.findIndex(x => x.id === key); let q = finalQuestions[qIndex]; if (!q) continue;
-            let zone = q.zone; let label = q.text.replace('.', ''); let valStr = "";
-            if (typeof val === 'object' && val !== null) {
-                if (val.type) valStr = `${val.type} ${val.tier && val.tier !== '-' ? '('+val.tier+')' : ''}`;
-                else { let parts = []; for(let [k, v] of Object.entries(val)) { if(v && v!==0) { if (v === "Так") parts.push(`${k}`); else if (typeof v === 'number') parts.push(`${k} (${v} м²)`); else parts.push(`${k} (${v})`); } } valStr = parts.join(', '); }
-            } else if (Array.isArray(val)) { valStr = val.join(', '); } else { valStr = val; }
-            if(!valStr) continue;
-            if(!grouped[zone]) grouped[zone] = []; grouped[zone].push({label, valStr, qIndex});
-        }
+        
+        finalQuestions.forEach((q, qIndex) => {
+            // Пропускаємо базові питання (вже виведені вище) та ті, що не стосуються поточних кімнат
+            if (q.id === 'rooms_count' || q.id === 'baths_count' || q.id === 'aux_rooms' || q.type === 'trigger_meas') return;
+            if (shouldSkip(q)) return;
+            
+            let zone = q.zone;
+            let label = q.text.replace('.', '');
+            let val = answers[q.id];
+            let valStr = "";
+            
+            // Логіка форматування відповідей
+            if (val === undefined || val === null || val === "" || (Array.isArray(val) && val.length === 0)) {
+                valStr = "<i style='color: var(--hint-color);'>не вибрано</i>";
+            } else if (val === "Ні" || val === "Не потребується" || val === "Не обладнувати") {
+                valStr = "Ні";
+            } else if (typeof val === 'object' && !Array.isArray(val)) {
+                if (val.type) {
+                    valStr = `${val.type} ${val.tier && val.tier !== '-' ? '('+val.tier+')' : ''}`;
+                } else {
+                    let parts = [];
+                    for(let [k, v] of Object.entries(val)) {
+                        if(v && v !== 0) {
+                            if (v === "Так") parts.push(`${k}`);
+                            else if (typeof v === 'number') parts.push(`${k} (${v} м²)`);
+                            else parts.push(`${k} (${v})`);
+                        }
+                    }
+                    valStr = parts.length > 0 ? parts.join(', ') : "<i style='color: var(--hint-color);'>не вибрано</i>";
+                }
+            } else if (Array.isArray(val)) {
+                valStr = val.join(', ');
+            } else {
+                valStr = val; // Для звичайних цифр або тексту
+            }
+            
+            if(!grouped[zone]) grouped[zone] = []; 
+            grouped[zone].push({label, valStr, qIndex});
+        });
 
         for(const [zone, items] of Object.entries(grouped)) { 
-            html += `<div class="summary-box"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
-                    <div class="cart-zone-title" style="margin-top:0; border:none; padding:0;">${zone}</div></div>`;
+            html += `<div class="summary-box">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+                    <div class="cart-zone-title" style="margin-top:0; border:none; padding:0;">${zone}</div>
+                </div>`;
+            
             items.forEach(item => {
-                html += `<div class="summary-item" style="align-items:center;"><div style="flex:1; padding-right:10px;">
-                            <div style="font-size:13px; color:var(--hint-color); margin-bottom:4px;">${item.label}</div>
-                            <div style="font-weight:500;">${item.valStr}</div>
-                         </div><div class="edit-btn" onclick="editStep(${item.qIndex})">✏️</div></div>`;
-            }); html += `</div>`; 
+                html += `<div class="summary-item" style="align-items:center;">
+                            <div style="flex:1; padding-right:10px;">
+                                <div style="font-size:13px; color:var(--hint-color); margin-bottom:4px;">${item.label}</div>
+                                <div style="font-weight:500;">${item.valStr}</div>
+                            </div>
+                            <div class="edit-btn" onclick="editStep(${item.qIndex})">✏️</div>
+                         </div>`;
+            });
+            html += `</div>`; 
         }
         
+        // ФІНАЛЬНА ВАРТІСТЬ
         html += `<div class="summary-box" style="background: rgba(52, 199, 89, 0.1); border-color: #34c759;">
                     <div style="text-align: center; color: #34c759; font-weight: 700; font-size: 16px; margin-bottom: 5px;">ВАРТІСТЬ ЗАРАЗ</div>
                     <div style="display: flex; justify-content: space-around;">
                         <div style="text-align: center;"><div style="font-size: 12px; color: var(--text-color);">Робота</div><div style="font-weight: 800; font-size: 18px; color: var(--text-color);" id="summary-total-work">${currentTotalWork.toLocaleString()} ₴</div></div>
                         <div style="text-align: center;"><div style="font-size: 12px; color: var(--text-color);">Матеріали (від)</div><div style="font-weight: 800; font-size: 18px; color: var(--text-color);" id="summary-total-mat">${currentTotalMat.toLocaleString()} ₴</div></div>
-                    </div></div>`;
+                    </div>
+                 </div>`;
+
         container.innerHTML = html;
     }
+
 
     function finishSurvey() {
         vibe('heavy');

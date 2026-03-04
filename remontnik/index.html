@@ -455,7 +455,7 @@
         return [
             { id: `room_${index}_floor`, zone: `КІМНАТА ${index}`, text: "Тип підлоги.", type: "cards", options: [
                 { label: "Ламінат", val: "Ламінат", img: "img/laminat.jpeg" }, { label: "Паркет", val: "Паркет", img: "img/parket.jpeg" },
-                { label: "Кварц вініл", val: "Кварц вініл", img: "img/kvarzvinil.webp" }, { label: "Керамограніт", val: "Керамограніт", img: "img/keramogranit.webp" }
+                { label: "Квар вініл", val: "Кварц вініл", img: "img/kvarzvinil.webp" }, { label: "Керамограніт", val: "Керамограніт", img: "img/keramogranit.webp" }
             ]},
             { id: `room_${index}_walls`, zone: `КІМНАТА ${index}`, text: "Стіни.", type: "cards_multiselect", options: [
                 {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}
@@ -534,8 +534,8 @@
                     currentStep = index; 
                     toggleMenu(); 
                     document.getElementById('section-measurements').classList.add('hidden'); 
-                    document.getElementById('section-questions').classList.remove('hidden'); 
                     document.getElementById('section-summary').classList.add('hidden');
+                    document.getElementById('section-questions').classList.remove('hidden'); 
                     document.getElementById('navBar').style.display = 'flex'; 
                     document.getElementById('btnNext').classList.remove('btn-submit');
                     renderQuestion(); 
@@ -681,8 +681,6 @@
             if (q.type === 'trigger_meas') {
                 renderMeasurements();
             } else {
-                document.getElementById('section-measurements').classList.add('hidden');
-                document.getElementById('section-questions').classList.remove('hidden');
                 renderQuestion();
             }
         }
@@ -690,8 +688,11 @@
 
     function renderSummary() {
         document.getElementById('live-cart').classList.add('visible'); 
+        
+        // ВИПРАВЛЕННЯ: Жорстко ховаємо всі інші екрани і показуємо Summary
         document.getElementById('section-questions').classList.add('hidden'); 
         document.getElementById('section-measurements').classList.add('hidden');
+        document.getElementById('section-client').classList.add('hidden');
         document.getElementById('section-summary').classList.remove('hidden');
         
         const btnNext = document.getElementById('btnNext'); 
@@ -804,6 +805,18 @@
             renderMeasurements();
             return;
         }
+
+        // ВИПРАВЛЕННЯ: Жорстко перемикаємо видимість екранів
+        document.getElementById('section-measurements').classList.add('hidden');
+        document.getElementById('section-summary').classList.add('hidden');
+        document.getElementById('section-client').classList.add('hidden');
+        document.getElementById('section-questions').classList.remove('hidden');
+
+        // Відновлюємо стандартні функції кнопок
+        const btnNext = document.getElementById('btnNext');
+        btnNext.innerText = 'Далі';
+        btnNext.onclick = goNext;
+        document.getElementById('btnBack').onclick = goBack;
 
         document.getElementById('step-count').innerText = `${currentStep + 1}/${finalQuestions.length}`;
         const container = document.getElementById('question-container'); 
@@ -1026,18 +1039,29 @@
         
         container.appendChild(animWrap);
 
-        document.getElementById('btnNext').innerText = 'Далі';
+        let isLast = true;
+        for(let i = currentStep + 1; i < finalQuestions.length; i++) {
+            if (!shouldSkip(finalQuestions[i])) { isLast = false; break; }
+        }
+        document.getElementById('btnNext').innerText = isLast ? (editId ? '✅ Перевірити зміни' : '✅ Перевірити') : 'Далі';
     }
 
     function renderMeasurements() {
         document.getElementById('live-cart').classList.add('visible'); 
+        
+        // ВИПРАВЛЕННЯ: Жорстко перемикаємо видимість
         document.getElementById('section-questions').classList.add('hidden'); 
         document.getElementById('section-summary').classList.add('hidden');
+        document.getElementById('section-client').classList.add('hidden');
         document.getElementById('section-measurements').classList.remove('hidden');
         
         const btnNext = document.getElementById('btnNext'); 
         btnNext.innerText = 'Далі'; 
         btnNext.classList.remove('btn-submit');
+        btnNext.onclick = goNext; // Відновлюємо функцію
+        
+        const btnBack = document.getElementById('btnBack'); 
+        btnBack.onclick = goBack;
         
         const container = document.getElementById('measurements-container'); container.innerHTML = ''; answers.measurements = answers.measurements || {}; const zones = []; const aux = answers['aux_rooms'] || [];
         if (aux.includes('Передпокій')) zones.push({id: 'hallway', name: 'Передпокій'}); if (aux.includes('Кухня')) zones.push({id: 'kitchen', name: 'Кухня'}); if (aux.includes('Балкон')) zones.push({id: 'balcony', name: 'Балкон'}); if (aux.includes('Гардероб')) zones.push({id: 'wardrobe', name: 'Гардероб'}); if (aux.includes('Підвал')) zones.push({id: 'basement', name: 'Підвал'}); if (aux.includes('Горище')) zones.push({id: 'attic', name: 'Горище'});
@@ -1129,14 +1153,11 @@
             let prevStep = finalQuestions.length - 1;
             while(prevStep >= 0 && shouldSkip(finalQuestions[prevStep])) { prevStep--; }
             currentStep = prevStep;
-            document.getElementById('section-summary').classList.add('hidden');
             document.getElementById('btnNext').classList.remove('btn-submit');
             
             if (finalQuestions[currentStep].type === 'trigger_meas') {
-                document.getElementById('section-measurements').classList.remove('hidden');
                 renderMeasurements();
             } else {
-                document.getElementById('section-questions').classList.remove('hidden');
                 renderQuestion();
             }
             return;
@@ -1148,7 +1169,7 @@
             if (finalQuestions[currentStep].type === 'trigger_meas') renderMeasurements();
             else renderQuestion(); 
         } else { 
-            currentStep = -1; document.getElementById('live-cart').classList.remove('visible'); document.getElementById('section-client').classList.remove('hidden'); document.getElementById('section-questions').classList.add('hidden'); document.getElementById('section-measurements').classList.add('hidden'); document.getElementById('btnBack').style.display = 'none'; 
+            currentStep = -1; document.getElementById('live-cart').classList.remove('visible'); document.getElementById('section-client').classList.remove('hidden'); document.getElementById('section-questions').classList.add('hidden'); document.getElementById('section-measurements').classList.add('hidden'); document.getElementById('section-summary').classList.add('hidden'); document.getElementById('btnBack').style.display = 'none'; 
         }
     }
 

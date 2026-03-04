@@ -273,6 +273,7 @@
     let calcTimeout = null;
     let currentTotalWork = 0;
     let currentTotalMat = 0;
+    let isEditingFromSummary = false; // Флаг для Швидкого редагування
 
     const blockSetup = [
         { id: "rooms_count", zone: "СТРУКТУРА ОБ'ЄКТУ", text: "Скільки ЖИТЛОВИХ кімнат?", type: "input_number", placeholder: "Введіть число" },
@@ -455,7 +456,7 @@
         return [
             { id: `room_${index}_floor`, zone: `КІМНАТА ${index}`, text: "Тип підлоги.", type: "cards", options: [
                 { label: "Ламінат", val: "Ламінат", img: "img/laminat.jpeg" }, { label: "Паркет", val: "Паркет", img: "img/parket.jpeg" },
-                { label: "Квар вініл", val: "Кварц вініл", img: "img/kvarzvinil.webp" }, { label: "Керамограніт", val: "Керамограніт", img: "img/keramogranit.webp" }
+                { label: "Кварц вініл", val: "Кварц вініл", img: "img/kvarzvinil.webp" }, { label: "Керамограніт", val: "Керамограніт", img: "img/keramogranit.webp" }
             ]},
             { id: `room_${index}_walls`, zone: `КІМНАТА ${index}`, text: "Стіни.", type: "cards_multiselect", options: [
                 {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}
@@ -531,6 +532,7 @@
                 item.innerText = q.zone.replace(' ЗАМІРИ ПРИМІЩЕНЬ', '📏 ЗАМІРИ ПРИМІЩЕНЬ');
                 item.onclick = () => { 
                     vibe();
+                    isEditingFromSummary = false;
                     currentStep = index; 
                     toggleMenu(); 
                     document.getElementById('section-measurements').classList.add('hidden'); 
@@ -564,59 +566,6 @@
         document.getElementById('sheet-overlay').classList.remove('open');
     }
     
-    function openCartSheet() {
-        vibe();
-        const list = document.getElementById('cart-list-content'); 
-        list.innerHTML = ''; 
-        
-        let html = '';
-        html += `<div class="cart-zone-title">📐 БАЗОВІ ДАНІ ТА ЗАМІРИ</div>`;
-        if (answers['rooms_count']) html += `• <b>Кількість кімнат:</b> ${answers['rooms_count']}<br>`;
-        if (answers['baths_count']) html += `• <b>Кількість санвузлів:</b> ${answers['baths_count']}<br>`;
-        
-        const aux = answers['aux_rooms'] || [];
-        if (aux.length > 0) html += `• <b>Додаткові приміщення:</b> ${aux.join(', ')}<br>`;
-
-        if (answers.measurements) {
-            const zoneNames = { 'hallway': 'Передпокій', 'kitchen': 'Кухня', 'balcony': 'Балкон', 'wardrobe': 'Гардероб', 'basement': 'Підвал', 'attic': 'Горище' };
-            for (const [zoneId, meas] of Object.entries(answers.measurements)) {
-                let displayName = zoneNames[zoneId] || zoneId;
-                if (zoneId.startsWith('room_')) displayName = `Кімната ${zoneId.split('_')[1]}`;
-                if (zoneId.startsWith('bath_')) displayName = `Санвузол ${zoneId.split('_')[1]}`;
-                if (meas.floor > 0 || meas.walls > 0) html += `• <b>${displayName}:</b> Підлога ${meas.floor} м² | Стіни ${meas.walls} м²<br>`;
-            }
-        }
-        html += `<br>`;
-
-        let grouped = {};
-        for(const [key, val] of Object.entries(answers)) {
-            if(key === 'measurements' || key === 'aux_rooms' || key === 'rooms_count' || key === 'baths_count' || !val || val === "Ні" || (Array.isArray(val) && val.length===0) || val === 0 || val === "0") continue;
-            let q = finalQuestions.find(x => x.id === key); let zone = q ? q.zone : "ЗАГАЛЬНІ"; let label = q ? q.text.replace('.', '') : key;
-            let valStr = "";
-            if (typeof val === 'object' && val !== null) {
-                if (val.type) valStr = `${val.type} ${val.tier && val.tier !== '-' ? '('+val.tier+')' : ''}`;
-                else { 
-                    let parts = []; 
-                    for(let [k, v] of Object.entries(val)) { 
-                        if(v && v!==0) {
-                            if (v === "Так") parts.push(`${k}`);
-                            else if (typeof v === 'number') parts.push(`${k} (${v} м²)`);
-                            else parts.push(`${k} (${v})`);
-                        } 
-                    } 
-                    valStr = parts.join(', '); 
-                }
-            } else if (Array.isArray(val)) { valStr = val.join(', '); } else { valStr = val; }
-            if(!valStr) continue;
-            if(!grouped[zone]) grouped[zone] = []; grouped[zone].push(`• <b>${label}:</b> ${valStr}`);
-        }
-        for(const [zone, items] of Object.entries(grouped)) { html += `<div class="cart-zone-title">${zone}</div>`; html += items.join('<br>') + '<br>'; }
-        list.innerHTML = html || '<i>Поки що нічого не вибрано...</i>'; 
-        
-        document.getElementById('cart-sheet').classList.add('open');
-        document.getElementById('sheet-overlay').classList.add('open');
-    }
-
     function closeCartSheet() { 
         vibe();
         document.getElementById('cart-sheet').classList.remove('open');
@@ -667,6 +616,7 @@
         vibe('light');
         document.getElementById('section-summary').classList.add('hidden');
         document.getElementById('btnNext').classList.remove('btn-submit');
+        isEditingFromSummary = true;
         
         if (index === -1) {
             currentStep = -1;
@@ -675,6 +625,7 @@
             document.getElementById('section-client').classList.remove('hidden');
             document.getElementById('btnBack').style.display = 'none';
             document.getElementById('live-cart').classList.remove('visible');
+            document.getElementById('btnNext').innerText = '✅ До підсумку';
         } else {
             currentStep = index;
             const q = finalQuestions[index];
@@ -687,9 +638,9 @@
     }
 
     function renderSummary() {
-        document.getElementById('live-cart').classList.add('visible'); 
+        document.getElementById('live-cart').classList.remove('visible'); 
         
-        // ВИПРАВЛЕННЯ: Жорстко ховаємо всі інші екрани і показуємо Summary
+        // Жорстко ховаємо всі інші екрани і показуємо Summary
         document.getElementById('section-questions').classList.add('hidden'); 
         document.getElementById('section-measurements').classList.add('hidden');
         document.getElementById('section-client').classList.add('hidden');
@@ -806,16 +757,11 @@
             return;
         }
 
-        // ВИПРАВЛЕННЯ: Жорстко перемикаємо видимість екранів
         document.getElementById('section-measurements').classList.add('hidden');
         document.getElementById('section-summary').classList.add('hidden');
         document.getElementById('section-client').classList.add('hidden');
         document.getElementById('section-questions').classList.remove('hidden');
 
-        // Відновлюємо стандартні функції кнопок
-        const btnNext = document.getElementById('btnNext');
-        btnNext.innerText = 'Далі';
-        btnNext.onclick = goNext;
         document.getElementById('btnBack').onclick = goBack;
 
         document.getElementById('step-count').innerText = `${currentStep + 1}/${finalQuestions.length}`;
@@ -1039,26 +985,35 @@
         
         container.appendChild(animWrap);
 
-        let isLast = true;
-        for(let i = currentStep + 1; i < finalQuestions.length; i++) {
-            if (!shouldSkip(finalQuestions[i])) { isLast = false; break; }
+        // Встановлюємо текст кнопки залежно від режиму
+        const btnNext = document.getElementById('btnNext');
+        if (isEditingFromSummary) {
+            btnNext.innerText = '✅ До підсумку';
+        } else {
+            btnNext.onclick = goNext; // ensure normal function
+            let isLast = true;
+            for(let i = currentStep + 1; i < finalQuestions.length; i++) {
+                if (!shouldSkip(finalQuestions[i])) { isLast = false; break; }
+            }
+            btnNext.innerText = isLast ? 'Перевірити дані' : 'Далі';
         }
-        document.getElementById('btnNext').innerText = isLast ? (editId ? '✅ Перевірити зміни' : '✅ Перевірити') : 'Далі';
     }
 
     function renderMeasurements() {
         document.getElementById('live-cart').classList.add('visible'); 
-        
-        // ВИПРАВЛЕННЯ: Жорстко перемикаємо видимість
         document.getElementById('section-questions').classList.add('hidden'); 
         document.getElementById('section-summary').classList.add('hidden');
-        document.getElementById('section-client').classList.add('hidden');
         document.getElementById('section-measurements').classList.remove('hidden');
         
         const btnNext = document.getElementById('btnNext'); 
-        btnNext.innerText = 'Далі'; 
         btnNext.classList.remove('btn-submit');
-        btnNext.onclick = goNext; // Відновлюємо функцію
+        btnNext.onclick = goNext; 
+        
+        if (isEditingFromSummary) {
+            btnNext.innerText = '✅ До підсумку';
+        } else {
+            btnNext.innerText = 'Далі';
+        }
         
         const btnBack = document.getElementById('btnBack'); 
         btnBack.onclick = goBack;
@@ -1127,12 +1082,33 @@
                 return;
             }
             
-            buildFullQuestionsList(); triggerLiveCalc(); document.getElementById('section-client').classList.add('hidden'); document.getElementById('section-questions').classList.remove('hidden'); document.getElementById('btnBack').style.display = 'block'; currentStep = 0; renderQuestion(); return;
+            buildFullQuestionsList(); triggerLiveCalc(); 
+            document.getElementById('section-client').classList.add('hidden'); 
+            
+            // Якщо редагували базові дані і натиснули Зберегти
+            if (isEditingFromSummary) {
+                isEditingFromSummary = false;
+                currentStep = finalQuestions.length;
+                renderSummary();
+                return;
+            }
+
+            document.getElementById('section-questions').classList.remove('hidden'); 
+            document.getElementById('btnBack').style.display = 'block'; 
+            currentStep = 0; renderQuestion(); return;
         }
         
-        // ПЕРЕВІРКА, ЧИ МИ НА СТОРІНЦІ SUMMARY
+        // ПЕРЕВІРКА, ЧИ МИ НА СТОРІНЦІ SUMMARY (Завершення)
         if (currentStep >= finalQuestions.length) {
             finishSurvey();
+            return;
+        }
+
+        // ШВИДКЕ ПОВЕРНЕННЯ ПІСЛЯ РЕДАГУВАННЯ
+        if (isEditingFromSummary) {
+            isEditingFromSummary = false;
+            currentStep = finalQuestions.length;
+            renderSummary();
             return;
         }
 
@@ -1148,7 +1124,18 @@
     function goBack() {
         vibe('light');
         
-        // Якщо повертаємось із Summary
+        // СКАСУВАННЯ ШВИДКОГО РЕДАГУВАННЯ
+        if (isEditingFromSummary) {
+            isEditingFromSummary = false;
+            currentStep = finalQuestions.length;
+            document.getElementById('section-client').classList.add('hidden');
+            document.getElementById('section-questions').classList.add('hidden');
+            document.getElementById('section-measurements').classList.add('hidden');
+            renderSummary();
+            return;
+        }
+        
+        // ПОВЕРНЕННЯ З ЕКРАНУ ПІДСУМКУ В РУЧНОМУ РЕЖИМІ
         if (currentStep === finalQuestions.length) {
             let prevStep = finalQuestions.length - 1;
             while(prevStep >= 0 && shouldSkip(finalQuestions[prevStep])) { prevStep--; }

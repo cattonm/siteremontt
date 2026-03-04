@@ -149,7 +149,7 @@
         { id: "hallway_floor", zone: "ПЕРЕДПОКІЙ", text: "Тип підлоги.", type: "cards", options: [
             {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Кварцвініл",val:"Кварцвініл",img:"img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}
         ]},
-        { id: "hallway_walls", zone: "ПЕРЕДПОКІЙ", text: "Стіни (можна обрати декілька).", type: "cards_multiselect", options: [
+        { id: "hallway_walls", zone: "ПЕРЕДПОКІЙ", text: "Стіни.", type: "cards_multiselect", options: [
             {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}
         ]},
         { id: "hallway_light", zone: "ПЕРЕДПОКІЙ", text: "Освітлення", type: "cards_multiselect", options: [
@@ -161,14 +161,14 @@
     ];
 
     const blockKitchen = [
-        { id: "kitchen_walls", zone: "КУХНЯ", text: "Стіни (можна обрати декілька).", type: "cards_multiselect", options: [
+        { id: "kitchen_walls", zone: "КУХНЯ", text: "Стіни.", type: "cards_multiselect", options: [
             {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}
         ]},
         { id: "kitchen_light", zone: "КУХНЯ", text: "Освітлення", type: "cards_multiselect", options: [
             {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"Трек / Лінія",val:"Трек / Лінія"}, {label:"Декор підсвітка",val:"Декор підсвітка",img:"img/dekorpidsv.webp"}
         ]},
         { id: "kitchen_floor", zone: "КУХНЯ", text: "Підлога.", type: "cards", options: [
-            {label:"Керамограніт",val:"Керамограніт",img:"img/kitchenkeramo.webp"}, {label:"Кварц-вініл",val:"Кварц-вініл",img:"img/kitchenkvarzv.webp"}
+            {label:"Керамограніт",val:"Керамограніт",img:"img/kitchenkeramo.webp"}, {label:"Кварц-вініл",val:"Кварц-вініл",img:"img/kitchenkvarzv.webp"}, {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}
         ]},
         { id: "kitchen_apron", zone: "КУХНЯ", text: "Фартух.", type: "cards", options: [
             {label:"Керамограніт",val:"Керамограніт",img:"img/fartukkeramo.webp"}, {label:"Матеріал стільниці",val:"Матеріал стільниці",img:"img/fartukstiln.jpeg"}
@@ -183,16 +183,16 @@
 
     const blockBalcony = [
         { id: "balcony_floor", zone: "БАЛКОН", text: "Тип підлоги.", type: "cards", options: [
-            {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}
+            {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}, {label:"Ні",val:"Ні"}
         ]},
-        { id: "balcony_walls", zone: "БАЛКОН", text: "Стіни (можна обрати декілька).", type: "cards_multiselect", options: [
-            {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}
+        { id: "balcony_walls", zone: "БАЛКОН", text: "Стіни.", type: "cards_multiselect", options: [
+            {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}, {label:"Вагонка",val:"Вагонка",img:"img/vagonka.jpg"}, {label:"Короїд",val:"Короїд",img:"img/koroid.jpg"}
         ]},
         { id: "balcony_light", zone: "БАЛКОН", text: "Освітлення", type: "cards_multiselect", options: [
-            {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledpidsv.webp"}
+            {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledpidsv.webp"}, {label:"Ні",val:"Ні"}
         ]},
         { id: "balcony_other", zone: "БАЛКОН", text: "Облаштування балкону", type: "multiselect_complex", hasOther: false, options: [
-            {label:"Утеплення", tier: false}, {label:"Робоче місце", tier: false}
+            {label:"Утеплення", tier: false}, {label:"Робоче місце", tier: false}, {label:"Ні", tier: false}
         ]}
     ];
 
@@ -200,8 +200,8 @@
         { id: "wardrobe_floor", zone: "ГАРДЕРОБ", text: "Тип підлоги.", type: "cards", options: [
             {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"img/laminat.jpeg"}
         ]},
-        { id: "wardrobe_walls", zone: "ГАРДЕРОБ", text: "Стіни (можна обрати декілька).", type: "cards_multiselect", options: [
-            {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}
+        { id: "wardrobe_walls", zone: "ГАРДЕРОБ", text: "Стіни.", type: "cards_multiselect", options: [
+            {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування",img:"img/gruntovka.webp"}
         ]},
         { id: "wardrobe_light", zone: "ГАРДЕРОБ", text: "Освітлення", type: "cards_multiselect", options: [
             {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledgarderob.webp"}
@@ -212,7 +212,7 @@
         { id: "basement_floor", zone: "ПІДВАЛ", text: "Тип підлоги.", type: "cards", options: [
             {label:"Керамограніт",val:"Керамограніт",img:"img/keramogranit.webp"}, {label:"Лінолеум",val:"Лінолеум",img:"img/linoleum.webp"}
         ]},
-        { id: "basement_walls", zone: "ПІДВАЛ", text: "Стіни (можна обрати декілька).", type: "cards_multiselect", options: [
+        { id: "basement_walls", zone: "ПІДВАЛ", text: "Стіни.", type: "cards_multiselect", options: [
             {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}
         ]},
         { id: "basement_ceiling", zone: "ПІДВАЛ", text: "Тип стелі.", type: "cards", options: [
@@ -224,7 +224,7 @@
     ];
 
     const blockAttic = [
-        { id: "attic_walls", zone: "ГОРИЩЕ", text: "Стіни (можна обрати декілька).", type: "cards_multiselect", options: [
+        { id: "attic_walls", zone: "ГОРИЩЕ", text: "Стіни.", type: "cards_multiselect", options: [
             {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Обшивка деревʼяними рейками",val:"Обшивка деревʼяними рейками",img:"img/obshivkaderev.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbzgipso.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}, {label:"ні",val:"ні"}
         ]},
         { id: "attic_floor", zone: "ГОРИЩЕ", text: "Тип підлоги.", type: "cards", options: [
@@ -254,14 +254,15 @@
             ]},
             { id: `bath_${index}_toilet`, zone: `САНВУЗОЛ ${index}`, text: "Унітаз.", type: "cards_with_tier", options: [
                 {label:"Окремостоячий",val:"Окремостоячий",img:"img/unitazokremo.webp", variants: ['Standard', 'Comfort', 'Premium']}, 
-                {label:"Інсталяція",val:"Інсталяція",img:"img/installunitaz.webp", variants: ['Standard', 'Comfort', 'Premium']}
+                {label:"Інсталяція",val:"Інсталяція",img:"img/installunitaz.webp", variants: ['Standard', 'Comfort', 'Premium']},
+                {label:"Ні",val:"Ні"}
             ]},
             { id: `bath_${index}_mixer_std`, zone: `САНВУЗОЛ ${index}`, text: "Кількість звичайних змішувачів (шт)", type: "input_number", placeholder: "0" },
             { id: `bath_${index}_mixer_hidden`, zone: `САНВУЗОЛ ${index}`, text: "Змішувачі прихованого монтажу (шт)", type: "input_number", placeholder: "0" },
             { id: `bath_${index}_other`, zone: `САНВУЗОЛ ${index}`, text: "Інші потреби", type: "multiselect_complex", hasOther:false, options: [
                 {label:"Гігієнічний душ",tier:true}, {label:"Пральна машина",tier:true}, {label:"Сушильна машина",tier:true}, 
                 {label:"Дзеркало з підігрівом",tier:true}, {label:"Бойлер до 100л",tier:true}, {label:"Бойлер непрямого нагріву (до 300л)",tier:true}, {label:"Умивальник з тумбою",tier:true}, 
-                {label:"Дзеркало",tier:true}, {label:"Рушникосушка",tier:true}
+                {label:"Дзеркало",tier:true}, {label:"Рушникосушка",tier:true}, {label:"Ні",tier:false}
             ]}
         ];
     }
@@ -272,7 +273,7 @@
                 { label: "Ламінат", val: "Ламінат", img: "img/laminat.jpeg" }, { label: "Паркет", val: "Паркет", img: "img/parket.jpeg" },
                 { label: "Кварц вініл", val: "Кварц вініл", img: "img/kvarzvinil.webp" }, { label: "Керамограніт", val: "Керамограніт", img: "img/keramogranit.webp" }
             ]},
-            { id: `room_${index}_walls`, zone: `КІМНАТА ${index}`, text: "Стіни (можна обрати декілька).", type: "cards_multiselect", options: [
+            { id: `room_${index}_walls`, zone: `КІМНАТА ${index}`, text: "Стіни.", type: "cards_multiselect", options: [
                 {label:"Шпалери",val:"Шпалери",img:"img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}
             ]},
             { id: `room_${index}_light`, zone: `КІМНАТА ${index}`, text: "Освітлення.", type: "cards_multiselect", options: [
@@ -504,9 +505,23 @@
             q.options.forEach(opt => {
                 const item = document.createElement('div'); item.className = 'list-item'; const left = document.createElement('div'); left.className = 'list-left';
                 const chk = document.createElement('input'); chk.type = "checkbox"; chk.checked = !!answers[q.id][opt.label];
-                chk.onchange = (e) => { e.preventDefault(); if(e.target.checked) answers[q.id][opt.label] = opt.tier ? (opt.customTiers ? opt.customTiers[0] : "Standard") : "Так"; else delete answers[q.id][opt.label]; triggerLiveCalc(); renderQuestion(); }; 
+                chk.onchange = (e) => { 
+                    e.preventDefault(); 
+                    if(e.target.checked) {
+                        if(opt.label === "Ні" || opt.label.startsWith("Не ")) {
+                            answers[q.id] = {}; 
+                            answers[q.id][opt.label] = "Так";
+                        } else {
+                            delete answers[q.id]["Ні"]; delete answers[q.id]["Не потребується"];
+                            answers[q.id][opt.label] = opt.tier ? (opt.customTiers ? opt.customTiers[0] : "Standard") : "Так"; 
+                        }
+                    } else { 
+                        delete answers[q.id][opt.label]; 
+                    } 
+                    triggerLiveCalc(); renderQuestion(); 
+                }; 
                 left.appendChild(chk); left.appendChild(document.createTextNode(opt.label)); item.appendChild(left);
-                if(answers[q.id][opt.label] && opt.tier) { 
+                if(answers[q.id][opt.label] && opt.tier && opt.label !== "Ні") { 
                     const sel = document.createElement('select'); sel.className = 'tier-select'; const variants = opt.customTiers ? opt.customTiers : ['Standard', 'Comfort', 'Premium']; 
                     variants.forEach(t => { const op = document.createElement('option'); op.value=t; op.innerText=t; if(answers[q.id][opt.label]===t) op.selected=true; sel.appendChild(op); }); 
                     sel.onchange = (e) => { e.preventDefault(); answers[q.id][opt.label] = e.target.value; triggerLiveCalc(); }; item.appendChild(sel); 
@@ -529,17 +544,17 @@
                 const labelDiv = document.createElement('div'); labelDiv.innerText = opt.label; card.appendChild(labelDiv);
                 card.onclick = (e) => {
                     e.preventDefault(); 
-                    if(opt.val.startsWith("Не") || opt.val === "ні") { 
+                    const isNi = opt.val.toLowerCase() === "ні" || opt.val.startsWith("Не");
+                    if(isNi) { 
                         answers[q.id] = [opt.val]; 
                     } else { 
-                        answers[q.id] = answers[q.id].filter(v => !v.startsWith("Не") && v !== "ні"); 
+                        answers[q.id] = answers[q.id].filter(v => !(v.toLowerCase() === "ні" || v.startsWith("Не"))); 
                         if(answers[q.id].includes(opt.val)) {
                             answers[q.id] = answers[q.id].filter(v=>v!==opt.val); 
                         } else {
                             answers[q.id].push(opt.val); 
-                            // РОЗУМНЕ ПОВІДОМЛЕННЯ ДЛЯ ГРУНТОВКИ
                             if (opt.val.includes("Грунтовка")) {
-                                const hasFinish = answers[q.id].some(v => v.includes("Фарбування") || v.includes("Шпалери") || v.includes("Декоративна") || v.includes("рейками"));
+                                const hasFinish = answers[q.id].some(v => v.includes("Фарбування") || v.includes("Шпалери") || v.includes("Декоративна") || v.includes("рейками") || v.includes("Вагонка") || v.includes("Короїд"));
                                 if (!hasFinish) {
                                     tg.showAlert("⚠️ Ви додали грунтовку. Не забудьте також обрати фінішне покриття (шпалери, фарбування тощо)!");
                                 }
@@ -640,7 +655,7 @@
     }
     setInterval(saveDraft, 2000);
 
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = newSearchParams(window.location.search);
     if (urlParams.has('edit_id')) {
         editId = urlParams.get('edit_id'); const savedDraft = localStorage.getItem('remont_draft_' + editId);
         if (savedDraft) { tg.showConfirm("У вас є незбережена чернетка. Відновити?", function(restored) { if(restored) applyDraft(savedDraft); else { localStorage.removeItem('remont_draft_' + editId); loadEditData(); } }); } else { loadEditData(); }

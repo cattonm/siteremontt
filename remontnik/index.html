@@ -230,11 +230,14 @@
     tg.expand();
     
     // === КОНТРОЛЕР ЕКРАНІВ (ЗАХИСТ ВІД НАКЛАДАННЯ) ===
+        // === КОНТРОЛЕР ЕКРАНІВ (ЗАХИСТ ВІД НАКЛАДАННЯ) ===
     function showSection(sectionId) {
-        ['section-client', 'section-questions', 'section-measurements', 'section-summary', 'section-thankyou'].forEach(id => {
+        // Додав 'loading-screen' у цей список, тепер він 100% буде ховатися!
+        ['loading-screen', 'section-client', 'section-questions', 'section-measurements', 'section-summary', 'section-thankyou'].forEach(id => {
             let el = document.getElementById(id);
             if (el) el.classList.add('hidden');
         });
+        
         document.getElementById(sectionId).classList.remove('hidden');
         
         // Керуємо видимістю плаваючого кошика

@@ -34,8 +34,7 @@
             --shadow-color: rgba(0,0,0,0.3);
         }
 
-        /* ЗБІЛЬШЕНИЙ PADDING-BOTTOM ЩОБ КОШИК НЕ ПЕРЕКРИВАВ ПИТАННЯ */
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; padding-bottom: 200px; margin: 0; background: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; overflow-x: hidden;}
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; padding-bottom: 220px; margin: 0; background: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; overflow-x: hidden;}
         .hidden { display: none !important; }
         
         #top-bar { display: flex; justify-content: space-between; align-items: center; background: var(--secondary-bg); padding: 12px 15px; border-radius: 16px; box-shadow: 0 4px 12px var(--shadow-color); margin-bottom: 15px; transition: 0.3s; }
@@ -49,17 +48,6 @@
         /* ANIMATED STEP CONTENT */
         .animated-step { animation: slideInRight 0.35s cubic-bezier(0.25, 0.8, 0.25, 1) forwards; }
         @keyframes slideInRight { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
-
-        /* SKELETON LOADER */
-        .skeleton-wrapper { display: flex; flex-direction: column; gap: 15px; padding-top: 20px;}
-        .skeleton { border-radius: 12px; animation: pulse 1.5s infinite ease-in-out; }
-        .sk-title { height: 28px; width: 60%; margin-bottom: 10px; }
-        .sk-input { height: 50px; width: 100%; }
-        .sk-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px;}
-        .sk-card { height: 140px; width: 100%; border-radius: 16px;}
-        body.dark-theme .skeleton { background-color: #2c2c2e; }
-        body:not(.dark-theme) .skeleton { background-color: #e5e5ea; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
         /* MENU AND BOTTOM SHEETS */
         .sheet-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2999; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; backdrop-filter: blur(2px); }
@@ -274,7 +262,7 @@
     let calcTimeout = null;
     let currentTotalWork = 0;
     let currentTotalMat = 0;
-    let isEditingFromSummary = false; // Флаг Швидкого редагування
+    let isEditingFromSummary = false; 
 
     const blockSetup = [
         { id: "rooms_count", zone: "СТРУКТУРА ОБ'ЄКТУ", text: "Скільки ЖИТЛОВИХ кімнат?", type: "input_number", placeholder: "Введіть число" },
@@ -493,6 +481,17 @@
                 if (key.startsWith(prefix + '_') && !aux.includes(zone)) { delete answers[key]; break; }
             }
         });
+        
+        if (answers.measurements) {
+            Object.keys(answers.measurements).forEach(zoneId => {
+                if (zoneId.startsWith('room_')) { const num = parseInt(zoneId.split('_')[1]); if (num > rooms) delete answers.measurements[zoneId]; }
+                if (zoneId.startsWith('bath_')) { const num = parseInt(zoneId.split('_')[1]); if (num > baths) delete answers.measurements[zoneId]; }
+                const zonePrefixesRev = { 'hallway': 'Передпокій', 'kitchen': 'Кухня', 'balcony': 'Балкон', 'wardrobe': 'Гардероб', 'basement': 'Підвал', 'attic': 'Горище' };
+                if (zonePrefixesRev[zoneId] && !aux.includes(zonePrefixesRev[zoneId])) {
+                    delete answers.measurements[zoneId];
+                }
+            });
+        }
     }
 
     function shouldSkip(q) {
@@ -671,7 +670,7 @@
         isEditingFromSummary = true;
         document.getElementById('section-summary').classList.add('hidden');
         document.getElementById('btnNext').classList.remove('btn-submit');
-        document.getElementById('btnNext').onclick = goNext; // Відновлюємо функцію кнопки
+        document.getElementById('btnNext').onclick = goNext;
         
         if (index === -1) {
             currentStep = -1;
@@ -713,31 +712,55 @@
         
         let html = '';
         
-        // БАЗОВІ ДАНІ ТА ЗАМІРИ
+        // 1. ІНФОРМАЦІЯ ПРО КЛІЄНТА
         html += `<div class="summary-box">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
-                <div class="cart-zone-title" style="margin-top:0; border:none; padding:0;">📐 БАЗОВІ ТА ЗАМІРИ</div>
+                <div class="cart-zone-title" style="margin-top:0; border:none; padding:0;">👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ</div>
                 <div class="edit-btn" onclick="editStep(-1)">✏️ Змінити</div>
             </div>`;
-        if (answers['rooms_count']) html += `<div class="summary-item"><span>Кімнат:</span> <b>${answers['rooms_count']}</b></div>`;
-        if (answers['baths_count']) html += `<div class="summary-item"><span>Санвузлів:</span> <b>${answers['baths_count']}</b></div>`;
+        html += `<div class="summary-item"><span>Ім'я:</span> <b>${document.getElementById('clientName').value || '-'}</b></div>`;
+        html += `<div class="summary-item"><span>Телефон:</span> <b>${document.getElementById('clientPhone').value || '-'}</b></div>`;
+        html += `<div class="summary-item"><span>Площа:</span> <b>${document.getElementById('clientArea').value || '0'} м²</b></div>`;
+        html += `<div class="summary-item"><span>Тип:</span> <b>${document.getElementById('objectType').value}</b></div>`;
+        html += `</div>`;
+
+        // 2. СТРУКТУРА ОБ'ЄКТУ
+        let idxRooms = finalQuestions.findIndex(q => q.id === 'rooms_count');
+        let idxBaths = finalQuestions.findIndex(q => q.id === 'baths_count');
+        let idxAux = finalQuestions.findIndex(q => q.id === 'aux_rooms');
+
+        html += `<div class="summary-box">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+                <div class="cart-zone-title" style="margin-top:0; border:none; padding:0;">🏗 СТРУКТУРА ОБ'ЄКТУ</div>
+            </div>`;
+        if (idxRooms > -1) html += `<div class="summary-item"><span>Кімнат:</span> <div style="display:flex; align-items:center; gap:10px;"><b>${answers['rooms_count'] || 0}</b> <div class="edit-btn" onclick="editStep(${idxRooms})">✏️</div></div></div>`;
+        if (idxBaths > -1) html += `<div class="summary-item"><span>Санвузлів:</span> <div style="display:flex; align-items:center; gap:10px;"><b>${answers['baths_count'] || 0}</b> <div class="edit-btn" onclick="editStep(${idxBaths})">✏️</div></div></div>`;
+        if (idxAux > -1) {
+            const aux = answers['aux_rooms'] || [];
+            let auxStr = aux.length > 0 ? aux.join(', ') : 'Немає';
+            html += `<div class="summary-item"><span>Додатково:</span> <div style="display:flex; align-items:center; gap:10px; text-align:right;"><b style="max-width:150px; word-wrap:break-word;">${auxStr}</b> <div class="edit-btn" onclick="editStep(${idxAux})">✏️</div></div></div>`;
+        }
+        html += `</div>`;
+
+        // 3. ЗАМІРИ ПРИМІЩЕНЬ
         if (answers.measurements) {
             let measIndex = finalQuestions.findIndex(q => q.type === 'trigger_meas');
-            html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; margin-bottom:5px;">
-                        <div style="font-size: 13px; font-weight: bold; color: var(--hint-color);">ПЛОЩІ (м²)</div>
-                        <div class="edit-btn" onclick="editStep(${measIndex})">✏️ Змінити</div>
-                     </div>`;
+            html += `<div class="summary-box">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+                            <div class="cart-zone-title" style="margin-top:0; border:none; padding:0;">📏 ТОЧНІ ЗАМІРИ</div>
+                            <div class="edit-btn" onclick="editStep(${measIndex})">✏️ Змінити</div>
+                        </div>`;
             const zoneNames = { 'hallway': 'Передпокій', 'kitchen': 'Кухня', 'balcony': 'Балкон', 'wardrobe': 'Гардероб', 'basement': 'Підвал', 'attic': 'Горище' };
             for (const [zoneId, meas] of Object.entries(answers.measurements)) {
                 let displayName = zoneNames[zoneId] || (zoneId.startsWith('room_') ? `Кімната ${zoneId.split('_')[1]}` : `Санвузол ${zoneId.split('_')[1]}`);
                 if (meas.floor > 0 || meas.walls > 0) {
-                    html += `<div class="summary-item" style="font-size: 14px;"><span>${displayName}:</span> <span style="text-align:right;">Підлога: ${meas.floor}<br>Стіни: ${meas.walls}</span></div>`;
+                    html += `<div class="summary-item" style="font-size: 14px;"><span>${displayName}:</span> <span style="text-align:right;">Підлога: ${meas.floor} м²<br>Стіни: ${meas.walls} м²</span></div>`;
                 }
             }
+            html += `</div>`;
         }
-        html += `</div>`;
 
-        // ІНШІ РОЗДІЛИ
+        // 4. ІНШІ РОЗДІЛИ
         let grouped = {};
         for(const [key, val] of Object.entries(answers)) {
             if(key === 'measurements' || key === 'aux_rooms' || key === 'rooms_count' || key === 'baths_count' || !val || val === "Ні" || (Array.isArray(val) && val.length===0) || val === 0 || val === "0") continue;
@@ -846,7 +869,7 @@
                         tg.showAlert("⚠️ Зверніть увагу: ви обрали лише грунтовку. Зазвичай також потрібно обрати фінішне покриття (шпалери або фарбування)!");
                     }
                     if (q.id === 'rooms_count' || q.id === 'baths_count' || q.id === 'aux_rooms') { 
-                        cleanupOldAnswers(); buildFullQuestionsList(); isEditingFromSummary = false;
+                        cleanupOldAnswers(); buildFullQuestionsList(); 
                     }
                     triggerLiveCalc(); renderQuestion(); 
                 }; grid.appendChild(card);
@@ -857,7 +880,7 @@
             inp.oninput = (e) => { 
                 e.preventDefault(); answers[q.id] = parseInt(e.target.value) || 0; 
                 if (q.id === 'rooms_count' || q.id === 'baths_count') { 
-                    cleanupOldAnswers(); buildFullQuestionsList(); isEditingFromSummary = false;
+                    cleanupOldAnswers(); buildFullQuestionsList(); 
                 }
                 triggerLiveCalc(); 
             }; animWrap.appendChild(inp);
@@ -1036,7 +1059,7 @@
                         }
                     } 
                     if (q.id === 'aux_rooms') { 
-                        cleanupOldAnswers(); buildFullQuestionsList(); isEditingFromSummary = false;
+                        cleanupOldAnswers(); buildFullQuestionsList(); 
                     } else { updateMenu(); }
                     triggerLiveCalc(); renderQuestion(); 
                 }; grid.appendChild(card);
@@ -1124,10 +1147,11 @@
         triggerLiveCalc(); 
     }
 
-    // ЛОГІКА ПОШУКУ ПРОПУЩЕНИХ ПИТАНЬ ПРИ РЕДАГУВАННІ
+    // МАРШРУТИЗАТОР ДЛЯ ШВИДКОГО РЕДАГУВАННЯ
     function routeToNextUnansweredOrSummary() {
         let nextUnanswered = -1;
         
+        // 1. Спочатку перевіряємо, чи не з'явилися нові кімнати, для яких ще немає замірів
         let measIndex = finalQuestions.findIndex(q => q.type === 'trigger_meas');
         if (measIndex !== -1) {
             const aux = answers['aux_rooms'] || [];
@@ -1151,6 +1175,7 @@
             }
         }
 
+        // 2. Якщо всі заміри є, шукаємо, чи є нові незаповнені питання по цих нових кімнатах
         if (nextUnanswered === -1) {
             for(let i = 0; i < finalQuestions.length; i++) {
                 if (shouldSkip(finalQuestions[i])) continue;
@@ -1161,6 +1186,7 @@
             }
         }
 
+        // 3. Перекидаємо куди треба
         if (nextUnanswered !== -1) {
             currentStep = nextUnanswered;
             document.getElementById('section-client').classList.add('hidden');
@@ -1172,6 +1198,7 @@
                 renderQuestion();
             }
         } else {
+            // Якщо все заповнено - повертаємось на Чекаут
             isEditingFromSummary = false;
             currentStep = finalQuestions.length;
             renderSummary();
@@ -1181,6 +1208,7 @@
     function goNext() {
         vibe('medium');
         
+        // ВАЛІДАЦІЯ ПЕРШОГО ЕКРАНУ
         if (currentStep === -1) {
             const nameInp = document.getElementById('clientName');
             const areaInp = document.getElementById('clientArea');
@@ -1210,10 +1238,12 @@
             currentStep = 0; renderQuestion(); return;
         }
         
+        // ПЕРЕВІРКА, ЧИ МИ НА СТОРІНЦІ SUMMARY (Завершення)
         if (currentStep >= finalQuestions.length) {
             finishSurvey(); return;
         }
 
+        // ШВИДКЕ ПОВЕРНЕННЯ ПІСЛЯ РЕДАГУВАННЯ
         if (isEditingFromSummary) {
             routeToNextUnansweredOrSummary(); return;
         }
@@ -1232,7 +1262,7 @@
     function goBack() {
         vibe('light');
         
-        // СКАСУВАННЯ ШВИДКОГО РЕДАГУВАННЯ
+        // СКАСУВАННЯ ШВИДКОГО РЕДАГУВАННЯ - Повернення на Чекаут
         if (isEditingFromSummary) {
             isEditingFromSummary = false;
             currentStep = finalQuestions.length;
@@ -1243,6 +1273,7 @@
             return;
         }
         
+        // ПОВЕРНЕННЯ З ЕКРАНУ ПІДСУМКУ В РУЧНОМУ РЕЖИМІ
         if (currentStep === finalQuestions.length) {
             let prevStep = finalQuestions.length - 1;
             while(prevStep >= 0 && shouldSkip(finalQuestions[prevStep])) { prevStep--; }

@@ -90,8 +90,8 @@
 </div>
 
 <div id="section-measurements" class="hidden">
-    <h3>📏 Точні заміри приміщень</h3>
-    <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Сума оновлюється автоматично під час введення.</p>
+    <h3 style="margin-bottom: 5px;">📏 Точні заміри приміщень</h3>
+    <p style="color: #666; font-size: 14px; margin-top: 0px; margin-bottom: 20px;">Введіть точні дані, щоб калькулятор працював ідеально.</p>
     <div id="measurements-container"></div>
 </div>
 
@@ -110,39 +110,57 @@
     let editId = null; 
     let calcTimeout = null;
 
-    const blockGeneral = [
-        { id: "rooms_count", zone: "ЗАГАЛЬНІ", text: "Скільки ЖИТЛОВИХ кімнат?", type: "input_number", placeholder: "Введіть число" },
-        { id: "baths_count", zone: "ЗАГАЛЬНІ", text: "Скільки САНВУЗЛІВ?", type: "input_number", placeholder: "Введіть число" },
-        { id: "aux_rooms", zone: "ЗАГАЛЬНІ", text: "Які ДОДАТКОВІ приміщення ремонтуємо?", type: "cards_multiselect", options: [
+    const blockSetup = [
+        { id: "rooms_count", zone: "СТРУКТУРА ОБ'ЄКТУ", text: "Скільки ЖИТЛОВИХ кімнат?", type: "input_number", placeholder: "Введіть число" },
+        { id: "baths_count", zone: "СТРУКТУРА ОБ'ЄКТУ", text: "Скільки САНВУЗЛІВ?", type: "input_number", placeholder: "Введіть число" },
+        { id: "aux_rooms", zone: "СТРУКТУРА ОБ'ЄКТУ", text: "Які ДОДАТКОВІ приміщення ремонтуємо?", type: "cards_multiselect", options: [
             {label:"Передпокій",val:"Передпокій"}, {label:"Кухня",val:"Кухня"}, {label:"Балкон",val:"Балкон"},
             {label:"Гардероб",val:"Гардероб"}, {label:"Підвал",val:"Підвал"}, {label:"Горище",val:"Горище"}
+        ]}
+    ];
+
+    const blockTriggerMeas = [
+        { id: "trigger_meas", zone: "ЗАМІРИ ПРИМІЩЕНЬ", text: "", type: "trigger_meas" }
+    ];
+
+    const blockDemolition = [
+        { id: "demo_entrance", zone: "ДЕМОНТАЖ / МОНТАЖ", text: "Демонтаж старих вхідних дверей?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "demo_interior", zone: "ДЕМОНТАЖ / МОНТАЖ", text: "Скільки міжкімнатних дверей демонтуємо?", type: "input_number", placeholder: "Впишіть кількість (шт) або 0" },
+        { id: "demo_build_walls", zone: "ДЕМОНТАЖ / МОНТАЖ", text: "Перепланування стін (Впишіть м²)", type: "multi_input_number", options: [
+            {label:"Демонтаж існуючих стін"}, {label:"Монтаж: Гіпсокартон"}, {label:"Монтаж: Цегла (1/2)"}, {label:"Монтаж: Газоблок"}
         ]},
-        { id: "rough_plaster_done", zone: "ЗАГАЛЬНІ", text: "Чи потрібна машинна штукатурка стін (чорнова)?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
-        { id: "entrance_door", zone: "ЗАГАЛЬНІ", text: "Тип вхідних дверей.", type: "cards_with_tier", options: [
+        { id: "demo_floor", zone: "ДЕМОНТАЖ / МОНТАЖ", text: "Демонтаж підлоги (Впишіть м²)", type: "multi_input_number", options: [
+            {label:"Паркет / Дерев'яна"}, {label:"Лінолеум / Ламінат"}, {label:"Стара стяжка"}
+        ]}
+    ];
+
+    const blockGeneral = [
+        { id: "rough_plaster_done", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Чи потрібна машинна штукатурка стін (чорнова)?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "entrance_door", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Тип нових вхідних дверей.", type: "cards_with_tier", options: [
             { label: "МДФ", val: "МДФ", variants: ['Standard', 'Comfort', 'Premium'] },
             { label: "Броньовані", val: "Броньовані", variants: ['Standard', 'Comfort', 'Premium'] },
             { label: "Не потребується", val: "Не потребується" }
         ]},
-        { id: "interior_door", zone: "ЗАГАЛЬНІ", text: "Тип міжкімнатних дверей.", type: "cards", options: [
+        { id: "interior_door", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Тип міжкімнатних дверей.", type: "cards", options: [
             {label:"Прихований монтаж",val:"Прихований монтаж",img:"img/hidemont.webp"},
             {label:"Стандарт",val:"Стандарт",img:"img/standarddoor.webp"},
             {label:"Ні / Залишаються",val:"Ні"}
         ]},
-        { id: "baseboard", zone: "ЗАГАЛЬНІ", text: "Тип підлогового плінтусу.", type: "cards", options: [
+        { id: "baseboard", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Тип підлогового плінтусу.", type: "cards", options: [
             {label:"Прихований монтаж",val:"Прихований монтаж",img:"img/plinthidem.webp"},
             {label:"Тіньовий шов",val:"Тіньовий шов",img:"img/shadowshow.webp"},
             {label:"Стандартний",val:"Стандартний",img:"img/plintstandard.webp"}
         ]},
-        { id: "ceiling", zone: "ЗАГАЛЬНІ", text: "Тип стелі.", type: "cards", options: [
+        { id: "ceiling", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Тип стелі.", type: "cards", options: [
             {label:"Натяжна",val:"Натяжна"}, {label:"Гіпсокартон",val:"Гіпсокартон"},{label:"Ні",val:"Ні"}
         ]},
-        { id: "ceiling_shadow", zone: "ЗАГАЛЬНІ", text: "Чи потрібен тіньовий шов для стелі?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
-        { id: "screed_done", zone: "ЗАГАЛЬНІ", text: "Чи є стяжка підлоги?", type: "cards", options: [
+        { id: "ceiling_shadow", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Чи потрібен тіньовий шов для стелі?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "screed_done", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Чи є стяжка підлоги?", type: "cards", options: [
             {label:"Є від забудовника",val:"Є від забудовника"}, {label:"Потрібна: Мокра",val:"Потрібна: Мокра"}, {label:"Потрібна: Напівсуха",val:"Потрібна: Напівсуха"}
         ]},
-        { id: "electricity_done", zone: "ЗАГАЛЬНІ", text: "Чи розведена електрика?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
-        { id: "plumbing_done", zone: "ЗАГАЛЬНІ", text: "Чи розведена каналізація?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
-        { id: "warm_floor", zone: "ЗАГАЛЬНІ", text: "Встановлення теплої підлоги:", type: "multiselect_dynamic" }
+        { id: "electricity_done", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Чи розведена електрика?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "plumbing_done", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Чи розведена каналізація?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "warm_floor", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Встановлення теплої підлоги:", type: "multiselect_dynamic" }
     ];
 
     const blockHallway = [
@@ -329,7 +347,8 @@
         for(let i=1; i<=bathsCount; i++) bathsQ.push(...getBathQuestions(i));
         const roomsQ = []; 
         for(let i=1; i<=roomsCount; i++) roomsQ.push(...getRoomQuestions(i));
-        finalQuestions = [...blockGeneral, ...blockHallway, ...bathsQ, ...blockKitchen, ...roomsQ, ...blockBalcony, ...blockWardrobe, ...blockBasement, ...blockAttic];
+        
+        finalQuestions = [...blockSetup, ...blockTriggerMeas, ...blockDemolition, ...blockGeneral, ...blockHallway, ...bathsQ, ...blockKitchen, ...roomsQ, ...blockBalcony, ...blockWardrobe, ...blockBasement, ...blockAttic];
         updateMenu();
     }
 
@@ -343,7 +362,7 @@
                 lastZone = q.zone; 
                 const item = document.createElement('div'); 
                 item.className = 'menu-item'; 
-                item.innerText = q.zone;
+                item.innerText = q.zone.replace(' ЗАМІРИ ПРИМІЩЕНЬ', '📏 ЗАМІРИ ПРИМІЩЕНЬ');
                 item.onclick = () => { 
                     currentStep = index; 
                     toggleMenu(); 
@@ -355,11 +374,6 @@
                 list.appendChild(item);
             }
         });
-        const measItem = document.createElement('div'); 
-        measItem.className = 'menu-item'; 
-        measItem.innerHTML = '<b>📏 ЗАМІРИ</b>'; 
-        measItem.onclick = () => { toggleMenu(); renderMeasurements(); }; 
-        list.appendChild(measItem);
     }
 
     function toggleMenu() { document.getElementById('side-menu').classList.toggle('open'); document.getElementById('menu-overlay').classList.toggle('open'); }
@@ -420,8 +434,9 @@
             let valStr = "";
             if (typeof val === 'object' && val !== null) {
                 if (val.type) valStr = `${val.type} ${val.tier && val.tier !== '-' ? '('+val.tier+')' : ''}`;
-                else { let parts = []; for(let [k, v] of Object.entries(val)) parts.push(`${k} ${v && v!=='Так' ? '('+v+')' : ''}`); valStr = parts.join(', '); }
+                else { let parts = []; for(let [k, v] of Object.entries(val)) { if(v && v!==0) parts.push(`${k} (${v})`); } valStr = parts.join(', '); }
             } else if (Array.isArray(val)) { valStr = val.join(', '); } else { valStr = val; }
+            if(!valStr) continue;
             if(!grouped[zone]) grouped[zone] = []; grouped[zone].push(`• <b>${label}:</b> ${valStr}`);
         }
         for(const [zone, items] of Object.entries(grouped)) { html += `<div class="cart-zone-title">${zone}</div>`; html += items.join('<br>') + '<br>'; }
@@ -431,7 +446,14 @@
     function closeCartModal() { document.getElementById('cart-modal').style.display = 'none'; }
 
     function renderQuestion() {
-        const q = finalQuestions[currentStep]; document.getElementById('step-count').innerText = `${currentStep + 1}/${finalQuestions.length}`;
+        const q = finalQuestions[currentStep]; 
+        
+        if (q.type === 'trigger_meas') {
+            renderMeasurements();
+            return;
+        }
+
+        document.getElementById('step-count').innerText = `${currentStep + 1}/${finalQuestions.length}`;
         const container = document.getElementById('question-container'); container.innerHTML = '';
         document.getElementById('live-cart').classList.add('visible');
 
@@ -450,6 +472,9 @@
                 const labelDiv = document.createElement('div'); labelDiv.innerText = opt.label; card.appendChild(labelDiv);
                 card.onclick = (e) => {
                     e.preventDefault(); answers[q.id] = opt.val; 
+                    if (opt.val === "Грунтовка без фарбування") {
+                        tg.showAlert("⚠️ Зверніть увагу: ви обрали лише грунтовку. Зазвичай також потрібно обрати фінішне покриття (шпалери або фарбування)!");
+                    }
                     if (q.id === 'rooms_count' || q.id === 'baths_count' || q.id === 'aux_rooms') { cleanupOldAnswers(); buildFullQuestionsList(); }
                     triggerLiveCalc(); renderQuestion(); 
                 }; grid.appendChild(card);
@@ -463,6 +488,31 @@
                 triggerLiveCalc(); 
             }; container.appendChild(inp);
         } 
+        else if (q.type === 'multi_input_number') {
+            if(typeof answers[q.id] !== 'object' || answers[q.id] === null) answers[q.id] = {};
+            const wrapList = document.createElement('div');
+            q.options.forEach(opt => {
+                const item = document.createElement('div');
+                item.style.display = 'flex'; item.style.justifyContent = 'space-between'; item.style.alignItems = 'center';
+                item.style.padding = '12px'; item.style.borderBottom = '1px solid #eee';
+                
+                const lbl = document.createElement('span'); lbl.innerText = opt.label; lbl.style.fontWeight = '500';
+                
+                const inp = document.createElement('input');
+                inp.type = "number"; inp.placeholder = "0"; 
+                inp.style.width = "80px"; inp.style.marginBottom = "0"; inp.style.padding = "8px";
+                inp.value = answers[q.id][opt.label] || '';
+                
+                inp.oninput = (e) => {
+                    const v = parseFloat(e.target.value);
+                    if(v > 0) answers[q.id][opt.label] = v; else delete answers[q.id][opt.label];
+                    triggerLiveCalc();
+                };
+                
+                item.appendChild(lbl); item.appendChild(inp); wrapList.appendChild(item);
+            });
+            container.appendChild(wrapList);
+        }
         else if (q.type === 'multiselect_dynamic') {
             const opts = []; const aux = answers['aux_rooms'] || []; aux.forEach(a => opts.push(a));
             const rooms = parseInt(answers['rooms_count']) || 0; const baths = parseInt(answers['baths_count']) || 0;
@@ -566,13 +616,34 @@
                 }; grid.appendChild(card);
             }); container.appendChild(grid);
         }
-        document.getElementById('btnNext').innerText = 'Далі';
+        
+        let isLast = true;
+        for(let i = currentStep + 1; i < finalQuestions.length; i++) {
+            if (!shouldSkip(finalQuestions[i])) { isLast = false; break; }
+        }
+        document.getElementById('btnNext').innerText = isLast ? (editId ? '✅ Зберегти зміни' : '✅ Завершити') : 'Далі';
     }
 
     function renderMeasurements() {
-        document.getElementById('live-cart').classList.add('visible'); document.getElementById('section-questions').classList.add('hidden'); document.getElementById('section-measurements').classList.remove('hidden');
-        const btnNext = document.getElementById('btnNext'); btnNext.innerText = editId ? '✅ Зберегти зміни' : '✅ Завершити'; btnNext.onclick = finishSurvey;
-        const btnBack = document.getElementById('btnBack'); btnBack.onclick = () => { document.getElementById('section-measurements').classList.add('hidden'); document.getElementById('section-questions').classList.remove('hidden'); btnNext.innerText = 'Далі'; btnNext.onclick = goNext; btnBack.onclick = goBack; renderQuestion(); };
+        document.getElementById('live-cart').classList.add('visible'); 
+        document.getElementById('section-questions').classList.add('hidden'); 
+        document.getElementById('section-measurements').classList.remove('hidden');
+        
+        const btnNext = document.getElementById('btnNext'); 
+        btnNext.innerText = 'Далі'; 
+        btnNext.onclick = () => { 
+            document.getElementById('section-measurements').classList.add('hidden'); 
+            document.getElementById('section-questions').classList.remove('hidden'); 
+            goNext(); 
+        };
+
+        const btnBack = document.getElementById('btnBack'); 
+        btnBack.onclick = () => { 
+            document.getElementById('section-measurements').classList.add('hidden'); 
+            document.getElementById('section-questions').classList.remove('hidden'); 
+            goBack(); 
+        };
+        
         const container = document.getElementById('measurements-container'); container.innerHTML = ''; answers.measurements = answers.measurements || {}; const zones = []; const aux = answers['aux_rooms'] || [];
         if (aux.includes('Передпокій')) zones.push({id: 'hallway', name: 'Передпокій'}); if (aux.includes('Кухня')) zones.push({id: 'kitchen', name: 'Кухня'}); if (aux.includes('Балкон')) zones.push({id: 'balcony', name: 'Балкон'}); if (aux.includes('Гардероб')) zones.push({id: 'wardrobe', name: 'Гардероб'}); if (aux.includes('Підвал')) zones.push({id: 'basement', name: 'Підвал'}); if (aux.includes('Горище')) zones.push({id: 'attic', name: 'Горище'});
         const roomsCount = answers['rooms_count'] || 0; for(let i=1; i<=roomsCount; i++) zones.push({id: `room_${i}`, name: `Кімната ${i}`});
@@ -624,7 +695,11 @@
             buildFullQuestionsList(); triggerLiveCalc(); document.getElementById('section-client').classList.add('hidden'); document.getElementById('section-questions').classList.remove('hidden'); document.getElementById('btnBack').style.display = 'block'; currentStep = 0; renderQuestion(); return;
         }
         let nextStep = currentStep + 1; while(nextStep < finalQuestions.length && shouldSkip(finalQuestions[nextStep])) { nextStep++; }
-        if (nextStep < finalQuestions.length) { currentStep = nextStep; renderQuestion(); } else { renderMeasurements(); }
+        if (nextStep < finalQuestions.length) { 
+            currentStep = nextStep; renderQuestion(); 
+        } else { 
+            finishSurvey(); 
+        }
     }
 
     function goBack() {
@@ -633,7 +708,9 @@
     }
 
     function finishSurvey() {
-        localStorage.removeItem('remont_draft_' + (editId || 'new')); document.getElementById('section-measurements').classList.add('hidden'); document.getElementById('navBar').style.display = 'none'; document.getElementById('live-cart').style.display = 'none';
+        localStorage.removeItem('remont_draft_' + (editId || 'new')); 
+        document.getElementById('section-questions').classList.add('hidden'); 
+        document.getElementById('navBar').style.display = 'none'; document.getElementById('live-cart').style.display = 'none';
         const thx = document.getElementById('section-thankyou'); thx.innerHTML = '<div class="check-icon">⏳</div><h3>Зберігаємо...</h3><p>Зачекайте мить.</p>'; thx.classList.remove('hidden');
         const data = { edit_id: editId, client: { name: document.getElementById('clientName').value, phone: document.getElementById('clientPhone').value, object_type: document.getElementById('objectType').value, address: document.getElementById('clientAddress').value, area: document.getElementById('clientArea').value, floor: document.getElementById('clientFloor').value, elevator: document.getElementById('clientElevator').value }, answers: answers };
         if (editId) { if (navigator.onLine) { fetch(`${BACKEND_URL}/api/save_order`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData }, body: JSON.stringify(data) }).then(res => { if (!res.ok) throw new Error("Помилка сервера"); tg.close(); }).catch(() => queueOffline(data)); } else { queueOffline(data); } } else { tg.sendData(JSON.stringify(data)); }
@@ -655,7 +732,7 @@
     }
     setInterval(saveDraft, 2000);
 
-    const urlParams = newSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('edit_id')) {
         editId = urlParams.get('edit_id'); const savedDraft = localStorage.getItem('remont_draft_' + editId);
         if (savedDraft) { tg.showConfirm("У вас є незбережена чернетка. Відновити?", function(restored) { if(restored) applyDraft(savedDraft); else { localStorage.removeItem('remont_draft_' + editId); loadEditData(); } }); } else { loadEditData(); }
@@ -665,7 +742,7 @@
         try {
             const parsed = JSON.parse(savedString); document.getElementById('clientName').value = parsed.client.name || ""; document.getElementById('clientPhone').value = parsed.client.phone || ""; document.getElementById('objectType').value = parsed.client.object_type || "Квартира (Новобудова)"; document.getElementById('clientAddress').value = parsed.client.address || ""; document.getElementById('clientArea').value = parsed.client.area || ""; document.getElementById('clientFloor').value = parsed.client.floor || "1"; document.getElementById('clientElevator').value = parsed.client.elevator || "Немає";
             answers = parsed.answers || {}; currentStep = parsed.currentStep || -1; buildFullQuestionsList();
-            if (currentStep > -1) { document.getElementById('section-client').classList.add('hidden'); document.getElementById('section-questions').classList.remove('hidden'); document.getElementById('btnBack').style.display = 'block'; triggerLiveCalc(); if (currentStep >= finalQuestions.length) renderMeasurements(); else renderQuestion(); }
+            if (currentStep > -1) { document.getElementById('section-client').classList.add('hidden'); document.getElementById('section-questions').classList.remove('hidden'); document.getElementById('btnBack').style.display = 'block'; triggerLiveCalc(); renderQuestion(); }
         } catch(e) {}
     }
 

@@ -79,9 +79,12 @@
         h3 { margin: 0 0 20px 0; font-size: 22px; font-weight: 700; line-height: 1.3; }
         label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 15px; color: var(--text-color); }
         
-        /* INPUTS */
+        /* INPUTS & VALIDATION */
         input[type="text"], input[type="tel"], input[type="number"], select { width: 100%; padding: 15px; border-radius: 12px; border: 1.5px solid var(--border-color); font-size: 16px; margin-bottom: 20px; box-sizing: border-box; background: var(--secondary-bg); color: var(--text-color); transition: all 0.2s; outline: none;}
         input:focus, select:focus { border-color: var(--link-color); box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15); }
+        
+        .input-error { border-color: #ff3b30 !important; background-color: rgba(255, 59, 48, 0.08) !important; animation: shake 0.4s 1; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
 
         /* CUPERTINO CARDS */
         .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -112,6 +115,7 @@
         .btn:active { transform: scale(0.95); }
         .btn-back { background: var(--secondary-bg); color: var(--text-color); flex: 0.3; border: 1.5px solid var(--border-color); }
         .btn-next { background: var(--link-color); color: #fff; box-shadow: 0 4px 14px rgba(0, 122, 255, 0.3);}
+        .btn-submit { background: #34c759 !important; color: #fff !important; box-shadow: 0 4px 14px rgba(52, 199, 89, 0.3) !important; font-size: 18px !important; }
         
         /* CART */
         #live-cart { position: fixed; bottom: 90px; left: 15px; right: 15px; background: rgba(28, 28, 30, 0.95); color: #fff; padding: 14px 18px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: 99; display: flex; justify-content: space-between; align-items: center; font-size: 14px; cursor: pointer; backdrop-filter: blur(10px); transition: opacity 0.3s, transform 0.2s; opacity: 0; pointer-events: none;}
@@ -123,6 +127,13 @@
         .cart-close-btn { background: var(--zone-badge-bg); color: var(--text-color); border: none; padding: 12px; border-radius: 12px; font-weight: 600; width: 100%; margin-top: 15px; cursor: pointer;}
         .cart-list { margin-top: 10px; font-size: 15px; line-height: 1.6; }
         .cart-zone-title { font-weight: 700; color: var(--link-color); margin-top: 20px; border-bottom: 1.5px solid var(--border-color); padding-bottom: 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;}
+
+        /* SUMMARY SCREEN */
+        .summary-box { background: var(--secondary-bg); border-radius: 16px; padding: 15px 20px; border: 1.5px solid var(--border-color); margin-bottom: 15px; box-shadow: 0 4px 12px var(--shadow-color); animation: slideInRight 0.3s forwards;}
+        .summary-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-color); align-items: center; font-size: 15px;}
+        .summary-item:last-child { border-bottom: none; padding-bottom: 0; }
+        .edit-btn { color: var(--link-color); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 6px 12px; background: rgba(10,132,255,0.1); border-radius: 8px; transition: transform 0.1s;}
+        .edit-btn:active { transform: scale(0.92); }
     </style>
 </head>
 <body>
@@ -175,11 +186,11 @@
         <div id="theme-toggle-client" onclick="toggleTheme()" style="cursor: pointer; font-size: 22px; user-select: none;">🌙</div>
     </div>
     <label>Ім'я клієнта</label> <input type="text" id="clientName" placeholder="Введіть ім'я">
-    <label>Телефон</label> <input type="tel" id="clientPhone" placeholder="+380...">
+    <label>Телефон</label> <input type="tel" id="clientPhone" inputmode="tel" placeholder="+380 (XX) XXX-XX-XX">
     <label>Тип об'єкту</label><select id="objectType"><option value="Квартира (Новобудова)">Квартира (Новобудова)</option><option value="Квартира (Вторинна)">Квартира (Вторинна)</option><option value="Будинок">Будинок</option><option value="Комерція">Комерція</option></select>
     <label>Адреса</label> <input type="text" id="clientAddress" placeholder="Вулиця / ЖК">
-    <label>Загальна площа об'єкта (м²)</label> <input type="number" id="clientArea" placeholder="Наприклад: 65">
-    <div style="display: flex; gap: 10px;"><div style="flex: 1;"><label>Поверх</label> <input type="number" id="clientFloor" placeholder="1" value="1"></div>
+    <label>Загальна площа об'єкта (м²)</label> <input type="number" inputmode="decimal" id="clientArea" placeholder="Наприклад: 65">
+    <div style="display: flex; gap: 10px;"><div style="flex: 1;"><label>Поверх</label> <input type="number" inputmode="numeric" id="clientFloor" placeholder="1" value="1"></div>
     <div style="flex: 1;"><label>Ліфт</label><select id="clientElevator"><option value="Вантажний">Вантажний</option><option value="Пасажирський">Пасажирський</option><option value="Немає">Немає</option></select></div></div>
 </div>
 
@@ -201,6 +212,12 @@
     <div id="measurements-container"></div>
 </div>
 
+<div id="section-summary" class="hidden animated-step">
+    <h3 style="margin-bottom: 5px;">✅ Перевірка даних</h3>
+    <p style="color: var(--hint-color); font-size: 14px; margin-top: 0px; margin-bottom: 20px;">Перевірте зібраний кошторис перед відправкою.</p>
+    <div id="summary-container"></div>
+</div>
+
 <div id="section-thankyou" class="hidden animated-step"></div>
 <div class="nav-bar" id="navBar">
     <button type="button" class="btn btn-back" onclick="goBack()" id="btnBack" style="display:none;">←</button>
@@ -212,50 +229,50 @@
     tg.expand();
     
     // HAPTIC FEEDBACK WRAPPER
-    function vibe(type = 'light') {
-        if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred(type);
-    }
-    function vibeSelect() {
-        if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged();
-    }
+    function vibe(type = 'light') { if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred(type); }
+    function vibeSelect() { if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged(); }
+    function vibeError() { if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error'); }
 
     // РУЧНА ТЕМА
     function applySavedTheme() {
         const savedTheme = localStorage.getItem('remont_theme');
         const iconClient = document.getElementById('theme-toggle-client');
         const iconQuestions = document.getElementById('theme-toggle-questions');
-        if (savedTheme === 'dark') {
-            document.body.classList.add('dark-theme');
-            if (iconClient) iconClient.innerText = '☀️';
-            if (iconQuestions) iconQuestions.innerText = '☀️';
-        } else {
-            document.body.classList.remove('dark-theme');
-            if (iconClient) iconClient.innerText = '🌙';
-            if (iconQuestions) iconQuestions.innerText = '🌙';
-        }
+        if (savedTheme === 'dark') { document.body.classList.add('dark-theme'); if (iconClient) iconClient.innerText = '☀️'; if (iconQuestions) iconQuestions.innerText = '☀️'; } 
+        else { document.body.classList.remove('dark-theme'); if (iconClient) iconClient.innerText = '🌙'; if (iconQuestions) iconQuestions.innerText = '🌙'; }
     }
     function toggleTheme() {
         vibe('medium');
         const isDark = document.body.classList.toggle('dark-theme');
         const iconClient = document.getElementById('theme-toggle-client');
         const iconQuestions = document.getElementById('theme-toggle-questions');
-        if (isDark) {
-            localStorage.setItem('remont_theme', 'dark');
-            if (iconClient) iconClient.innerText = '☀️';
-            if (iconQuestions) iconQuestions.innerText = '☀️';
-        } else {
-            localStorage.setItem('remont_theme', 'light');
-            if (iconClient) iconClient.innerText = '🌙';
-            if (iconQuestions) iconQuestions.innerText = '🌙';
-        }
+        if (isDark) { localStorage.setItem('remont_theme', 'dark'); if (iconClient) iconClient.innerText = '☀️'; if (iconQuestions) iconQuestions.innerText = '☀️'; } 
+        else { localStorage.setItem('remont_theme', 'light'); if (iconClient) iconClient.innerText = '🌙'; if (iconQuestions) iconQuestions.innerText = '🌙'; }
     }
     applySavedTheme();
+
+    // МАСКА ДЛЯ ТЕЛЕФОНУ
+    document.getElementById('clientPhone').addEventListener('input', function(e) {
+        let digits = e.target.value.replace(/\D/g, '');
+        if (digits.startsWith('380')) digits = digits.substring(3);
+        else if (digits.startsWith('80')) digits = digits.substring(2);
+        else if (digits.startsWith('0')) digits = digits.substring(1);
+        
+        let res = '+380';
+        if (digits.length > 0) res += ' (' + digits.substring(0, 2);
+        if (digits.length >= 3) res += ') ' + digits.substring(2, 5);
+        if (digits.length >= 6) res += '-' + digits.substring(5, 7);
+        if (digits.length >= 8) res += '-' + digits.substring(7, 9);
+        e.target.value = res;
+    });
 
     let answers = {}; 
     let currentStep = -1; 
     let finalQuestions = []; 
     let editId = null; 
     let calcTimeout = null;
+    let currentTotalWork = 0;
+    let currentTotalMat = 0;
 
     const blockSetup = [
         { id: "rooms_count", zone: "СТРУКТУРА ОБ'ЄКТУ", text: "Скільки ЖИТЛОВИХ кімнат?", type: "input_number", placeholder: "Введіть число" },
@@ -266,9 +283,7 @@
         ]}
     ];
 
-    const blockTriggerMeas = [
-        { id: "trigger_meas", zone: "ЗАМІРИ ПРИМІЩЕНЬ", text: "", type: "trigger_meas" }
-    ];
+    const blockTriggerMeas = [ { id: "trigger_meas", zone: "ЗАМІРИ ПРИМІЩЕНЬ", text: "", type: "trigger_meas" } ];
 
     const blockDemolition = [
         { id: "demo_entrance", zone: "ДЕМОНТАЖ / МОНТАЖ", text: "Демонтаж старих вхідних дверей?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
@@ -520,7 +535,9 @@
                     toggleMenu(); 
                     document.getElementById('section-measurements').classList.add('hidden'); 
                     document.getElementById('section-questions').classList.remove('hidden'); 
+                    document.getElementById('section-summary').classList.add('hidden');
                     document.getElementById('navBar').style.display = 'flex'; 
+                    document.getElementById('btnNext').classList.remove('btn-submit');
                     renderQuestion(); 
                 };
                 list.appendChild(item);
@@ -613,6 +630,21 @@
 
     function triggerLiveCalc() { clearTimeout(calcTimeout); calcTimeout = setTimeout(fetchLiveCalc, 500); }
 
+    // АНІМАЦІЯ ЦИФР
+    function animateValue(obj, start, end, duration) {
+        let startTimestamp = null;
+        const step = (timestamp) => {
+            if (!startTimestamp) startTimestamp = timestamp;
+            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+            const ease = 1 - Math.pow(1 - progress, 4);
+            const currentVal = Math.floor(ease * (end - start) + start);
+            obj.innerHTML = currentVal.toLocaleString() + ' ₴';
+            if (progress < 1) { window.requestAnimationFrame(step); } 
+            else { obj.innerHTML = end.toLocaleString() + ' ₴'; }
+        };
+        window.requestAnimationFrame(step);
+    }
+
     async function fetchLiveCalc() {
         if(!navigator.onLine) return; 
         const area = parseFloat(document.getElementById('clientArea').value) || 0;
@@ -623,16 +655,148 @@
             if (!res.ok) throw new Error(`HTTP error ${res.status}`);
             const p = await res.json();
             if(p.work !== undefined) {
-                document.getElementById('cart-work').innerText = p.work.toLocaleString() + ' ₴';
-                document.getElementById('cart-mat').innerText = p.mat_min.toLocaleString() + ' ₴';
+                animateValue(document.getElementById('cart-work'), currentTotalWork, p.work, 600);
+                animateValue(document.getElementById('cart-mat'), currentTotalMat, p.mat_min, 600);
+                currentTotalWork = p.work;
+                currentTotalMat = p.mat_min;
             }
         } catch(e) {}
+    }
+
+    function editStep(index) {
+        vibe('light');
+        document.getElementById('section-summary').classList.add('hidden');
+        document.getElementById('btnNext').classList.remove('btn-submit');
+        
+        if (index === -1) {
+            currentStep = -1;
+            document.getElementById('section-questions').classList.add('hidden');
+            document.getElementById('section-measurements').classList.add('hidden');
+            document.getElementById('section-client').classList.remove('hidden');
+            document.getElementById('btnBack').style.display = 'none';
+            document.getElementById('live-cart').classList.remove('visible');
+        } else {
+            currentStep = index;
+            const q = finalQuestions[index];
+            if (q.type === 'trigger_meas') {
+                renderMeasurements();
+            } else {
+                document.getElementById('section-measurements').classList.add('hidden');
+                document.getElementById('section-questions').classList.remove('hidden');
+                renderQuestion();
+            }
+        }
+    }
+
+    function renderSummary() {
+        document.getElementById('live-cart').classList.add('visible'); 
+        document.getElementById('section-questions').classList.add('hidden'); 
+        document.getElementById('section-measurements').classList.add('hidden');
+        document.getElementById('section-summary').classList.remove('hidden');
+        
+        const btnNext = document.getElementById('btnNext'); 
+        btnNext.innerHTML = '🚀 Відправити в систему'; 
+        btnNext.classList.add('btn-submit');
+        btnNext.onclick = finishSurvey;
+
+        const btnBack = document.getElementById('btnBack'); 
+        btnBack.onclick = goBack; 
+
+        const container = document.getElementById('summary-container');
+        container.innerHTML = '';
+        
+        let html = '';
+        
+        // БАЗОВІ ДАНІ ТА ЗАМІРИ
+        html += `<div class="summary-box">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+                <div class="cart-zone-title" style="margin-top:0; border:none; padding:0;">📐 БАЗОВІ ТА ЗАМІРИ</div>
+                <div class="edit-btn" onclick="editStep(-1)">✏️ Змінити</div>
+            </div>`;
+        if (answers['rooms_count']) html += `<div class="summary-item"><span>Кімнат:</span> <b>${answers['rooms_count']}</b></div>`;
+        if (answers['baths_count']) html += `<div class="summary-item"><span>Санвузлів:</span> <b>${answers['baths_count']}</b></div>`;
+        if (answers.measurements) {
+            let measIndex = finalQuestions.findIndex(q => q.type === 'trigger_meas');
+            html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; margin-bottom:5px;">
+                        <div style="font-size: 13px; font-weight: bold; color: var(--hint-color);">ПЛОЩІ (м²)</div>
+                        <div class="edit-btn" onclick="editStep(${measIndex})">✏️ Змінити</div>
+                     </div>`;
+            const zoneNames = { 'hallway': 'Передпокій', 'kitchen': 'Кухня', 'balcony': 'Балкон', 'wardrobe': 'Гардероб', 'basement': 'Підвал', 'attic': 'Горище' };
+            for (const [zoneId, meas] of Object.entries(answers.measurements)) {
+                let displayName = zoneNames[zoneId] || (zoneId.startsWith('room_') ? `Кімната ${zoneId.split('_')[1]}` : `Санвузол ${zoneId.split('_')[1]}`);
+                if (meas.floor > 0 || meas.walls > 0) {
+                    html += `<div class="summary-item" style="font-size: 14px;"><span>${displayName}:</span> <span style="text-align:right;">Підлога: ${meas.floor}<br>Стіни: ${meas.walls}</span></div>`;
+                }
+            }
+        }
+        html += `</div>`;
+
+        // ІНШІ РОЗДІЛИ
+        let grouped = {};
+        for(const [key, val] of Object.entries(answers)) {
+            if(key === 'measurements' || key === 'aux_rooms' || key === 'rooms_count' || key === 'baths_count' || !val || val === "Ні" || (Array.isArray(val) && val.length===0) || val === 0 || val === "0") continue;
+            let qIndex = finalQuestions.findIndex(x => x.id === key);
+            let q = finalQuestions[qIndex];
+            if (!q) continue;
+            
+            let zone = q.zone;
+            let label = q.text.replace('.', '');
+            let valStr = "";
+            
+            if (typeof val === 'object' && val !== null) {
+                if (val.type) valStr = `${val.type} ${val.tier && val.tier !== '-' ? '('+val.tier+')' : ''}`;
+                else { 
+                    let parts = []; 
+                    for(let [k, v] of Object.entries(val)) { 
+                        if(v && v!==0) {
+                            if (v === "Так") parts.push(`${k}`);
+                            else if (typeof v === 'number') parts.push(`${k} (${v} м²)`);
+                            else parts.push(`${k} (${v})`);
+                        } 
+                    } 
+                    valStr = parts.join(', '); 
+                }
+            } else if (Array.isArray(val)) { valStr = val.join(', '); } else { valStr = val; }
+            
+            if(!valStr) continue;
+            if(!grouped[zone]) grouped[zone] = []; 
+            grouped[zone].push({label, valStr, qIndex});
+        }
+
+        for(const [zone, items] of Object.entries(grouped)) { 
+            html += `<div class="summary-box">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 10px;">
+                    <div class="cart-zone-title" style="margin-top:0; border:none; padding:0;">${zone}</div>
+                </div>`;
+            
+            items.forEach(item => {
+                html += `<div class="summary-item" style="align-items:center;">
+                            <div style="flex:1; padding-right:10px;">
+                                <div style="font-size:13px; color:var(--hint-color); margin-bottom:4px;">${item.label}</div>
+                                <div style="font-weight:500;">${item.valStr}</div>
+                            </div>
+                            <div class="edit-btn" onclick="editStep(${item.qIndex})">✏️</div>
+                         </div>`;
+            });
+            html += `</div>`; 
+        }
+        
+        // ФІНАЛЬНА ВАРТІСТЬ
+        html += `<div class="summary-box" style="background: rgba(52, 199, 89, 0.1); border-color: #34c759;">
+                    <div style="text-align: center; color: #34c759; font-weight: 700; font-size: 16px; margin-bottom: 5px;">ВАРТІСТЬ ЗАРАЗ</div>
+                    <div style="display: flex; justify-content: space-around;">
+                        <div style="text-align: center;"><div style="font-size: 12px; color: var(--text-color);">Робота</div><div style="font-weight: 800; font-size: 18px; color: var(--text-color);">${currentTotalWork.toLocaleString()} ₴</div></div>
+                        <div style="text-align: center;"><div style="font-size: 12px; color: var(--text-color);">Матеріали (від)</div><div style="font-weight: 800; font-size: 18px; color: var(--text-color);">${currentTotalMat.toLocaleString()} ₴</div></div>
+                    </div>
+                 </div>`;
+
+        container.innerHTML = html;
     }
 
     function renderQuestion() {
         const q = finalQuestions[currentStep]; 
         
-        // Progress Bar Update
+        // Progress Bar
         const progressPercent = ((currentStep + 1) / finalQuestions.length) * 100;
         document.getElementById('progress-bar').style.width = `${progressPercent}%`;
 
@@ -644,7 +808,6 @@
         document.getElementById('step-count').innerText = `${currentStep + 1}/${finalQuestions.length}`;
         const container = document.getElementById('question-container'); 
         
-        // Animation wrap
         container.innerHTML = '';
         const animWrap = document.createElement('div');
         animWrap.className = 'animated-step';
@@ -675,7 +838,7 @@
             }); animWrap.appendChild(grid);
         } 
         else if (q.type === 'input_number') {
-            const inp = document.createElement('input'); inp.type = "number"; inp.placeholder = q.placeholder; inp.value = answers[q.id] || '';
+            const inp = document.createElement('input'); inp.type = "number"; inp.inputMode = "decimal"; inp.placeholder = q.placeholder; inp.value = answers[q.id] || '';
             inp.oninput = (e) => { 
                 e.preventDefault(); answers[q.id] = parseInt(e.target.value) || 0; 
                 if (q.id === 'rooms_count' || q.id === 'baths_count') { cleanupOldAnswers(); buildFullQuestionsList(); }
@@ -692,7 +855,7 @@
                 const lbl = document.createElement('span'); lbl.innerText = opt.label; lbl.style.fontWeight = '600'; lbl.style.color = "var(--text-color)";
                 
                 const inp = document.createElement('input');
-                inp.type = "number"; inp.placeholder = "0"; 
+                inp.type = "number"; inp.inputMode = "decimal"; inp.placeholder = "0"; 
                 inp.style.width = "80px"; inp.style.marginBottom = "0"; inp.style.padding = "10px";
                 inp.style.backgroundColor = "var(--bg-color)"; inp.style.color = "var(--text-color)";
                 inp.style.border = "1.5px solid var(--border-color)";
@@ -760,7 +923,6 @@
                 chk.checked = !!answers[q.id][opt.label];
                 
                 item.onclick = (e) => {
-                    // Prevent double trigger if clicked directly on checkbox or inputs
                     if(e.target.tagName === 'INPUT' || e.target.classList.contains('tier-btn')) return;
                     vibe();
                     chk.checked = !chk.checked;
@@ -787,7 +949,6 @@
                 const lbl = document.createElement('span'); lbl.innerText = opt.label; lbl.style.fontWeight = '600'; left.appendChild(lbl);
                 item.appendChild(left);
                 
-                // РЕАЛІЗАЦІЯ SEGMENTED CONTROL ЗАМІСТЬ СЕЛЕКТА
                 if(answers[q.id][opt.label] && opt.tier && opt.label !== "Ні") { 
                     const tiers = document.createElement('div');
                     tiers.className = "tier-container";
@@ -797,9 +958,7 @@
                         let btnText = v; if(v==='Standard') btnText='S'; if(v==='Comfort') btnText='C'; if(v==='Premium') btnText='P';
                         btn.className = `tier-btn ${answers[q.id][opt.label] === v ? 'active' : ''}`;
                         btn.innerText = btnText;
-                        btn.onclick = (e) => {
-                            e.stopPropagation(); vibeSelect(); answers[q.id][opt.label] = v; triggerLiveCalc(); renderQuestion();
-                        };
+                        btn.onclick = (e) => { e.stopPropagation(); vibeSelect(); answers[q.id][opt.label] = v; triggerLiveCalc(); renderQuestion(); };
                         tiers.appendChild(btn);
                     });
                     item.appendChild(tiers);
@@ -810,7 +969,7 @@
                     numWrap.style.width = "100%"; numWrap.style.marginTop = "15px";
                     
                     const numInp = document.createElement('input');
-                    numInp.type = "number"; numInp.placeholder = opt.placeholder || "0";
+                    numInp.type = "number"; numInp.inputMode = "decimal"; numInp.placeholder = opt.placeholder || "0";
                     numInp.style.marginBottom = "0"; numInp.style.backgroundColor = "var(--bg-color)";
                     
                     numInp.value = (answers[q.id][opt.label] === "Так") ? "" : answers[q.id][opt.label];
@@ -867,34 +1026,18 @@
         
         container.appendChild(animWrap);
 
-        let isLast = true;
-        for(let i = currentStep + 1; i < finalQuestions.length; i++) {
-            if (!shouldSkip(finalQuestions[i])) { isLast = false; break; }
-        }
-        document.getElementById('btnNext').innerText = isLast ? (editId ? '✅ Зберегти зміни' : '✅ Завершити') : 'Далі';
+        document.getElementById('btnNext').innerText = 'Далі';
     }
 
     function renderMeasurements() {
         document.getElementById('live-cart').classList.add('visible'); 
         document.getElementById('section-questions').classList.add('hidden'); 
+        document.getElementById('section-summary').classList.add('hidden');
         document.getElementById('section-measurements').classList.remove('hidden');
         
         const btnNext = document.getElementById('btnNext'); 
         btnNext.innerText = 'Далі'; 
-        btnNext.onclick = () => { 
-            vibe('medium');
-            document.getElementById('section-measurements').classList.add('hidden'); 
-            document.getElementById('section-questions').classList.remove('hidden'); 
-            goNext(); 
-        };
-
-        const btnBack = document.getElementById('btnBack'); 
-        btnBack.onclick = () => { 
-            vibe('light');
-            document.getElementById('section-measurements').classList.add('hidden'); 
-            document.getElementById('section-questions').classList.remove('hidden'); 
-            goBack(); 
-        };
+        btnNext.classList.remove('btn-submit');
         
         const container = document.getElementById('measurements-container'); container.innerHTML = ''; answers.measurements = answers.measurements || {}; const zones = []; const aux = answers['aux_rooms'] || [];
         if (aux.includes('Передпокій')) zones.push({id: 'hallway', name: 'Передпокій'}); if (aux.includes('Кухня')) zones.push({id: 'kitchen', name: 'Кухня'}); if (aux.includes('Балкон')) zones.push({id: 'balcony', name: 'Балкон'}); if (aux.includes('Гардероб')) zones.push({id: 'wardrobe', name: 'Гардероб'}); if (aux.includes('Підвал')) zones.push({id: 'basement', name: 'Підвал'}); if (aux.includes('Горище')) zones.push({id: 'attic', name: 'Горище'});
@@ -907,9 +1050,9 @@
             const box = document.createElement('div'); box.className = 'measurement-box animated-step';
             box.innerHTML = `<h4 style="margin-top:0; font-size:18px;">${zone.name}</h4>
                 <label>Площа підлоги (м²)</label>
-                <input type="number" placeholder="0" value="${answers.measurements[zone.id].floor}" class="inp-floor">
+                <input type="number" inputmode="decimal" placeholder="0" value="${answers.measurements[zone.id].floor}" class="inp-floor">
                 <label>Площа стін (м²)</label>
-                <input type="number" placeholder="0" value="${answers.measurements[zone.id].walls}" class="inp-walls">`;
+                <input type="number" inputmode="decimal" placeholder="0" value="${answers.measurements[zone.id].walls}" class="inp-walls">`;
             
             const inpFloor = box.querySelector('.inp-floor'); 
             const inpWalls = box.querySelector('.inp-walls');
@@ -942,29 +1085,77 @@
 
     function goNext() {
         vibe('medium');
+        
+        // ВАЛІДАЦІЯ ПЕРШОГО ЕКРАНУ
         if (currentStep === -1) {
-            const name = document.getElementById('clientName').value; const area = document.getElementById('clientArea').value;
-            if (!name) return tg.showAlert("Введіть ім'я!"); if (!area) return tg.showAlert("Введіть загальну площу!");
+            const nameInp = document.getElementById('clientName');
+            const areaInp = document.getElementById('clientArea');
+            let hasError = false;
+            
+            [nameInp, areaInp].forEach(inp => inp.classList.remove('input-error'));
+            
+            if (!nameInp.value.trim()) { nameInp.classList.add('input-error'); hasError = true; }
+            if (!areaInp.value.trim() || parseFloat(areaInp.value) <= 0) { areaInp.classList.add('input-error'); hasError = true; }
+
+            if (hasError) {
+                vibeError();
+                tg.showAlert("Будь ласка, заповніть обов'язкові поля (Ім'я та Площу)!");
+                return;
+            }
+            
             buildFullQuestionsList(); triggerLiveCalc(); document.getElementById('section-client').classList.add('hidden'); document.getElementById('section-questions').classList.remove('hidden'); document.getElementById('btnBack').style.display = 'block'; currentStep = 0; renderQuestion(); return;
         }
+        
+        // ПЕРЕВІРКА, ЧИ МИ НА СТОРІНЦІ SUMMARY
+        if (currentStep >= finalQuestions.length) {
+            finishSurvey();
+            return;
+        }
+
         let nextStep = currentStep + 1; while(nextStep < finalQuestions.length && shouldSkip(finalQuestions[nextStep])) { nextStep++; }
         if (nextStep < finalQuestions.length) { 
             currentStep = nextStep; renderQuestion(); 
         } else { 
-            finishSurvey(); 
+            currentStep = finalQuestions.length;
+            renderSummary(); 
         }
     }
 
     function goBack() {
         vibe('light');
+        
+        // Якщо повертаємось із Summary
+        if (currentStep === finalQuestions.length) {
+            let prevStep = finalQuestions.length - 1;
+            while(prevStep >= 0 && shouldSkip(finalQuestions[prevStep])) { prevStep--; }
+            currentStep = prevStep;
+            document.getElementById('section-summary').classList.add('hidden');
+            document.getElementById('btnNext').classList.remove('btn-submit');
+            
+            if (finalQuestions[currentStep].type === 'trigger_meas') {
+                document.getElementById('section-measurements').classList.remove('hidden');
+                renderMeasurements();
+            } else {
+                document.getElementById('section-questions').classList.remove('hidden');
+                renderQuestion();
+            }
+            return;
+        }
+
         let prevStep = currentStep - 1; while(prevStep >= 0 && shouldSkip(finalQuestions[prevStep])) { prevStep--; }
-        if (prevStep >= 0) { currentStep = prevStep; renderQuestion(); } else { currentStep = -1; document.getElementById('live-cart').classList.remove('visible'); document.getElementById('section-client').classList.remove('hidden'); document.getElementById('section-questions').classList.add('hidden'); document.getElementById('btnBack').style.display = 'none'; }
+        if (prevStep >= 0) { 
+            currentStep = prevStep; 
+            if (finalQuestions[currentStep].type === 'trigger_meas') renderMeasurements();
+            else renderQuestion(); 
+        } else { 
+            currentStep = -1; document.getElementById('live-cart').classList.remove('visible'); document.getElementById('section-client').classList.remove('hidden'); document.getElementById('section-questions').classList.add('hidden'); document.getElementById('section-measurements').classList.add('hidden'); document.getElementById('btnBack').style.display = 'none'; 
+        }
     }
 
     function finishSurvey() {
         vibe('heavy');
         localStorage.removeItem('remont_draft_' + (editId || 'new')); 
-        document.getElementById('section-questions').classList.add('hidden'); 
+        document.getElementById('section-summary').classList.add('hidden'); 
         document.getElementById('navBar').style.display = 'none'; document.getElementById('live-cart').style.display = 'none';
         const thx = document.getElementById('section-thankyou'); thx.innerHTML = '<div class="check-icon animated-step">✅</div><h3 class="animated-step">Зберігаємо...</h3><p class="animated-step" style="color: var(--hint-color);">Зачекайте мить.</p>'; thx.classList.remove('hidden');
         const data = { edit_id: editId, client: { name: document.getElementById('clientName').value, phone: document.getElementById('clientPhone').value, object_type: document.getElementById('objectType').value, address: document.getElementById('clientAddress').value, area: document.getElementById('clientArea').value, floor: document.getElementById('clientFloor').value, elevator: document.getElementById('clientElevator').value }, answers: answers };
@@ -997,7 +1188,20 @@
         try {
             const parsed = JSON.parse(savedString); document.getElementById('clientName').value = parsed.client.name || ""; document.getElementById('clientPhone').value = parsed.client.phone || ""; document.getElementById('objectType').value = parsed.client.object_type || "Квартира (Новобудова)"; document.getElementById('clientAddress').value = parsed.client.address || ""; document.getElementById('clientArea').value = parsed.client.area || ""; document.getElementById('clientFloor').value = parsed.client.floor || "1"; document.getElementById('clientElevator').value = parsed.client.elevator || "Немає";
             answers = parsed.answers || {}; currentStep = parsed.currentStep || -1; buildFullQuestionsList();
-            if (currentStep > -1) { document.getElementById('section-client').classList.add('hidden'); document.getElementById('section-questions').classList.remove('hidden'); document.getElementById('btnBack').style.display = 'block'; triggerLiveCalc(); renderQuestion(); }
+            if (currentStep > -1) { 
+                document.getElementById('section-client').classList.add('hidden'); 
+                document.getElementById('btnBack').style.display = 'block'; 
+                triggerLiveCalc(); 
+                
+                if (currentStep >= finalQuestions.length) {
+                    renderSummary();
+                } else if (finalQuestions[currentStep].type === 'trigger_meas') {
+                    renderMeasurements();
+                } else {
+                    document.getElementById('section-questions').classList.remove('hidden'); 
+                    renderQuestion(); 
+                }
+            }
         } catch(e) {}
     }
 

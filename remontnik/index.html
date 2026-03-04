@@ -31,7 +31,7 @@
         .tier-container { display: flex; gap: 5px; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
         .tier-btn { border: 1px solid #ccc; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; background: #fff; color: #555; min-width: 24px; }
         .tier-btn.active { background: #3390ec; color: #fff; border-color: #3390ec; }
-        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; }
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; flex-wrap: wrap; }
         .list-item input[type="checkbox"] { width: 22px; height: 22px; margin-right: 12px; accent-color: #3390ec; }
         .tier-select { padding: 5px; border-radius: 6px; border: 1px solid #ddd; background: #fff; font-size: 14px; }
         #imageModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 3000; display: none; justify-content: center; align-items: center; flex-direction: column; }
@@ -210,7 +210,11 @@
             {label:"Точкове світло",val:"Точкове світло",img:"img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"img/ledpidsv.webp"}, {label:"Ні",val:"Ні"}
         ]},
         { id: "balcony_other", zone: "БАЛКОН", text: "Облаштування балкону", type: "multiselect_complex", hasOther: false, options: [
-            {label:"Утеплення", tier: false}, {label:"Робоче місце", tier: false}, {label:"Ні", tier: false}
+            {label:"Утеплення", tier: false}, 
+            {label:"Робоче місце", tier: false}, 
+            {label:"Зовнішнє скління", tier: false, needsNumber: true, placeholder: "Площа (м²)"},
+            {label:"Балконний блок", tier: false, needsNumber: true, placeholder: "Площа (м²)"},
+            {label:"Ні", tier: false}
         ]}
     ];
 
@@ -434,7 +438,17 @@
             let valStr = "";
             if (typeof val === 'object' && val !== null) {
                 if (val.type) valStr = `${val.type} ${val.tier && val.tier !== '-' ? '('+val.tier+')' : ''}`;
-                else { let parts = []; for(let [k, v] of Object.entries(val)) { if(v && v!==0) parts.push(`${k} (${v})`); } valStr = parts.join(', '); }
+                else { 
+                    let parts = []; 
+                    for(let [k, v] of Object.entries(val)) { 
+                        if(v && v!==0) {
+                            if (v === "Так") parts.push(`${k}`);
+                            else if (typeof v === 'number') parts.push(`${k} (${v} м²)`);
+                            else parts.push(`${k} (${v})`);
+                        } 
+                    } 
+                    valStr = parts.join(', '); 
+                }
             } else if (Array.isArray(val)) { valStr = val.join(', '); } else { valStr = val; }
             if(!valStr) continue;
             if(!grouped[zone]) grouped[zone] = []; grouped[zone].push(`• <b>${label}:</b> ${valStr}`);
@@ -553,8 +567,20 @@
             if(typeof answers[q.id] !== 'object' || answers[q.id] === null) answers[q.id] = {};
             const list = document.createElement('div');
             q.options.forEach(opt => {
-                const item = document.createElement('div'); item.className = 'list-item'; const left = document.createElement('div'); left.className = 'list-left';
-                const chk = document.createElement('input'); chk.type = "checkbox"; chk.checked = !!answers[q.id][opt.label];
+                const item = document.createElement('div'); 
+                item.className = 'list-item'; 
+                item.style.flexWrap = 'wrap'; // Дозволяє елементам переноситись на новий рядок
+
+                const left = document.createElement('div'); 
+                left.className = 'list-left';
+                left.style.display = 'flex';
+                left.style.alignItems = 'center';
+                left.style.width = '100%';
+
+                const chk = document.createElement('input'); 
+                chk.type = "checkbox"; 
+                chk.checked = !!answers[q.id][opt.label];
+                
                 chk.onchange = (e) => { 
                     e.preventDefault(); 
                     if(e.target.checked) {
@@ -570,12 +596,53 @@
                     } 
                     triggerLiveCalc(); renderQuestion(); 
                 }; 
-                left.appendChild(chk); left.appendChild(document.createTextNode(opt.label)); item.appendChild(left);
+                
+                left.appendChild(chk); 
+                left.appendChild(document.createTextNode(opt.label)); 
+                item.appendChild(left);
+                
                 if(answers[q.id][opt.label] && opt.tier && opt.label !== "Ні") { 
                     const sel = document.createElement('select'); sel.className = 'tier-select'; const variants = opt.customTiers ? opt.customTiers : ['Standard', 'Comfort', 'Premium']; 
                     variants.forEach(t => { const op = document.createElement('option'); op.value=t; op.innerText=t; if(answers[q.id][opt.label]===t) op.selected=true; sel.appendChild(op); }); 
                     sel.onchange = (e) => { e.preventDefault(); answers[q.id][opt.label] = e.target.value; triggerLiveCalc(); }; item.appendChild(sel); 
-                } list.appendChild(item);
+                } 
+                
+                // ПРОГРЕСИВНЕ ПОЛЕ ВВОДУ ДЛЯ ВІКОН
+                if(answers[q.id][opt.label] && opt.needsNumber) {
+                    const numWrap = document.createElement('div');
+                    numWrap.style.width = "100%";
+                    numWrap.style.marginTop = "10px";
+                    
+                    const numInp = document.createElement('input');
+                    numInp.type = "number";
+                    numInp.placeholder = opt.placeholder || "0";
+                    numInp.style.marginBottom = "0";
+                    numInp.style.width = "100%";
+                    numInp.style.boxSizing = "border-box";
+                    numInp.style.padding = "10px";
+                    numInp.style.borderRadius = "8px";
+                    numInp.style.border = "1px solid #3390ec";
+                    numInp.style.backgroundColor = "#f0f8ff";
+                    
+                    // Якщо тільки що клікнули, воно має статус "Так", тому робимо пустим
+                    numInp.value = (answers[q.id][opt.label] === "Так") ? "" : answers[q.id][opt.label];
+                    
+                    numInp.oninput = (e) => {
+                        e.preventDefault();
+                        let val = parseFloat(e.target.value);
+                        if(val > 0) {
+                            answers[q.id][opt.label] = val;
+                        } else {
+                            answers[q.id][opt.label] = "Так"; // залишаємо просто галочку без цифри
+                        }
+                        triggerLiveCalc();
+                    };
+                    
+                    numWrap.appendChild(numInp);
+                    item.appendChild(numWrap);
+                }
+
+                list.appendChild(item);
             });
             if (q.hasOther) { 
                 const otherInput = document.createElement('input'); otherInput.placeholder = "Інше (впишіть вручну)..."; otherInput.style.marginTop = "10px"; otherInput.value = answers[q.id]['Other'] || ''; 

@@ -1274,16 +1274,36 @@
         } catch(e) {}
     }
 
-    async function loadEditData() {
+        async function loadEditData() {
         showSection('loading-screen');
         try {
             const res = await fetch(`${BACKEND_URL}/api/get_order?id=${editId}`, { headers: { 'X-Telegram-Init-Data': tg.initData } });
             if (res.status === 423) { const err = await res.json(); tg.showAlert(err.error); tg.close(); return; }
             if (!res.ok) throw new Error("Server error");
-            const data = await res.json(); document.getElementById('clientName').value = data.client.name || ""; document.getElementById('clientPhone').value = data.client.phone || ""; document.getElementById('objectType').value = data.client.object_type || "Квартира (Новобудова)"; document.getElementById('clientAddress').value = data.client.address || ""; document.getElementById('clientArea').value = data.client.area || ""; document.getElementById('clientFloor').value = data.client.floor || "1"; document.getElementById('clientElevator').value = data.client.elevator || "Немає";
-            answers = data.answers || {}; buildFullQuestionsList(); currentStep = 0; document.getElementById('btnBack').style.display = 'block'; triggerLiveCalc(); renderQuestion();
-        } catch(e) { alert("Помилка з'єднання."); showSection('section-client'); }
+            const data = await res.json(); 
+            document.getElementById('clientName').value = data.client.name || ""; 
+            document.getElementById('clientPhone').value = data.client.phone || ""; 
+            document.getElementById('objectType').value = data.client.object_type || "Квартира (Новобудова)"; 
+            document.getElementById('clientAddress').value = data.client.address || ""; 
+            document.getElementById('clientArea').value = data.client.area || ""; 
+            document.getElementById('clientFloor').value = data.client.floor || "1"; 
+            document.getElementById('clientElevator').value = data.client.elevator || "Немає";
+            
+            answers = data.answers || {}; 
+            buildFullQuestionsList(); 
+            
+            // ЗМІНА: Одразу переходимо на фінальний екран замість першого питання
+            currentStep = finalQuestions.length; 
+            document.getElementById('btnBack').style.display = 'block'; 
+            triggerLiveCalc(); 
+            renderSummary(); 
+            
+        } catch(e) { 
+            alert("Помилка з'єднання."); 
+            showSection('section-client'); 
+        }
     }
+
 </script>
 </body>
 </html>

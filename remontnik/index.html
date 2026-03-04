@@ -34,7 +34,8 @@
             --shadow-color: rgba(0,0,0,0.3);
         }
 
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; padding-bottom: 220px; margin: 0; background: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; overflow-x: hidden;}
+        /* ЗБІЛЬШЕНИЙ PADDING-BOTTOM ЩОБ КОШИК НЕ ПЕРЕКРИВАВ ПИТАННЯ */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; padding-bottom: 200px; margin: 0; background: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; overflow-x: hidden;}
         .hidden { display: none !important; }
         
         #top-bar { display: flex; justify-content: space-between; align-items: center; background: var(--secondary-bg); padding: 12px 15px; border-radius: 16px; box-shadow: 0 4px 12px var(--shadow-color); margin-bottom: 15px; transition: 0.3s; }
@@ -48,6 +49,17 @@
         /* ANIMATED STEP CONTENT */
         .animated-step { animation: slideInRight 0.35s cubic-bezier(0.25, 0.8, 0.25, 1) forwards; }
         @keyframes slideInRight { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+
+        /* SKELETON LOADER */
+        .skeleton-wrapper { display: flex; flex-direction: column; gap: 15px; padding-top: 20px;}
+        .skeleton { border-radius: 12px; animation: pulse 1.5s infinite ease-in-out; }
+        .sk-title { height: 28px; width: 60%; margin-bottom: 10px; }
+        .sk-input { height: 50px; width: 100%; }
+        .sk-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 15px;}
+        .sk-card { height: 140px; width: 100%; border-radius: 16px;}
+        body.dark-theme .skeleton { background-color: #2c2c2e; }
+        body:not(.dark-theme) .skeleton { background-color: #e5e5ea; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
         /* MENU AND BOTTOM SHEETS */
         .sheet-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2999; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; backdrop-filter: blur(2px); }
@@ -217,7 +229,7 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
     
-    // HAPTIC FEEDBACK WRAPPER
+    // HAPTIC FEEDBACK
     function vibe(type = 'light') { if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred(type); }
     function vibeSelect() { if (tg.HapticFeedback) tg.HapticFeedback.selectionChanged(); }
     function vibeError() { if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('error'); }
@@ -262,7 +274,7 @@
     let calcTimeout = null;
     let currentTotalWork = 0;
     let currentTotalMat = 0;
-    let isEditingFromSummary = false; 
+    let isEditingFromSummary = false; // Флаг Швидкого редагування
 
     const blockSetup = [
         { id: "rooms_count", zone: "СТРУКТУРА ОБ'ЄКТУ", text: "Скільки ЖИТЛОВИХ кімнат?", type: "input_number", placeholder: "Введіть число" },
@@ -471,17 +483,19 @@
         const rooms = parseInt(answers['rooms_count']) || 0;
         const baths = parseInt(answers['baths_count']) || 0;
         const aux = answers['aux_rooms'] || [];
+        
         Object.keys(answers).forEach(key => {
             if (key.startsWith('room_')) { const num = parseInt(key.split('_')[1]); if (num > rooms) delete answers[key]; }
             if (key.startsWith('bath_')) { const num = parseInt(key.split('_')[1]); if (num > baths) delete answers[key]; }
         });
+        
         const zonePrefixes = { 'hallway': 'Передпокій', 'kitchen': 'Кухня', 'balcony': 'Балкон', 'wardrobe': 'Гардероб', 'basement': 'Підвал', 'attic': 'Горище' };
         Object.keys(answers).forEach(key => {
             for (let [prefix, zone] of Object.entries(zonePrefixes)) {
                 if (key.startsWith(prefix + '_') && !aux.includes(zone)) { delete answers[key]; break; }
             }
         });
-        
+
         if (answers.measurements) {
             Object.keys(answers.measurements).forEach(zoneId => {
                 if (zoneId.startsWith('room_')) { const num = parseInt(zoneId.split('_')[1]); if (num > rooms) delete answers.measurements[zoneId]; }
@@ -553,7 +567,6 @@
         document.getElementById('side-menu').classList.toggle('open'); 
         document.getElementById('menu-overlay').classList.toggle('open'); 
     }
-    
     function openImage(src, event) { 
         event.stopPropagation(); vibe();
         document.getElementById('modalImg').src = src; 
@@ -565,7 +578,6 @@
         document.getElementById('image-sheet').classList.remove('open');
         document.getElementById('sheet-overlay').classList.remove('open');
     }
-    
     function openCartSheet() {
         vibe();
         const list = document.getElementById('cart-list-content'); 
@@ -618,22 +630,19 @@
         document.getElementById('cart-sheet').classList.add('open');
         document.getElementById('sheet-overlay').classList.add('open');
     }
-
     function closeCartSheet() { 
         vibe();
         document.getElementById('cart-sheet').classList.remove('open');
         document.getElementById('sheet-overlay').classList.remove('open');
     }
-
     function closeAllSheets() {
-        closeCartSheet();
-        closeImage();
+        closeCartSheet(); closeImage();
     }
-
     function triggerLiveCalc() { clearTimeout(calcTimeout); calcTimeout = setTimeout(fetchLiveCalc, 500); }
 
     // АНІМАЦІЯ ЦИФР
     function animateValue(obj, start, end, duration) {
+        if (!obj) return;
         let startTimestamp = null;
         const step = (timestamp) => {
             if (!startTimestamp) startTimestamp = timestamp;
@@ -659,10 +668,73 @@
             if(p.work !== undefined) {
                 animateValue(document.getElementById('cart-work'), currentTotalWork, p.work, 600);
                 animateValue(document.getElementById('cart-mat'), currentTotalMat, p.mat_min, 600);
+                
+                const sumWork = document.getElementById('summary-total-work');
+                const sumMat = document.getElementById('summary-total-mat');
+                if (sumWork) animateValue(sumWork, currentTotalWork, p.work, 600);
+                if (sumMat) animateValue(sumMat, currentTotalMat, p.mat_min, 600);
+
                 currentTotalWork = p.work;
                 currentTotalMat = p.mat_min;
             }
         } catch(e) {}
+    }
+
+    // ДОПОМІЖНА ФУНКЦІЯ: РАХУЄМО, СКІЛЬКИ ПИТАНЬ ЩЕ НЕ ЗАПОВНЕНО
+    function getUnansweredCount() {
+        let count = 0;
+        let measIndex = finalQuestions.findIndex(q => q.type === 'trigger_meas');
+        if (measIndex !== -1) {
+            const aux = answers['aux_rooms'] || [];
+            const rooms = parseInt(answers['rooms_count']) || 0;
+            const baths = parseInt(answers['baths_count']) || 0;
+            let meas = answers.measurements || {};
+            const reqZones = [];
+            for(let i=1; i<=rooms; i++) reqZones.push(`room_${i}`);
+            for(let i=1; i<=baths; i++) reqZones.push(`bath_${i}`);
+            if(aux.includes('Передпокій')) reqZones.push('hallway');
+            if(aux.includes('Кухня')) reqZones.push('kitchen');
+            if(aux.includes('Балкон')) reqZones.push('balcony');
+            if(aux.includes('Гардероб')) reqZones.push('wardrobe');
+            if(aux.includes('Підвал')) reqZones.push('basement');
+            if(aux.includes('Горище')) reqZones.push('attic');
+            
+            for(let z of reqZones) {
+                if(!meas[z] || meas[z].floor === '' || meas[z].floor === undefined || meas[z].walls === '' || meas[z].walls === undefined) {
+                    count++; break; 
+                }
+            }
+        }
+
+        for(let i = 0; i < finalQuestions.length; i++) {
+            if (shouldSkip(finalQuestions[i])) continue;
+            if (finalQuestions[i].type === 'trigger_meas') continue;
+            if (answers[finalQuestions[i].id] === undefined) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    function updateNextButton() {
+        const btnNext = document.getElementById('btnNext');
+        if (!btnNext) return;
+        
+        if (currentStep === -1) {
+            btnNext.innerText = isEditingFromSummary ? '✅ До підсумку' : 'Далі';
+            return;
+        }
+
+        if (isEditingFromSummary) {
+            let missing = getUnansweredCount();
+            btnNext.innerText = missing > 0 ? 'Далі' : '✅ До підсумку';
+        } else {
+            let isLast = true;
+            for(let i = currentStep + 1; i < finalQuestions.length; i++) {
+                if (!shouldSkip(finalQuestions[i])) { isLast = false; break; }
+            }
+            btnNext.innerText = isLast ? 'Перевірити дані' : 'Далі';
+        }
     }
 
     function editStep(index) {
@@ -679,20 +751,22 @@
             document.getElementById('section-client').classList.remove('hidden');
             document.getElementById('btnBack').style.display = 'none';
             document.getElementById('live-cart').classList.remove('visible');
-            document.getElementById('btnNext').innerText = '✅ До підсумку';
         } else {
             currentStep = index;
             const q = finalQuestions[index];
             if (q.type === 'trigger_meas') {
                 renderMeasurements();
             } else {
+                document.getElementById('section-measurements').classList.add('hidden');
+                document.getElementById('section-questions').classList.remove('hidden');
                 renderQuestion();
             }
         }
+        updateNextButton();
     }
 
     function renderSummary() {
-        document.getElementById('live-cart').classList.remove('visible'); // Ховаємо кошик на фіналі
+        document.getElementById('live-cart').classList.remove('visible'); 
         
         document.getElementById('section-questions').classList.add('hidden'); 
         document.getElementById('section-measurements').classList.add('hidden');
@@ -814,8 +888,8 @@
         html += `<div class="summary-box" style="background: rgba(52, 199, 89, 0.1); border-color: #34c759;">
                     <div style="text-align: center; color: #34c759; font-weight: 700; font-size: 16px; margin-bottom: 5px;">ВАРТІСТЬ ЗАРАЗ</div>
                     <div style="display: flex; justify-content: space-around;">
-                        <div style="text-align: center;"><div style="font-size: 12px; color: var(--text-color);">Робота</div><div style="font-weight: 800; font-size: 18px; color: var(--text-color);">${currentTotalWork.toLocaleString()} ₴</div></div>
-                        <div style="text-align: center;"><div style="font-size: 12px; color: var(--text-color);">Матеріали (від)</div><div style="font-weight: 800; font-size: 18px; color: var(--text-color);">${currentTotalMat.toLocaleString()} ₴</div></div>
+                        <div style="text-align: center;"><div style="font-size: 12px; color: var(--text-color);">Робота</div><div style="font-weight: 800; font-size: 18px; color: var(--text-color);" id="summary-total-work">${currentTotalWork.toLocaleString()} ₴</div></div>
+                        <div style="text-align: center;"><div style="font-size: 12px; color: var(--text-color);">Матеріали (від)</div><div style="font-weight: 800; font-size: 18px; color: var(--text-color);" id="summary-total-mat">${currentTotalMat.toLocaleString()} ₴</div></div>
                     </div>
                  </div>`;
 
@@ -825,21 +899,8 @@
     function renderQuestion() {
         const q = finalQuestions[currentStep]; 
         
-        // Progress Bar
         const progressPercent = ((currentStep + 1) / finalQuestions.length) * 100;
         document.getElementById('progress-bar').style.width = `${progressPercent}%`;
-
-        if (q.type === 'trigger_meas') {
-            renderMeasurements();
-            return;
-        }
-
-        document.getElementById('section-measurements').classList.add('hidden');
-        document.getElementById('section-summary').classList.add('hidden');
-        document.getElementById('section-client').classList.add('hidden');
-        document.getElementById('section-questions').classList.remove('hidden');
-
-        document.getElementById('btnBack').onclick = goBack;
 
         document.getElementById('step-count').innerText = `${currentStep + 1}/${finalQuestions.length}`;
         const container = document.getElementById('question-container'); 
@@ -876,13 +937,17 @@
             }); animWrap.appendChild(grid);
         } 
         else if (q.type === 'input_number') {
-            const inp = document.createElement('input'); inp.type = "number"; inp.inputMode = "decimal"; inp.placeholder = q.placeholder; inp.value = answers[q.id] || '';
+            const inp = document.createElement('input'); inp.type = "number"; inp.inputMode = "decimal"; inp.placeholder = q.placeholder; 
+            inp.value = answers[q.id] !== undefined ? answers[q.id] : '';
             inp.oninput = (e) => { 
-                e.preventDefault(); answers[q.id] = parseInt(e.target.value) || 0; 
+                e.preventDefault(); 
+                let val = parseInt(e.target.value);
+                answers[q.id] = isNaN(val) ? undefined : val; 
                 if (q.id === 'rooms_count' || q.id === 'baths_count') { 
                     cleanupOldAnswers(); buildFullQuestionsList(); 
                 }
                 triggerLiveCalc(); 
+                updateNextButton();
             }; animWrap.appendChild(inp);
         } 
         else if (q.type === 'multi_input_number') {
@@ -906,6 +971,7 @@
                     const v = parseFloat(e.target.value);
                     if(v > 0) { answers[q.id][opt.label] = v; inp.style.borderColor = "var(--link-color)"; } else { delete answers[q.id][opt.label]; inp.style.borderColor = "var(--border-color)";}
                     triggerLiveCalc();
+                    updateNextButton();
                 };
                 
                 item.appendChild(lbl); item.appendChild(inp); wrapList.appendChild(item);
@@ -1019,6 +1085,7 @@
                         let val = parseFloat(e.target.value);
                         if(val > 0) { answers[q.id][opt.label] = val; } else { answers[q.id][opt.label] = "Так"; }
                         triggerLiveCalc();
+                        updateNextButton();
                     };
                     
                     numWrap.appendChild(numInp); item.appendChild(numWrap);
@@ -1067,19 +1134,7 @@
         }
         
         container.appendChild(animWrap);
-
-        const btnNext = document.getElementById('btnNext');
-        document.getElementById('btnNext').onclick = goNext;
-        
-        if (isEditingFromSummary) {
-            btnNext.innerText = '✅ До підсумку';
-        } else {
-            let isLast = true;
-            for(let i = currentStep + 1; i < finalQuestions.length; i++) {
-                if (!shouldSkip(finalQuestions[i])) { isLast = false; break; }
-            }
-            btnNext.innerText = isLast ? 'Перевірити дані' : 'Далі';
-        }
+        updateNextButton();
     }
 
     function renderMeasurements() {
@@ -1094,12 +1149,6 @@
         btnNext.classList.remove('btn-submit');
         btnNext.onclick = goNext; 
         
-        if (isEditingFromSummary) {
-            btnNext.innerText = '✅ До підсумку';
-        } else {
-            btnNext.innerText = 'Далі';
-        }
-        
         const btnBack = document.getElementById('btnBack'); 
         btnBack.onclick = goBack;
         
@@ -1107,7 +1156,7 @@
         if (aux.includes('Передпокій')) zones.push({id: 'hallway', name: 'Передпокій'}); if (aux.includes('Кухня')) zones.push({id: 'kitchen', name: 'Кухня'}); if (aux.includes('Балкон')) zones.push({id: 'balcony', name: 'Балкон'}); if (aux.includes('Гардероб')) zones.push({id: 'wardrobe', name: 'Гардероб'}); if (aux.includes('Підвал')) zones.push({id: 'basement', name: 'Підвал'}); if (aux.includes('Горище')) zones.push({id: 'attic', name: 'Горище'});
         const roomsCount = answers['rooms_count'] || 0; for(let i=1; i<=roomsCount; i++) zones.push({id: `room_${i}`, name: `Кімната ${i}`});
         const bathsCount = answers['baths_count'] || 0; for(let i=1; i<=bathsCount; i++) zones.push({id: `bath_${i}`, name: `Санвузол ${i}`});
-        if (zones.length === 0) { container.innerHTML = '<p style="color:var(--hint-color)">Немає вибраних приміщень для замірів.</p>'; return; }
+        if (zones.length === 0) { container.innerHTML = '<p style="color:var(--hint-color)">Немає вибраних приміщень для замірів.</p>'; updateNextButton(); return; }
         
         zones.forEach(zone => {
             if(!answers.measurements[zone.id]) answers.measurements[zone.id] = {floor: '', walls: ''};
@@ -1125,33 +1174,35 @@
 
             inpFloor.oninput = (e) => { 
                 e.preventDefault(); 
-                const val = parseFloat(e.target.value) || 0; 
-                answers.measurements[zone.id].floor = val; 
+                const val = parseFloat(e.target.value); 
+                answers.measurements[zone.id].floor = isNaN(val) ? '' : val; 
                 
                 if (inpWalls.dataset.manual === "false" || inpWalls.value === '') { 
-                    const calculatedWalls = (val * 3).toFixed(1); 
-                    inpWalls.value = calculatedWalls; 
-                    answers.measurements[zone.id].walls = parseFloat(calculatedWalls) || 0; 
+                    if (!isNaN(val)) {
+                        const calculatedWalls = (val * 3).toFixed(1); 
+                        inpWalls.value = calculatedWalls; 
+                        answers.measurements[zone.id].walls = parseFloat(calculatedWalls) || 0; 
+                    }
                 } 
-                triggerLiveCalc(); 
+                triggerLiveCalc(); updateNextButton();
             };
             
             inpWalls.oninput = (e) => { 
                 e.preventDefault(); 
-                answers.measurements[zone.id].walls = parseFloat(e.target.value) || 0; 
+                const val = parseFloat(e.target.value);
+                answers.measurements[zone.id].walls = isNaN(val) ? '' : val; 
                 inpWalls.dataset.manual = "true";
-                triggerLiveCalc(); 
+                triggerLiveCalc(); updateNextButton();
             }; 
             container.appendChild(box);
         }); 
-        triggerLiveCalc(); 
+        triggerLiveCalc(); updateNextButton();
     }
 
-    // МАРШРУТИЗАТОР ДЛЯ ШВИДКОГО РЕДАГУВАННЯ
+    // МАРШРУТИЗАТОР ДЛЯ ШВИДКОГО РЕДАГУВАННЯ (Шукає пропущені питання)
     function routeToNextUnansweredOrSummary() {
         let nextUnanswered = -1;
         
-        // 1. Спочатку перевіряємо, чи не з'явилися нові кімнати, для яких ще немає замірів
         let measIndex = finalQuestions.findIndex(q => q.type === 'trigger_meas');
         if (measIndex !== -1) {
             const aux = answers['aux_rooms'] || [];
@@ -1175,7 +1226,6 @@
             }
         }
 
-        // 2. Якщо всі заміри є, шукаємо, чи є нові незаповнені питання по цих нових кімнатах
         if (nextUnanswered === -1) {
             for(let i = 0; i < finalQuestions.length; i++) {
                 if (shouldSkip(finalQuestions[i])) continue;
@@ -1186,7 +1236,6 @@
             }
         }
 
-        // 3. Перекидаємо куди треба
         if (nextUnanswered !== -1) {
             currentStep = nextUnanswered;
             document.getElementById('section-client').classList.add('hidden');
@@ -1198,7 +1247,6 @@
                 renderQuestion();
             }
         } else {
-            // Якщо все заповнено - повертаємось на Чекаут
             isEditingFromSummary = false;
             currentStep = finalQuestions.length;
             renderSummary();
@@ -1281,7 +1329,11 @@
             document.getElementById('btnNext').classList.remove('btn-submit');
             
             if (finalQuestions[currentStep].type === 'trigger_meas') { renderMeasurements(); } 
-            else { renderQuestion(); }
+            else { 
+                document.getElementById('section-summary').classList.add('hidden');
+                document.getElementById('section-questions').classList.remove('hidden');
+                renderQuestion(); 
+            }
             return;
         }
 
@@ -1291,7 +1343,7 @@
             if (finalQuestions[currentStep].type === 'trigger_meas') renderMeasurements();
             else renderQuestion(); 
         } else { 
-            currentStep = -1; document.getElementById('live-cart').classList.remove('visible'); document.getElementById('section-client').classList.remove('hidden'); document.getElementById('section-questions').classList.add('hidden'); document.getElementById('section-measurements').classList.add('hidden'); document.getElementById('section-summary').classList.add('hidden'); document.getElementById('btnBack').style.display = 'none'; 
+            currentStep = -1; document.getElementById('live-cart').classList.remove('visible'); document.getElementById('section-client').classList.remove('hidden'); document.getElementById('section-questions').classList.add('hidden'); document.getElementById('section-measurements').classList.add('hidden'); document.getElementById('section-summary').classList.add('hidden'); document.getElementById('btnBack').style.display = 'none'; updateNextButton();
         }
     }
 

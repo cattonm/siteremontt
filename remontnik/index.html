@@ -100,7 +100,10 @@
 </div>
 
 <div id="section-client">
-    <h3>👷 Інформація про об'єкт</h3>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3 style="margin: 0;">👷 Інформація про об'єкт</h3>
+        <div id="theme-toggle-client" onclick="toggleTheme()" style="cursor: pointer; font-size: 22px; user-select: none;">🌙</div>
+    </div>
     <label>Ім'я клієнта</label> <input type="text" id="clientName" placeholder="Введіть ім'я">
     <label>Телефон</label> <input type="tel" id="clientPhone" placeholder="+380...">
     <label>Тип об'єкту</label><select id="objectType"><option value="Квартира (Новобудова)">Квартира (Новобудова)</option><option value="Квартира (Вторинна)">Квартира (Вторинна)</option><option value="Будинок">Будинок</option><option value="Комерція">Комерція</option></select>
@@ -111,7 +114,13 @@
 </div>
 
 <div id="section-questions" class="hidden">
-    <div id="top-bar"><div id="menu-btn" onclick="toggleMenu()">☰ Меню</div><div id="step-count">1/X</div></div>
+    <div id="top-bar">
+        <div id="menu-btn" onclick="toggleMenu()">☰ Меню</div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div id="theme-toggle-questions" onclick="toggleTheme()" style="cursor: pointer; font-size: 18px; user-select: none;">🌙</div>
+            <div id="step-count">1/X</div>
+        </div>
+    </div>
     <div id="question-container"></div>
 </div>
 
@@ -131,16 +140,40 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
     
-    // АВТОМАТИЧНА ТЕМНА ТЕМА
-    function applyTheme() {
-        if (tg.colorScheme === 'dark') {
+    // РУЧНА ТЕМА ІЗ ЗБЕРЕЖЕННЯМ В ЛОКАЛЬНУ ПАМ'ЯТЬ
+    function applySavedTheme() {
+        const savedTheme = localStorage.getItem('remont_theme');
+        const iconClient = document.getElementById('theme-toggle-client');
+        const iconQuestions = document.getElementById('theme-toggle-questions');
+        
+        if (savedTheme === 'dark') {
             document.body.classList.add('dark-theme');
+            if (iconClient) iconClient.innerText = '☀️';
+            if (iconQuestions) iconQuestions.innerText = '☀️';
         } else {
             document.body.classList.remove('dark-theme');
+            if (iconClient) iconClient.innerText = '🌙';
+            if (iconQuestions) iconQuestions.innerText = '🌙';
         }
     }
-    applyTheme();
-    tg.onEvent('themeChanged', applyTheme);
+
+    function toggleTheme() {
+        const isDark = document.body.classList.toggle('dark-theme');
+        const iconClient = document.getElementById('theme-toggle-client');
+        const iconQuestions = document.getElementById('theme-toggle-questions');
+        
+        if (isDark) {
+            localStorage.setItem('remont_theme', 'dark');
+            if (iconClient) iconClient.innerText = '☀️';
+            if (iconQuestions) iconQuestions.innerText = '☀️';
+        } else {
+            localStorage.setItem('remont_theme', 'light');
+            if (iconClient) iconClient.innerText = '🌙';
+            if (iconQuestions) iconQuestions.innerText = '🌙';
+        }
+    }
+    
+    applySavedTheme();
 
     let answers = {}; 
     let currentStep = -1; 

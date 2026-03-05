@@ -335,11 +335,13 @@
             {label:"Натяжна",val:"Натяжна"}, {label:"Гіпсокартон",val:"Гіпсокартон"},{label:"Ні",val:"Ні"}
         ]},
         { id: "ceiling_shadow", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Чи потрібен тіньовий шов для стелі?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
-            { id: "screed_done", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Чи є стяжка підлоги?", type: "cards", options: [
-        {label:"Є від забудовника",val:"Є від забудовника"}, {label:"Потрібна: Мокра",val:"Потрібна: Мокра"}, {label:"Потрібна: Напівсуха",val:"Потрібна: Напівсуха"}
-    ]},
-    { id: "screed_area", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Вкажіть площу стяжки (м²)", type: "input_number", placeholder: "Введіть площу" },
-    { id: "electricity_done", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Чи розведена електрика?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+        { id: "screed_done", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Чи є стяжка підлоги?", type: "cards", options: [
+            {label:"Є від забудовника",val:"Є від забудовника"}, {label:"Потрібна: Мокра",val:"Потрібна: Мокра"}, {label:"Потрібна: Напівсуха",val:"Потрібна: Напівсуха"}
+        ]},
+        // ДОДАНО ПЛОЩУ СТЯЖКИ
+        { id: "screed_area", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Вкажіть площу стяжки (м²)", type: "input_number", placeholder: "Введіть площу" },
+        
+        { id: "electricity_done", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Чи розведена електрика?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
         { id: "plumbing_done", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Чи розведена каналізація?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
         { id: "warm_floor", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Встановлення теплої підлоги:", type: "multiselect_dynamic" }
     ];
@@ -529,11 +531,13 @@
         }
     }
 
-        function shouldSkip(q) {
+    function shouldSkip(q) {
         if (!q) return false;
         if (q.id === 'ceiling_shadow' && answers['ceiling'] === 'Ні') return true;
-        // Пропускаємо площу стяжки, якщо стяжка не потрібна або від забудовника
+        
+        // ПРОПУСК площі стяжки, якщо вона не потрібна
         if (q.id === 'screed_area' && (!answers['screed_done'] || answers['screed_done'] === 'Є від забудовника')) return true;
+        
         const aux = answers['aux_rooms'] || [];
         if (q.id.startsWith('hallway_') && !aux.includes('Передпокій')) return true;
         if (q.id.startsWith('kitchen_') && !aux.includes('Кухня')) return true;
@@ -684,7 +688,9 @@
                 currentTotalWork = p.work;
                 currentTotalMat = p.mat_min;
             }
-        } catch(e) {}
+        } catch(e) {
+            console.error("Помилка під час fetchLiveCalc", e);
+        }
     }
 
     // ЛОГІКА КНОПКИ ДАЛІ ТА МАРШРУТИЗАТОРА
@@ -797,17 +803,19 @@
                 }; grid.appendChild(card);
             }); animWrap.appendChild(grid);
         } 
-                else if (q.type === 'input_number') {
+        else if (q.type === 'input_number') {
             const inp = document.createElement('input'); inp.type = "number"; inp.inputMode = "decimal"; inp.placeholder = q.placeholder; 
             
-            // Автозаповнення площі стяжки загальною площею об'єкта
+            // АВТОЗАПОВНЕННЯ ПЛОЩІ СТЯЖКИ
             if (q.id === 'screed_area' && answers[q.id] === undefined) {
-                answers[q.id] = parseFloat(document.getElementById('clientArea').value) || '';
+                const areaVal = parseFloat(document.getElementById('clientArea').value);
+                answers[q.id] = isNaN(areaVal) ? '' : areaVal;
             }
+            
             inp.value = answers[q.id] !== undefined ? answers[q.id] : '';
-            inp.oninput = (e) => {  
+            inp.oninput = (e) => { 
                 e.preventDefault(); 
-                let val = parseInt(e.target.value);
+                let val = parseFloat(e.target.value); // Використовуємо parseFloat для площі
                 answers[q.id] = isNaN(val) ? undefined : val; 
                 if (q.id === 'rooms_count' || q.id === 'baths_count') { cleanupOldAnswers(); buildFullQuestionsList(); }
                 triggerLiveCalc(); updateNextButton();
@@ -1277,7 +1285,6 @@
             }); html += `</div>`; 
         }
 
-        // БЛОК НЕСТАНДАРТНИХ РОБІТ НА ПІДСУМКУ
         let customIndex = finalQuestions.findIndex(q => q.id === 'custom_works');
         let cWorks = answers['custom_works'] || [];
         html += `<div class="summary-box">

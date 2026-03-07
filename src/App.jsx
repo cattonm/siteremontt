@@ -59,7 +59,9 @@ export default function App() {
             setIsLoadingEdit(true);
             
             // Зверни увагу: тут має бути правильний роут твого бекенду для отримання даних
-            fetch(`${BACKEND_URL}/api/get_order?edit_id=${editId}`)
+            fetch(`${BACKEND_URL}/api/get_order?edit_id=${editId}`, {
+                headers: { 'X-Telegram-Init-Data': tg?.initData || '' } 
+            })
                 .then(res => {
                     if(!res.ok) throw new Error("Помилка завантаження");
                     return res.json();

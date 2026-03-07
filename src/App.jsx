@@ -6,7 +6,7 @@ import CustomWorks from './components/CustomWorks';
 import Summary from './components/Summary';
 import AnimatedPrice from './components/AnimatedPrice';
 import { vibe, vibeError, tg } from './utils/telegram';
-import { Menu, Moon, Sun, ShoppingCart, ArrowLeft, Send } from 'lucide-react';
+import { Menu, Moon, Sun, ShoppingCart, ArrowLeft, Send, Trash2 } from 'lucide-react';
 
 import { 
     blockSetup, blockTriggerMeas, blockDemolition, blockGeneral, 
@@ -17,18 +17,55 @@ import {
 const BACKEND_URL = "https://remontnikuav.onrender.com";
 
 export default function App() {
-    const [currentStep, setCurrentStep] = useState(-1);
+    // --- 1. ІНІЦІАЛІЗАЦІЯ СТАНУ З ЧЕРНЕТКИ (З ЛОКАЛЬНОГО СХОВИЩА) ---
+    const [currentStep, setCurrentStep] = useState(() => {
+        const saved = localStorage.getItem('remont_draft_step');
+        return saved !== null ? JSON.parse(saved) : -1;
+    });
+
+    const [client, setClient] = useState(() => {
+        const saved = localStorage.getItem('remont_draft_client');
+        return saved !== null ? JSON.parse(saved) : { name: '', phone: '', object_type: 'Квартира (Новобудова)', address: '', area: '', floor: '1', elevator: 'Немає' };
+    });
+
+    const [answers, setAnswers] = useState(() => {
+        const saved = localStorage.getItem('remont_draft_answers');
+        return saved !== null ? JSON.parse(saved) : {};
+    });
+
     const [isEditingFromSummary, setIsEditingFromSummary] = useState(false);
     
+    // UI States
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [modalImg, setModalImg] = useState(null);
     const [isDark, setIsDark] = useState(false);
 
     const [totals, setTotals] = useState({ work: 0, mat_min: 0 });
-    const [client, setClient] = useState({ name: '', phone: '', object_type: 'Квартира (Новобудова)', address: '', area: '', floor: '1', elevator: 'Немає' });
-    const [answers, setAnswers] = useState({});
 
+    // --- 2. АВТОЗБЕРЕЖЕННЯ ПРИ БУДЬ-ЯКІЙ ЗМІНІ ---
+    useEffect(() => {
+        localStorage.setItem('remont_draft_step', JSON.stringify(currentStep));
+        localStorage.setItem('remont_draft_client', JSON.stringify(client));
+        localStorage.setItem('remont_draft_answers', JSON.stringify(answers));
+    }, [currentStep, client, answers]);
+
+    // Функція повного очищення (Почати заново)
+    const resetDraft = () => {
+        vibe('heavy');
+        if (window.confirm("Ви впевнені, що хочете очистити всю анкету і почати заново?")) {
+            localStorage.removeItem('remont_draft_step');
+            localStorage.removeItem('remont_draft_client');
+            localStorage.removeItem('remont_draft_answers');
+            setClient({ name: '', phone: '', object_type: 'Квартира (Новобудова)', address: '', area: '', floor: '1', elevator: 'Немає' });
+            setAnswers({});
+            setCurrentStep(-1);
+            setIsMenuOpen(false);
+            setTotals({ work: 0, mat_min: 0 });
+        }
+    };
+
+    // Ініціалізація Телеграму та Теми
     useEffect(() => {
         if (tg) tg.expand();
         const savedTheme = localStorage.getItem('remont_theme');
@@ -73,6 +110,7 @@ export default function App() {
         return zones;
     }, [finalQuestions, answers]);
 
+    // Калькулятор (запит на бекенд)
     useEffect(() => {
         if (currentStep < 0) return; 
         const delay = setTimeout(async () => {
@@ -92,12 +130,26 @@ export default function App() {
             if (isEditingFromSummary) { setIsEditingFromSummary(false); setCurrentStep(finalQuestions.length); return; }
             setCurrentStep(0); return;
         }
+
         if (currentStep >= finalQuestions.length) {
-            vibe('heavy'); const editId = new URLSearchParams(window.location.search).get('edit_id'); const data = { edit_id: editId, client, answers };
-            if (editId) { fetch(`${BACKEND_URL}/api/save_order`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' }, body: JSON.stringify(data) }).then(() => tg?.close()); } 
-            else { if(tg && tg.sendData) tg.sendData(JSON.stringify(data)); }
+            // --- 3. ОЧИЩЕННЯ ЧЕРНЕТКИ ПІСЛЯ ВІДПРАВКИ ---
+            vibe('heavy'); 
+            const editId = new URLSearchParams(window.location.search).get('edit_id'); 
+            const data = { edit_id: editId, client, answers };
+            
+            // Очищаємо сховище, бо анкета завершена
+            localStorage.removeItem('remont_draft_step');
+            localStorage.removeItem('remont_draft_client');
+            localStorage.removeItem('remont_draft_answers');
+
+            if (editId) { 
+                fetch(`${BACKEND_URL}/api/save_order`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' }, body: JSON.stringify(data) }).then(() => tg?.close()); 
+            } else { 
+                if(tg && tg.sendData) tg.sendData(JSON.stringify(data)); 
+            }
             return;
         }
+
         if (isEditingFromSummary) { setIsEditingFromSummary(false); setCurrentStep(finalQuestions.length); return; }
         let next = currentStep + 1; while(next < finalQuestions.length && shouldSkip(finalQuestions[next], answers)) { next++; }
         setCurrentStep(next);
@@ -173,6 +225,10 @@ export default function App() {
                 {menuZones.map((z, i) => (
                     <div key={i} className="menu-item" onClick={() => jumpToMenuStep(z.step)}> {z.name} </div>
                 ))}
+                {/* 4. КНОПКА ОЧИЩЕННЯ В МЕНЮ */}
+                <div className="menu-item" style={{ color: '#ff3b30', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px', borderTop: '1px solid var(--border-color)', borderBottom: 'none' }} onClick={resetDraft}>
+                    <Trash2 size={18} /> Почати заново
+                </div>
             </div>
 
             <div className={`image-modal ${modalImg ? 'open' : ''}`}>
@@ -202,7 +258,6 @@ export default function App() {
 
             {renderCurrentStep()}
 
-            {/* ПЛАВАЮЧИЙ КОШИК (Видимий) */}
             {currentStep >= 0 && currentStep < finalQuestions.length && (
                 <div id="live-cart" className="visible" onClick={() => setIsCartOpen(true)}>
                     <div><span style={{fontSize:'12px', color:'#aaa', fontWeight:500}}>Робота</span><span className="cart-val"><AnimatedPrice value={totals.work} /> ₴</span></div>

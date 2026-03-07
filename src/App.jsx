@@ -17,7 +17,7 @@ import {
 const BACKEND_URL = "https://remontnikuav.onrender.com";
 
 export default function App() {
-    // --- 1. ІНІЦІАЛІЗАЦІЯ СТАНУ З ЧЕРНЕТКИ (З ЛОКАЛЬНОГО СХОВИЩА) ---
+    // 1. Ініціалізація з пам'яті
     const [currentStep, setCurrentStep] = useState(() => {
         const saved = localStorage.getItem('remont_draft_step');
         return saved !== null ? JSON.parse(saved) : -1;
@@ -40,32 +40,46 @@ export default function App() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [modalImg, setModalImg] = useState(null);
     const [isDark, setIsDark] = useState(false);
+    const [showDraftPrompt, setShowDraftPrompt] = useState(false); // Новий стан для віконця чернетки
 
     const [totals, setTotals] = useState({ work: 0, mat_min: 0 });
 
-    // --- 2. АВТОЗБЕРЕЖЕННЯ ПРИ БУДЬ-ЯКІЙ ЗМІНІ ---
+    // 2. Логіка перевірки при запуску
+    useEffect(() => {
+        const savedStep = localStorage.getItem('remont_draft_step');
+        if (savedStep !== null && parseInt(savedStep, 10) > -1) {
+            setShowDraftPrompt(true); // Показуємо запит, якщо зупинилися на питаннях
+        }
+    }, []);
+
+    // Автозбереження
     useEffect(() => {
         localStorage.setItem('remont_draft_step', JSON.stringify(currentStep));
         localStorage.setItem('remont_draft_client', JSON.stringify(client));
         localStorage.setItem('remont_draft_answers', JSON.stringify(answers));
     }, [currentStep, client, answers]);
 
-    // Функція повного очищення (Почати заново)
+    // Тихе очищення (для кнопки "Почати заново" у віконці)
+    const resetDraftSilent = () => {
+        localStorage.removeItem('remont_draft_step');
+        localStorage.removeItem('remont_draft_client');
+        localStorage.removeItem('remont_draft_answers');
+        setClient({ name: '', phone: '', object_type: 'Квартира (Новобудова)', address: '', area: '', floor: '1', elevator: 'Немає' });
+        setAnswers({});
+        setCurrentStep(-1);
+        setIsMenuOpen(false);
+        setTotals({ work: 0, mat_min: 0 });
+        setIsEditingFromSummary(false);
+    };
+
+    // Очищення з підтвердженням (для бокового меню)
     const resetDraft = () => {
         vibe('heavy');
         if (window.confirm("Ви впевнені, що хочете очистити всю анкету і почати заново?")) {
-            localStorage.removeItem('remont_draft_step');
-            localStorage.removeItem('remont_draft_client');
-            localStorage.removeItem('remont_draft_answers');
-            setClient({ name: '', phone: '', object_type: 'Квартира (Новобудова)', address: '', area: '', floor: '1', elevator: 'Немає' });
-            setAnswers({});
-            setCurrentStep(-1);
-            setIsMenuOpen(false);
-            setTotals({ work: 0, mat_min: 0 });
+            resetDraftSilent();
         }
     };
 
-    // Ініціалізація Телеграму та Теми
     useEffect(() => {
         if (tg) tg.expand();
         const savedTheme = localStorage.getItem('remont_theme');
@@ -110,7 +124,6 @@ export default function App() {
         return zones;
     }, [finalQuestions, answers]);
 
-    // Калькулятор (запит на бекенд)
     useEffect(() => {
         if (currentStep < 0) return; 
         const delay = setTimeout(async () => {
@@ -132,21 +145,12 @@ export default function App() {
         }
 
         if (currentStep >= finalQuestions.length) {
-            // --- 3. ОЧИЩЕННЯ ЧЕРНЕТКИ ПІСЛЯ ВІДПРАВКИ ---
             vibe('heavy'); 
             const editId = new URLSearchParams(window.location.search).get('edit_id'); 
             const data = { edit_id: editId, client, answers };
-            
-            // Очищаємо сховище, бо анкета завершена
-            localStorage.removeItem('remont_draft_step');
-            localStorage.removeItem('remont_draft_client');
-            localStorage.removeItem('remont_draft_answers');
-
-            if (editId) { 
-                fetch(`${BACKEND_URL}/api/save_order`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' }, body: JSON.stringify(data) }).then(() => tg?.close()); 
-            } else { 
-                if(tg && tg.sendData) tg.sendData(JSON.stringify(data)); 
-            }
+            resetDraftSilent(); // Очищаємо після відправки
+            if (editId) { fetch(`${BACKEND_URL}/api/save_order`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' }, body: JSON.stringify(data) }).then(() => tg?.close()); } 
+            else { if(tg && tg.sendData) tg.sendData(JSON.stringify(data)); }
             return;
         }
 
@@ -218,6 +222,21 @@ export default function App() {
 
     return (
         <>
+            {/* ОВЕРЛЕЙ-ПРОМПТ ДЛЯ ЧЕРНЕТКИ */}
+            {showDraftPrompt && (
+                <>
+                    <div className="sheet-overlay open" style={{ zIndex: 9998 }}></div>
+                    <div className="image-modal open" style={{ zIndex: 9999, padding: '25px', textAlign: 'center', background: 'var(--modal-bg)' }}>
+                        <h3 style={{ marginTop: 0, fontSize: '20px' }}>Відновлення</h3>
+                        <p style={{ color: 'var(--hint-color)', fontSize: '15px', lineHeight: '1.4', marginBottom: 0 }}>Знайдено незбережену анкету. Бажаєте продовжити заповнення з місця зупинки?</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
+                            <button onClick={() => { vibe('medium'); setShowDraftPrompt(false); }} style={{ background: 'var(--link-color)', color: 'white', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>Продовжити збережену</button>
+                            <button onClick={() => { vibe('light'); resetDraftSilent(); setShowDraftPrompt(false); }} style={{ background: 'rgba(255, 59, 48, 0.1)', color: '#ff3b30', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>Почати заново</button>
+                        </div>
+                    </div>
+                </>
+            )}
+
             <div className={`sheet-overlay ${isCartOpen || isMenuOpen || modalImg ? 'open' : ''}`} onClick={() => { setIsCartOpen(false); setIsMenuOpen(false); setModalImg(null); }}></div>
 
             <div id="side-menu" className={isMenuOpen ? 'open' : ''}>
@@ -225,7 +244,6 @@ export default function App() {
                 {menuZones.map((z, i) => (
                     <div key={i} className="menu-item" onClick={() => jumpToMenuStep(z.step)}> {z.name} </div>
                 ))}
-                {/* 4. КНОПКА ОЧИЩЕННЯ В МЕНЮ */}
                 <div className="menu-item" style={{ color: '#ff3b30', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px', borderTop: '1px solid var(--border-color)', borderBottom: 'none' }} onClick={resetDraft}>
                     <Trash2 size={18} /> Почати заново
                 </div>

@@ -6,7 +6,7 @@ import CustomWorks from './components/CustomWorks';
 import Summary from './components/Summary';
 import AnimatedPrice from './components/AnimatedPrice';
 import { vibe, vibeError, tg } from './utils/telegram';
-import { Menu, Moon, Sun, ShoppingCart, ArrowLeft, Send, Trash2 } from 'lucide-react';
+import { Menu, Moon, Sun, ShoppingCart, ArrowLeft, Send, Trash2, Loader2 } from 'lucide-react';
 
 import { 
     blockSetup, blockTriggerMeas, blockDemolition, blockGeneral, 
@@ -17,7 +17,9 @@ import {
 const BACKEND_URL = "https://remontnikuav.onrender.com";
 
 export default function App() {
-    // 1. Ініціалізація з пам'яті
+    // Стан завантаження для режиму редагування
+    const [isLoadingEdit, setIsLoadingEdit] = useState(false);
+
     const [currentStep, setCurrentStep] = useState(() => {
         const saved = localStorage.getItem('remont_draft_step');
         return saved !== null ? JSON.parse(saved) : -1;
@@ -40,26 +42,59 @@ export default function App() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [modalImg, setModalImg] = useState(null);
     const [isDark, setIsDark] = useState(false);
-    const [showDraftPrompt, setShowDraftPrompt] = useState(false); // Новий стан для віконця чернетки
+    const [showDraftPrompt, setShowDraftPrompt] = useState(false); 
 
     const [totals, setTotals] = useState({ work: 0, mat_min: 0 });
 
-    // 2. Логіка перевірки при запуску
+    // --- ГОЛОВНА ЛОГІКА ЗАПУСКУ (РЕДАГУВАННЯ АБО ЧЕРНЕТКА) ---
     useEffect(() => {
-        const savedStep = localStorage.getItem('remont_draft_step');
-        if (savedStep !== null && parseInt(savedStep, 10) > -1) {
-            setShowDraftPrompt(true); // Показуємо запит, якщо зупинилися на питаннях
+        if (tg) tg.expand();
+        const savedTheme = localStorage.getItem('remont_theme');
+        if (savedTheme === 'dark') { setIsDark(true); document.body.classList.add('dark-theme'); }
+
+        const editId = new URLSearchParams(window.location.search).get('edit_id');
+        
+        if (editId) {
+            // РЕЖИМ РЕДАГУВАННЯ: Завантажуємо дані з бекенду
+            setIsLoadingEdit(true);
+            
+            // Зверни увагу: тут має бути правильний роут твого бекенду для отримання даних
+            fetch(`${BACKEND_URL}/api/get_order?edit_id=${editId}`)
+                .then(res => {
+                    if(!res.ok) throw new Error("Помилка завантаження");
+                    return res.json();
+                })
+                .then(data => {
+                    if (data.client) setClient(data.client);
+                    if (data.answers) setAnswers(data.answers);
+                    // Кидаємо одразу на фінальний екран (підсумок)
+                    setCurrentStep(9999); 
+                })
+                .catch(err => {
+                    console.error(err);
+                    if(tg) tg.showAlert("Не вдалося завантажити анкету для редагування.");
+                })
+                .finally(() => setIsLoadingEdit(false));
+
+        } else {
+            // РЕЖИМ СТВОРЕННЯ: Перевіряємо локальну чернетку
+            const savedStep = localStorage.getItem('remont_draft_step');
+            if (savedStep !== null && parseInt(savedStep, 10) > -1) {
+                setShowDraftPrompt(true);
+            }
         }
     }, []);
 
-    // Автозбереження
+    // Автозбереження (працює тільки якщо ми не в режимі редагування старої анкети)
     useEffect(() => {
-        localStorage.setItem('remont_draft_step', JSON.stringify(currentStep));
-        localStorage.setItem('remont_draft_client', JSON.stringify(client));
-        localStorage.setItem('remont_draft_answers', JSON.stringify(answers));
+        const editId = new URLSearchParams(window.location.search).get('edit_id');
+        if (!editId) {
+            localStorage.setItem('remont_draft_step', JSON.stringify(currentStep));
+            localStorage.setItem('remont_draft_client', JSON.stringify(client));
+            localStorage.setItem('remont_draft_answers', JSON.stringify(answers));
+        }
     }, [currentStep, client, answers]);
 
-    // Тихе очищення (для кнопки "Почати заново" у віконці)
     const resetDraftSilent = () => {
         localStorage.removeItem('remont_draft_step');
         localStorage.removeItem('remont_draft_client');
@@ -72,19 +107,12 @@ export default function App() {
         setIsEditingFromSummary(false);
     };
 
-    // Очищення з підтвердженням (для бокового меню)
     const resetDraft = () => {
         vibe('heavy');
         if (window.confirm("Ви впевнені, що хочете очистити всю анкету і почати заново?")) {
             resetDraftSilent();
         }
     };
-
-    useEffect(() => {
-        if (tg) tg.expand();
-        const savedTheme = localStorage.getItem('remont_theme');
-        if (savedTheme === 'dark') { setIsDark(true); document.body.classList.add('dark-theme'); }
-    }, []);
 
     const toggleTheme = () => {
         vibe('medium');
@@ -125,7 +153,7 @@ export default function App() {
     }, [finalQuestions, answers]);
 
     useEffect(() => {
-        if (currentStep < 0) return; 
+        if (currentStep < 0 && currentStep !== 9999) return; 
         const delay = setTimeout(async () => {
             if(!navigator.onLine || !client.area) return;
             try {
@@ -148,9 +176,13 @@ export default function App() {
             vibe('heavy'); 
             const editId = new URLSearchParams(window.location.search).get('edit_id'); 
             const data = { edit_id: editId, client, answers };
-            resetDraftSilent(); // Очищаємо після відправки
-            if (editId) { fetch(`${BACKEND_URL}/api/save_order`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' }, body: JSON.stringify(data) }).then(() => tg?.close()); } 
-            else { if(tg && tg.sendData) tg.sendData(JSON.stringify(data)); }
+            if (!editId) resetDraftSilent(); 
+
+            if (editId) { 
+                fetch(`${BACKEND_URL}/api/save_order`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' }, body: JSON.stringify(data) }).then(() => tg?.close()); 
+            } else { 
+                if(tg && tg.sendData) tg.sendData(JSON.stringify(data)); 
+            }
             return;
         }
 
@@ -172,6 +204,17 @@ export default function App() {
     const totalCost = totals.work + totals.mat_min;
     const workPct = totalCost > 0 ? Math.round((totals.work / totalCost) * 100) : 0;
     const matPct = totalCost > 0 ? 100 - workPct : 0;
+
+    // --- ЕКРАН ЗАВАНТАЖЕННЯ ---
+    if (isLoadingEdit) {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-color)', color: 'var(--link-color)' }}>
+                <Loader2 size={48} className="lucide-spin" style={{ animation: 'spin 1s linear infinite' }} />
+                <h3 style={{ marginTop: '20px', color: 'var(--text-color)' }}>Завантаження анкети...</h3>
+                <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
+            </div>
+        );
+    }
 
     const renderCurrentStep = () => {
         if (currentStep === -1) return <ClientForm client={client} setClient={setClient} toggleTheme={toggleTheme} isDark={isDark} />;
@@ -213,8 +256,9 @@ export default function App() {
     };
 
     let btnNextText = "Далі";
+    const editId = new URLSearchParams(window.location.search).get('edit_id');
     if (currentStep === -1 && isEditingFromSummary) btnNextText = "Зберегти зміни";
-    else if (currentStep >= finalQuestions.length) btnNextText = "Відправити";
+    else if (currentStep >= finalQuestions.length) btnNextText = editId ? "💾 Зберегти оновлення" : "Відправити";
     else if (currentStep >= 0) {
         let isLast = true; for(let i = currentStep + 1; i < finalQuestions.length; i++) { if (!shouldSkip(finalQuestions[i], answers)) { isLast = false; break; } }
         if (isLast) btnNextText = "Перевірити дані";
@@ -222,7 +266,6 @@ export default function App() {
 
     return (
         <>
-            {/* ОВЕРЛЕЙ-ПРОМПТ ДЛЯ ЧЕРНЕТКИ */}
             {showDraftPrompt && (
                 <>
                     <div className="sheet-overlay open" style={{ zIndex: 9998 }}></div>

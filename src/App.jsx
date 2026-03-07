@@ -113,7 +113,6 @@ export default function App() {
     const editStep = (index) => { vibe('light'); setIsEditingFromSummary(true); setCurrentStep(index); };
     const jumpToMenuStep = (stepIdx) => { vibe('light'); setIsEditingFromSummary(false); setCurrentStep(stepIdx); setIsMenuOpen(false); };
 
-    // Логіка для графіка в кошику
     const totalCost = totals.work + totals.mat_min;
     const workPct = totalCost > 0 ? Math.round((totals.work / totalCost) * 100) : 0;
     const matPct = totalCost > 0 ? 100 - workPct : 0;
@@ -125,7 +124,6 @@ export default function App() {
         const q = finalQuestions[currentStep];
         if (!q) return null;
 
-        // Визначаємо поточний індекс зони для сегментованого прогрес-бару
         const currentZoneIndex = menuZones.findIndex(z => z.name === (q.zone ? q.zone.replace(' ЗАМІРИ ПРИМІЩЕНЬ', 'ЗАМІРИ') : ""));
 
         return (
@@ -145,8 +143,7 @@ export default function App() {
                     </div>
                 )}
                 
-                {/* СЕГМЕНТОВАНИЙ ПРОГРЕС-БАР */}
-                <div id="progress-container" style={{marginBottom: '20px'}}>
+                <div id="progress-container">
                     {menuZones.map((z, idx) => (
                         <div key={idx} className={`progress-segment ${idx === currentZoneIndex ? 'active' : (idx < currentZoneIndex ? 'passed' : '')}`}></div>
                     ))}
@@ -183,7 +180,6 @@ export default function App() {
                 <button className="cart-close-btn" onClick={() => setModalImg(null)} style={{ marginTop: '15px' }}>Закрити</button>
             </div>
 
-            {/* ШТОРКА КОШИКА З ГРАФІКОМ */}
             <div className={`bottom-sheet ${isCartOpen ? 'open' : ''}`}>
                 <div className="drag-handle"></div>
                 <h3 style={{marginBottom: '5px'}}>Структура вартості</h3>
@@ -201,12 +197,12 @@ export default function App() {
                         </div>
                     </div>
                 </div>
-
                 <button className="cart-close-btn" onClick={() => setIsCartOpen(false)} style={{marginTop: '25px'}}>Закрити кошик</button>
             </div>
 
             {renderCurrentStep()}
 
+            {/* ПЛАВАЮЧИЙ КОШИК (Видимий) */}
             {currentStep >= 0 && currentStep < finalQuestions.length && (
                 <div id="live-cart" className="visible" onClick={() => setIsCartOpen(true)}>
                     <div><span style={{fontSize:'12px', color:'#aaa', fontWeight:500}}>Робота</span><span className="cart-val"><AnimatedPrice value={totals.work} /> ₴</span></div>
@@ -217,11 +213,11 @@ export default function App() {
 
             <div className="nav-bar">
                 {currentStep >= 0 && (
-                    <button type="button" className="btn btn-back" style={{display:'flex', justifyContent:'center', alignItems:'center'}} onClick={goBack}>
+                    <button type="button" className="btn btn-back" onClick={goBack}>
                         <ArrowLeft size={20} />
                     </button>
                 )}
-                <button type="button" className={`btn btn-next ${currentStep >= finalQuestions.length ? 'btn-submit' : ''}`} style={{display:'flex', justifyContent:'center', alignItems:'center', gap:'8px'}} onClick={goNext}>
+                <button type="button" className={`btn btn-next ${currentStep >= finalQuestions.length ? 'btn-submit' : ''}`} onClick={goNext}>
                     {btnNextText} {currentStep >= finalQuestions.length && <Send size={18} />}
                 </button>
             </div>

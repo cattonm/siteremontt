@@ -5,7 +5,6 @@ import { Wrench, Trash2, PlusCircle } from 'lucide-react';
 export default function CustomWorks({ answers, setAnswers }) {
     const customWorks = answers['custom_works'] || [];
     
-    // Популярні роботи для швидкого вводу
     const popularTags = ["Підйом матеріалів", "Вивіз сміття", "Клінінг після ремонту", "Монтаж сейфу", "Знешумлення труб", "Тепла стіна"];
 
     let zoneOptions = ["Загальні"];
@@ -48,7 +47,7 @@ export default function CustomWorks({ answers, setAnswers }) {
 
     return (
         <div className="animated-step">
-            <div className="zone-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <div className="zone-badge">
                 <Wrench size={14} /> НЕСТАНДАРТНІ РОБОТИ
             </div>
             <h3>Додати індивідуальні роботи?</h3>
@@ -59,7 +58,6 @@ export default function CustomWorks({ answers, setAnswers }) {
                     <label style={{ fontSize: '12px', color: 'var(--hint-color)', marginBottom: '4px' }}>Назва роботи</label>
                     <input type="text" placeholder="Наприклад: Монтаж сейфу" value={work.name} onChange={(e) => updateWork(idx, 'name', e.target.value)} style={{ padding: '12px', marginBottom: '8px', borderRadius: '8px' }} />
                     
-                    {/* ТЕГИ ПАМ'ЯТІ */}
                     <div className="tag-container">
                         {popularTags.map(tag => (
                             <div key={tag} className="tag-pill" onClick={() => applyTag(idx, tag)}>+ {tag}</div>

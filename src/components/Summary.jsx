@@ -4,7 +4,6 @@ import { vibe } from '../utils/telegram';
 import { ChevronDown, ChevronUp, User, Ruler, Settings, Wrench, Edit3, CheckCircle2 } from 'lucide-react';
 
 export default function Summary({ client, answers, finalQuestions, shouldSkip, editStep, totals }) {
-    // Стан для акордеонів (що відкрито, що закрито)
     const [openZones, setOpenZones] = useState({ "👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ": true });
 
     const toggleZone = (zoneName) => {
@@ -55,7 +54,6 @@ export default function Summary({ client, answers, finalQuestions, shouldSkip, e
             </div>
             <p style={{ color: 'var(--hint-color)', fontSize: '14px', marginTop: 0, marginBottom: '20px' }}>Натисніть на розділ, щоб розгорнути деталі.</p>
 
-            {/* КЛІЄНТ */}
             <div className="summary-box" style={{ padding: '0 20px' }}>
                 <div className="accordion-header" onClick={() => toggleZone("👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ")}>
                     <div className="accordion-title"><User size={18} /> ІНФОРМАЦІЯ ПРО ОБ'ЄКТ</div>
@@ -70,7 +68,6 @@ export default function Summary({ client, answers, finalQuestions, shouldSkip, e
                 </div>
             </div>
 
-            {/* ЗАМІРИ */}
             {answers.measurements && Object.keys(answers.measurements).length > 0 && (
                 <div className="summary-box" style={{ padding: '0 20px' }}>
                     <div className="accordion-header" onClick={() => toggleZone("📏 ТОЧНІ ЗАМІРИ")}>
@@ -96,7 +93,6 @@ export default function Summary({ client, answers, finalQuestions, shouldSkip, e
                 </div>
             )}
 
-            {/* ЗОНИ АНКЕТИ */}
             {Object.entries(grouped).map(([zone, items]) => (
                 <div key={zone} className="summary-box" style={{ padding: '0 20px' }}>
                     <div className="accordion-header" onClick={() => toggleZone(zone)}>
@@ -118,7 +114,6 @@ export default function Summary({ client, answers, finalQuestions, shouldSkip, e
                 </div>
             ))}
 
-            {/* НЕСТАНДАРТНІ */}
             <div className="summary-box" style={{ padding: '0 20px' }}>
                 <div className="accordion-header" onClick={() => toggleZone("⭐️ НЕСТАНДАРТНІ РОБОТИ")}>
                     <div className="accordion-title"><Wrench size={18} /> НЕСТАНДАРТНІ РОБОТИ</div>
@@ -138,7 +133,6 @@ export default function Summary({ client, answers, finalQuestions, shouldSkip, e
                 </div>
             </div>
 
-            {/* ФІНАЛЬНА ЦІНА */}
             <div className="summary-box" style={{ background: 'rgba(52, 199, 89, 0.1)', borderColor: '#34c759', padding: '15px 20px' }}>
                 <div style={{ textAlign: 'center', color: '#34c759', fontWeight: 700, fontSize: '16px', marginBottom: '10px' }}>ВАРТІСТЬ ЗАРАЗ</div>
                 <div style={{ display: 'flex', justifyContent: 'space-around' }}>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import useStore from './store/useStore'; // ПІДКЛЮЧАЄМО НАШ STORE
 import ClientForm from './components/ClientForm';
 import Survey from './components/Survey';
 import Measurements from './components/Measurements';
@@ -17,36 +18,25 @@ import {
 const BACKEND_URL = "https://remontnikuav.onrender.com";
 
 export default function App() {
-    // Стан завантаження для режиму редагування
+    // === 1. ГЛОБАЛЬНИЙ СТАН З ZUSTAND ===
+    const { 
+        currentStep, setCurrentStep, 
+        client, setClient, 
+        answers, setAnswers, 
+        rooms, resetDraftSilent: storeResetDraft 
+    } = useStore();
+
+    // === 2. ЛОКАЛЬНІ СТАНИ UI (Не йдуть на сервер) ===
     const [isLoadingEdit, setIsLoadingEdit] = useState(false);
-
-    const [currentStep, setCurrentStep] = useState(() => {
-        const saved = localStorage.getItem('remont_draft_step');
-        return saved !== null ? JSON.parse(saved) : -1;
-    });
-
-    const [client, setClient] = useState(() => {
-        const saved = localStorage.getItem('remont_draft_client');
-        return saved !== null ? JSON.parse(saved) : { name: '', phone: '', object_type: 'Квартира (Новобудова)', address: '', area: '', floor: '1', elevator: 'Немає' };
-    });
-
-    const [answers, setAnswers] = useState(() => {
-        const saved = localStorage.getItem('remont_draft_answers');
-        return saved !== null ? JSON.parse(saved) : {};
-    });
-
     const [isEditingFromSummary, setIsEditingFromSummary] = useState(false);
-    
-    // UI States
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [modalImg, setModalImg] = useState(null);
     const [isDark, setIsDark] = useState(false);
     const [showDraftPrompt, setShowDraftPrompt] = useState(false); 
-
     const [totals, setTotals] = useState({ work: 0, mat_min: 0 });
 
-    // --- ГОЛОВНА ЛОГІКА ЗАПУСКУ (РЕДАГУВАННЯ АБО ЧЕРНЕТКА) ---
+    // === 3. ГОЛОВНА ЛОГІКА ЗАПУСКУ ===
     useEffect(() => {
         if (tg) tg.expand();
         const savedTheme = localStorage.getItem('remont_theme');
@@ -55,10 +45,8 @@ export default function App() {
         const editId = new URLSearchParams(window.location.search).get('edit_id');
         
         if (editId) {
-            // РЕЖИМ РЕДАГУВАННЯ: Завантажуємо дані з бекенду
+            // РЕЖИМ РЕДАГУВАННЯ
             setIsLoadingEdit(true);
-            
-            // Зверни увагу: тут має бути правильний роут твого бекенду для отримання даних
             fetch(`${BACKEND_URL}/api/get_order?edit_id=${editId}`, {
                 headers: { 'X-Telegram-Init-Data': tg?.initData || '' } 
             })
@@ -68,7 +56,13 @@ export default function App() {
                 })
                 .then(data => {
                     if (data.client) setClient(data.client);
-                    if (data.answers) setAnswers(data.answers);
+                    if (data.answers) {
+                        setAnswers(data.answers);
+                        // Завантажуємо масив кімнат, якщо він прийшов з сервера
+                        if (data.answers.rooms) {
+                            useStore.setState({ rooms: data.answers.rooms });
+                        }
+                    }
                     // Кидаємо одразу на фінальний екран (підсумок)
                     setCurrentStep(9999); 
                 })
@@ -79,31 +73,16 @@ export default function App() {
                 .finally(() => setIsLoadingEdit(false));
 
         } else {
-            // РЕЖИМ СТВОРЕННЯ: Перевіряємо локальну чернетку
-            const savedStep = localStorage.getItem('remont_draft_step');
-            if (savedStep !== null && parseInt(savedStep, 10) > -1) {
+            // РЕЖИМ СТВОРЕННЯ: Перевіряємо локальну чернетку з Zustand
+            if (currentStep > -1) {
                 setShowDraftPrompt(true);
             }
         }
     }, []);
 
-    // Автозбереження (працює тільки якщо ми не в режимі редагування старої анкети)
-    useEffect(() => {
-        const editId = new URLSearchParams(window.location.search).get('edit_id');
-        if (!editId) {
-            localStorage.setItem('remont_draft_step', JSON.stringify(currentStep));
-            localStorage.setItem('remont_draft_client', JSON.stringify(client));
-            localStorage.setItem('remont_draft_answers', JSON.stringify(answers));
-        }
-    }, [currentStep, client, answers]);
-
-    const resetDraftSilent = () => {
-        localStorage.removeItem('remont_draft_step');
-        localStorage.removeItem('remont_draft_client');
-        localStorage.removeItem('remont_draft_answers');
-        setClient({ name: '', phone: '', object_type: 'Квартира (Новобудова)', address: '', area: '', floor: '1', elevator: 'Немає' });
-        setAnswers({});
-        setCurrentStep(-1);
+    // Повне скидання чернетки (UI + Store)
+    const handleResetDraftSilent = () => {
+        storeResetDraft(); // Очищає стан Zustand та localStorage
         setIsMenuOpen(false);
         setTotals({ work: 0, mat_min: 0 });
         setIsEditingFromSummary(false);
@@ -112,7 +91,8 @@ export default function App() {
     const resetDraft = () => {
         vibe('heavy');
         if (window.confirm("Ви впевнені, що хочете очистити всю анкету і почати заново?")) {
-            resetDraftSilent();
+            handleResetDraftSilent();
+            setShowDraftPrompt(false);
         }
     };
 
@@ -123,6 +103,7 @@ export default function App() {
         else { document.body.classList.remove('dark-theme'); localStorage.setItem('remont_theme', 'light'); }
     };
 
+    // === 4. ЛОГІКА ПИТАНЬ ===
     const finalQuestions = useMemo(() => {
         const rCount = parseInt(answers.rooms_count) || 0;
         const bCount = parseInt(answers.baths_count) || 0;
@@ -154,18 +135,30 @@ export default function App() {
         return zones;
     }, [finalQuestions, answers]);
 
+    // === 5. LIVE CALC: ЖИВИЙ РОЗРАХУНОК ===
     useEffect(() => {
         if (currentStep < 0 && currentStep !== 9999) return; 
         const delay = setTimeout(async () => {
             if(!navigator.onLine || !client.area) return;
             try {
-                const res = await fetch(`${BACKEND_URL}/api/live_calc`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ client, answers }) });
-                if (res.ok) { const data = await res.json(); setTotals({ work: data.work, mat_min: data.mat_min }); }
+                // АДАПТЕР: Формуємо єдиний об'єкт для сервера
+                const payloadAnswers = { ...answers, rooms: rooms };
+                
+                const res = await fetch(`${BACKEND_URL}/api/live_calc`, { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ client, answers: payloadAnswers }) 
+                });
+                if (res.ok) { 
+                    const data = await res.json(); 
+                    setTotals({ work: data.work, mat_min: data.mat_min }); 
+                }
             } catch(e) { console.log("Calc error", e); }
         }, 500);
         return () => clearTimeout(delay);
-    }, [client, answers, currentStep]);
+    }, [client, answers, rooms, currentStep]);
 
+    // === 6. НАВІГАЦІЯ ===
     const goNext = () => {
         vibe('medium');
         if (currentStep === -1) {
@@ -174,14 +167,23 @@ export default function App() {
             setCurrentStep(0); return;
         }
 
+        // ВІДПРАВКА АНКЕТИ НА СЕРВЕР
         if (currentStep >= finalQuestions.length) {
             vibe('heavy'); 
             const editId = new URLSearchParams(window.location.search).get('edit_id'); 
-            const data = { edit_id: editId, client, answers };
-            if (!editId) resetDraftSilent(); 
+            
+            // АДАПТЕР: Додаємо rooms до фінального JSON
+            const payloadAnswers = { ...answers, rooms: rooms };
+            const data = { edit_id: editId, client, answers: payloadAnswers };
+            
+            if (!editId) handleResetDraftSilent(); 
 
             if (editId) { 
-                fetch(`${BACKEND_URL}/api/save_order`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' }, body: JSON.stringify(data) }).then(() => tg?.close()); 
+                fetch(`${BACKEND_URL}/api/save_order`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' }, 
+                    body: JSON.stringify(data) 
+                }).then(() => tg?.close()); 
             } else { 
                 if(tg && tg.sendData) tg.sendData(JSON.stringify(data)); 
             }
@@ -207,7 +209,7 @@ export default function App() {
     const workPct = totalCost > 0 ? Math.round((totals.work / totalCost) * 100) : 0;
     const matPct = totalCost > 0 ? 100 - workPct : 0;
 
-    // --- ЕКРАН ЗАВАНТАЖЕННЯ ---
+    // === 7. ВІДМАЛЬОВКА ІНТЕРФЕЙСУ ===
     if (isLoadingEdit) {
         return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-color)', color: 'var(--link-color)' }}>
@@ -276,7 +278,7 @@ export default function App() {
                         <p style={{ color: 'var(--hint-color)', fontSize: '15px', lineHeight: '1.4', marginBottom: 0 }}>Знайдено незбережену анкету. Бажаєте продовжити заповнення з місця зупинки?</p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
                             <button onClick={() => { vibe('medium'); setShowDraftPrompt(false); }} style={{ background: 'var(--link-color)', color: 'white', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>Продовжити збережену</button>
-                            <button onClick={() => { vibe('light'); resetDraftSilent(); setShowDraftPrompt(false); }} style={{ background: 'rgba(255, 59, 48, 0.1)', color: '#ff3b30', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>Почати заново</button>
+                            <button onClick={() => { vibe('light'); handleResetDraftSilent(); setShowDraftPrompt(false); }} style={{ background: 'rgba(255, 59, 48, 0.1)', color: '#ff3b30', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>Почати заново</button>
                         </div>
                     </div>
                 </>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import useStore from './store/useStore'; // ПІДКЛЮЧАЄМО НАШ STORE
 import ClientForm from './components/ClientForm';
+import RoomVisualizer from './components/RoomVisualizer';
 import Survey from './components/Survey';
 import Measurements from './components/Measurements';
 import CustomWorks from './components/CustomWorks';
@@ -252,7 +253,7 @@ export default function App() {
                     ))}
                 </div>
                 
-                {q.type === 'trigger_meas' ? <Measurements answers={answers} setAnswers={setAnswers} /> : 
+                {q.type === 'trigger_meas' ? <RoomVisualizer /> : 
                  q.type === 'custom_works_builder' ? <CustomWorks answers={answers} setAnswers={setAnswers} /> : 
                  <Survey question={q} answers={answers} setAnswers={setAnswers} client={client} openImage={setModalImg} />}
             </>

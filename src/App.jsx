@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import useStore from './store/useStore'; // ПІДКЛЮЧАЄМО НАШ STORE
+import useStore from './store/useStore'; 
 import ClientForm from './components/ClientForm';
 import RoomVisualizer from './components/RoomVisualizer';
 import Survey from './components/Survey';

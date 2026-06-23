@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import useStore from '../store/useStore';
 import { Trash2 } from 'lucide-react';
 import { vibe } from '../utils/telegram';
+import SelectedMaterialsSummary from './SelectedMaterialsSummary';
 import { ROOM_QUESTIONS_CONFIG } from '../data/questions';
 import Survey from './Survey';
 import ApartmentScene3D from './ApartmentScene3D';
+
 
 const ROOM_TYPES = [
     { id: 'room', name: 'Кімната' }, { id: 'kitchen', name: 'Кухня' }, { id: 'bath', name: 'Санвузол' },
@@ -68,39 +70,40 @@ export default function RoomVisualizer() {
             </div>
 
             {activeRoom && (
-                <div style={{ borderTop: '2px dashed var(--border-color)', paddingTop: '20px', animation: 'fadeIn 0.3s ease' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                        <h4 style={{ margin: 0, fontSize: '18px', color: 'var(--text-color)', textTransform: 'uppercase', fontWeight: 800 }}>{activeRoom.name}</h4>
-                        <Trash2 size={20} color="#ff3b30" style={{ cursor: 'pointer' }} onClick={() => { vibe('heavy'); removeRoom(activeId); setActiveId(null); }} />
-                    </div>
+    <div style={{ borderTop: '2px dashed var(--border-color)', paddingTop: '20px', animation: 'fadeIn 0.3s ease' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <h4 style={{ margin: 0, fontSize: '18px', color: 'var(--text-color)', textTransform: 'uppercase', fontWeight: 800 }}>{activeRoom.name}</h4>
+            <Trash2 size={20} color="#ff3b30" style={{ cursor: 'pointer' }} onClick={() => { vibe('heavy'); removeRoom(activeId); setActiveId(null); }} />
+        </div>
 
-                    <div className="measurement-box" style={{ marginBottom: '20px' }}>
-                        <label>Площа (м²)</label>
-                        <input type="number" inputMode="decimal" value={activeRoom.measurements.floor} onChange={(e) => {
-                            const val = parseFloat(e.target.value);
-                            updateRoom(activeId, { measurements: { ...activeRoom.measurements, floor: isNaN(val) ? '' : val, walls: isNaN(val) ? '' : parseFloat((val * 3).toFixed(1)) } });
-                        }} />
-                    </div>
+        {/* ЖИВИЙ 3D-ПЕРЕГЛЯД — реагує на вибір нижче в реальному часі */}
+        <div style={{ marginBottom: '20px' }}>
+            <SelectedMaterialsSummary room={activeRoom} />
+        </div>
 
-                    {/* Картки матеріалів — це і є місце для "фото", як у попередній версії */}
-                    <div style={{ marginTop: '20px' }}>
-                        {(ROOM_QUESTIONS_CONFIG[activeRoom.type] || []).map(question => (
-                            <Survey
-                                key={question.id}
-                                question={question}
-                                answers={activeRoom}
-                                setAnswers={(updater) => {
-                                    if (typeof updater === 'function') {
-                                        updateRoom(activeId, updater(activeRoom));
-                                    } else {
-                                        updateRoom(activeId, { ...activeRoom, ...updater });
-                                    }
-                                }}
-                            />
-                        ))}
-                    </div>
-                </div>
-            )}
+        <div className="measurement-box" style={{ marginBottom: '20px' }}>
+            <label>Площа (м²)</label>
+            <input type="number" inputMode="decimal" value={activeRoom.measurements.floor} onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                updateRoom(activeId, { measurements: { ...activeRoom.measurements, floor: isNaN(val) ? '' : val, walls: isNaN(val) ? '' : parseFloat((val * 3).toFixed(1)) } });
+            }} />
+        </div>
+
+        <div style={{ marginTop: '20px' }}>
+            {(ROOM_QUESTIONS_CONFIG[activeRoom.type] || []).map(question => (
+                <Survey
+                    key={question.id}
+                    question={question}
+                    answers={activeRoom}
+                    setAnswers={(updater) => {
+                        if (typeof updater === 'function') updateRoom(activeId, updater(activeRoom));
+                        else updateRoom(activeId, { ...activeRoom, ...updater });
+                    }}
+                />
+            ))}
+        </div>
+    </div>
+)}
         </div>
     );
 }

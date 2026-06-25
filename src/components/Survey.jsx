@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
+import { Check } from 'lucide-react';
 import { vibe, vibeSelect } from '../utils/telegram';
 
-export default function Survey({ question, answers, setAnswers, client, openImage }) {
+export default function Survey({ question, answers, setAnswers, client, openImage, compact = false }) {
     if (!question) return null;
 
     // Поточне значення для цього питання
@@ -20,6 +21,21 @@ export default function Survey({ question, answers, setAnswers, client, openImag
     // --- РЕНДЕРИ РІЗНИХ ТИПІВ ПИТАНЬ ---
 
     if (question.type === 'cards') {
+        if (compact) {
+            return (
+                <div className="compact-question">
+                    <div className="compact-label">{question.text}</div>
+                    <div className="pill-row">
+                        {question.options.map(opt => (
+                            <div key={opt.val} className={`pill ${val === opt.val ? 'selected' : ''}`} onClick={() => { vibe(); setAnswer(opt.val); }}>
+                                <span className="pill-radio" />
+                                {opt.label}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
         return (
             <div className="animated-step">
                 {question.zone && <div className="zone-badge">{question.zone}</div>}
@@ -73,6 +89,24 @@ export default function Survey({ question, answers, setAnswers, client, openImag
             setAnswer(next);
         };
 
+        if (compact) {
+            return (
+                <div className="compact-question">
+                    <div className="compact-label">{question.text}</div>
+                    <div className="pill-row">
+                        {question.options.map(opt => (
+                            <div key={opt.val} className={`pill ${currentArr.includes(opt.val) ? 'selected' : ''}`} onClick={() => handleSelect(opt.val)}>
+                                <span className="pill-check">
+                                    {currentArr.includes(opt.val) && <Check size={12} color="#fff" strokeWidth={3} />}
+                                </span>
+                                {opt.label}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
         return (
             <div className="animated-step">
                 {question.zone && <div className="zone-badge">{question.zone}</div>}
@@ -104,6 +138,37 @@ export default function Survey({ question, answers, setAnswers, client, openImag
             }
         };
 
+        const showTiers = (opt) => opt && currentObj.type === opt.val && opt.val !== "Не обладнувати" && opt.val !== "Не потребується" && opt.val !== "Ні" && opt.val !== "Ні / Залишаються";
+
+        if (compact) {
+            const activeOpt = question.options.find(o => o.val === currentObj.type);
+            return (
+                <div className="compact-question">
+                    <div className="compact-label">{question.text}</div>
+                    <div className="pill-row">
+                        {question.options.map(opt => (
+                            <div key={opt.val} className={`pill ${currentObj.type === opt.val ? 'selected' : ''}`} onClick={() => handleCardClick(opt)}>
+                                <span className="pill-radio" />
+                                {opt.label}
+                            </div>
+                        ))}
+                    </div>
+                    {showTiers(activeOpt) && (
+                        <div className="tier-container" style={{ maxWidth: '220px', marginTop: '12px' }}>
+                            {(activeOpt.variants || ['Standard', 'Comfort', 'Premium']).map(v => {
+                                let btnText = v; if(v==='Standard') btnText='S'; if(v==='Comfort') btnText='C'; if(v==='Premium') btnText='P';
+                                return (
+                                    <div key={v} className={`tier-btn ${currentObj.tier === v ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); vibeSelect(); setAnswer({...currentObj, tier: v}); }}>
+                                        {btnText}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         return (
             <div className="animated-step">
                 {question.zone && <div className="zone-badge">{question.zone}</div>}
@@ -111,7 +176,7 @@ export default function Survey({ question, answers, setAnswers, client, openImag
                 <div className="card-grid">
                     {question.options.map(opt => {
                         const isSel = currentObj.type === opt.val;
-                        const showTiers = isSel && opt.val !== "Не обладнувати" && opt.val !== "Не потребується" && opt.val !== "Ні" && opt.val !== "Ні / Залишаються";
+                        const showTiersFlag = showTiers(opt);
                         return (
                             <div key={opt.val} className={`card ${isSel ? 'selected' : ''}`} onClick={() => handleCardClick(opt)}>
                                 {opt.img && (
@@ -121,7 +186,7 @@ export default function Survey({ question, answers, setAnswers, client, openImag
                                     </div>
                                 )}
                                 <div className="card-label">{opt.label}</div>
-                                {showTiers && (
+                                {showTiersFlag && (
                                     <div className="tier-container">
                                         {(opt.variants || ['Standard', 'Comfort', 'Premium']).map(v => {
                                             let btnText = v; if(v==='Standard') btnText='S'; if(v==='Comfort') btnText='C'; if(v==='Premium') btnText='P';

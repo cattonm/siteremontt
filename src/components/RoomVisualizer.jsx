@@ -3,7 +3,9 @@ import useStore from '../store/useStore';
 import { Trash2 } from 'lucide-react';
 import { vibe } from '../utils/telegram';
 import SelectedMaterialsSummary from './SelectedMaterialsSummary';
+import AccordionGroup from './AccordionGroup';
 import { ROOM_QUESTIONS_CONFIG } from '../data/questions';
+import { groupQuestions } from '../utils/groupQuestions';
 import Survey from './Survey';
 import ApartmentScene3D from './ApartmentScene3D';
 
@@ -90,15 +92,24 @@ export default function RoomVisualizer() {
         </div>
 
         <div style={{ marginTop: '20px' }}>
-            {(ROOM_QUESTIONS_CONFIG[activeRoom.type] || []).map(question => (
-                <Survey
-                    key={question.id}
-                    question={question}
-                    answers={activeRoom}
-                    setAnswers={(updater) => {
-                        if (typeof updater === 'function') updateRoom(activeId, updater(activeRoom));
-                        else updateRoom(activeId, { ...activeRoom, ...updater });
-                    }}
+            {groupQuestions(ROOM_QUESTIONS_CONFIG[activeRoom.type] || []).map(({ name, questions }) => (
+                <AccordionGroup
+                    key={name}
+                    name={name}
+                    questions={questions}
+                    room={activeRoom}
+                    renderQuestion={(question) => (
+                        <Survey
+                            key={question.id}
+                            question={question}
+                            answers={activeRoom}
+                            compact
+                            setAnswers={(updater) => {
+                                if (typeof updater === 'function') updateRoom(activeId, updater(activeRoom));
+                                else updateRoom(activeId, { ...activeRoom, ...updater });
+                            }}
+                        />
+                    )}
                 />
             ))}
         </div>

@@ -73,6 +73,18 @@ input:focus, select:focus { border-color: var(--link-color); box-shadow: 0 0 0 3
 .zoom-icon { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.5); color: white; padding: 4px 8px; border-radius: 20px; font-size: 13px; cursor: pointer; z-index: 10; transition: background 0.2s; backdrop-filter: blur(4px);}
 .card-label { font-weight: 500; font-size: 14px; }
 
+.compact-question { margin-bottom: 18px; }
+.compact-question:last-child { margin-bottom: 0; }
+.compact-label { font-size: 14px; font-weight: 700; color: var(--text-color); margin-bottom: 10px; }
+.pill-row { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.pill { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--text-color); padding: 4px 0; user-select: none; }
+.pill-radio, .pill-check { flex: 0 0 auto; width: 18px; height: 18px; border: 2px solid var(--border-color); box-sizing: border-box; position: relative; transition: border-color 0.2s; }
+.pill-radio { border-radius: 50%; }
+.pill-check { border-radius: 5px; display: flex; align-items: center; justify-content: center; }
+.pill.selected { color: var(--link-color); font-weight: 700; }
+.pill.selected .pill-radio, .pill.selected .pill-check { border-color: var(--link-color); }
+.pill.selected .pill-radio::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--link-color); }
+.pill.selected .pill-check { background: var(--link-color); }
 .tier-container { display: flex; background: var(--zone-badge-bg); border-radius: 8px; padding: 3px; margin-top: 10px; width: 100%; box-sizing: border-box;}
 .tier-btn { flex: 1; padding: 8px 0; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--hint-color); text-align: center; transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1); }
 .tier-btn.active { background: var(--card-bg); color: var(--text-color); box-shadow: 0 2px 8px rgba(0,0,0,0.12); }

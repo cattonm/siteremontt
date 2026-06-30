@@ -10,7 +10,8 @@ export const DEFAULT_TEMPLATE = {
     rows: [
         { id: 'living', roomTypes: ['room', 'kitchen'] },          // спільна житлова зона
         { id: 'utility', roomTypes: ['hallway'] },                  // коридор на всю ширину
-        { id: 'wet', roomTypes: ['bath', 'wardrobe', 'balcony'] }   // санвузол/гардероб/балкон
+        { id: 'wet', roomTypes: ['bath', 'wardrobe', 'balcony'] },  // санвузол/гардероб/балкон
+        { id: 'extra', roomTypes: ['basement', 'attic'] }           // підвал/мансарда — окремий ряд
     ]
 };
 

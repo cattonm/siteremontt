@@ -12,7 +12,8 @@ import ApartmentScene3D from './ApartmentScene3D';
 
 const ROOM_TYPES = [
     { id: 'room', name: 'Кімната' }, { id: 'kitchen', name: 'Кухня' }, { id: 'bath', name: 'Санвузол' },
-    { id: 'hallway', name: 'Передпокій' }, { id: 'balcony', name: 'Балкон' }, { id: 'wardrobe', name: 'Гардероб' }
+    { id: 'hallway', name: 'Передпокій' }, { id: 'balcony', name: 'Балкон' }, { id: 'wardrobe', name: 'Гардероб' },
+    { id: 'basement', name: 'Підвал' }, { id: 'attic', name: 'Мансарда' }
 ];
 
 export default function RoomVisualizer() {

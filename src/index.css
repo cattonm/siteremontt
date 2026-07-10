@@ -134,3 +134,27 @@ input:focus, select:focus { border-color: var(--link-color); box-shadow: 0 0 0 3
 .chart-legend { flex: 1; display: flex; flex-direction: column; gap: 8px; }
 .legend-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+.donut-hole { width: 56px; height: 56px; border-radius: 50%; background: var(--modal-bg); }
+.chart-legend { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.legend-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+/* ==== RoomPhotoPreview: пошарове фото кімнати ==== */
+.rpp-wrap { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #ededf0; }
+.rpp-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.rpp-layer { transition: opacity 0.35s ease; pointer-events: none; }
+.rpp-hotspot {
+    position: absolute; transform: translate(-50%, -50%);
+    width: 38px; height: 38px; border-radius: 50%;
+    background: #fff; color: #1c1c1e; border: none; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25); cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.rpp-hotspot:active { transform: translate(-50%, -50%) scale(0.9); }
+.rpp-hotspot.active { background: #e31e24; color: #fff; }
+
+/* ==== Двоколонковий режим візуалізатора на широких екранах ==== */
+@media (min-width: 900px) {
+    .visualizer-split { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; align-items: start; }
+    .visualizer-preview-col { position: sticky; top: 16px; }
+}

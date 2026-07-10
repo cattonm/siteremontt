@@ -22,6 +22,7 @@ import { ROOM_QUESTIONS_CONFIG } from '../data/questions';
 import { groupQuestions } from '../utils/groupQuestions';
 import Survey from './Survey';
 import ApartmentScene3D from './ApartmentScene3D';
+import { ZONES, assignRoomsToZones } from '../data/apartmentTemplate';
 
 const ROOM_TYPES = [
     { id: 'room', name: 'Кімната' }, { id: 'kitchen', name: 'Кухня' }, { id: 'bath', name: 'Санвузол' },
@@ -64,6 +65,18 @@ export default function RoomVisualizer() {
         setOpenGroup(null); // нова кімната — акордеон згорнутий
     };
 
+    // Клік по зоні на плані (по підлозі або по плашці):
+    //  - у зоні вже є кімната — просто вибираємо її;
+    //  - зона порожня — СТВОРЮЄМО кімнату цього типу (як у Kapitel можна
+    //    почати з будь-якого приміщення прямо з макета).
+    const { roomByZoneId } = assignRoomsToZones(rooms);
+    const handleZonePress = (zoneId) => {
+        const assigned = roomByZoneId[zoneId];
+        if (assigned) { selectRoom(assigned.id); return; }
+        const zone = ZONES.find((z) => z.id === zoneId);
+        if (zone) handleAddRoom(zone.type);
+    };
+
     // Хотспот на фото: відкриваємо секцію та плавно скролимо до неї.
     // setTimeout(60) дає акордеону кадр на відкриття, інакше scrollIntoView
     // цілиться в ще згорнутий (нульової висоти) блок.
@@ -99,14 +112,39 @@ export default function RoomVisualizer() {
                 ))}
             </div>
 
-            {/* 3D ПЛАН КВАРТИРИ — білий фон, як на референсі */}
-            <div style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '12px', minHeight: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                {rooms.length === 0 ? (
-                    <div style={{ color: '#8e8e93', fontSize: '14px', padding: '20px' }}>Створіть кімнати для плану</div>
-                ) : (
-                    <ApartmentScene3D rooms={rooms} activeId={activeId} onSelectRoom={selectRoom} />
-                )}
+            {/* 3D ПЛАН КВАРТИРИ — фіксований макет, показується завжди */}
+            <div style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden' }}>
+                <ApartmentScene3D rooms={rooms} activeId={activeId} onZonePress={handleZonePress} />
             </div>
+            {rooms.length === 0 && (
+                <div style={{ color: 'var(--hint-color)', fontSize: '13px', textAlign: 'center', marginTop: '-10px' }}>
+                    Натисни на приміщення на плані або на кнопку вище, щоб додати його
+                </div>
+            )}
+
+            {/* ЧИПИ КІМНАТ — дублюють вибір з плану (зручно пальцем на телефоні;
+                сюди ж потрапляють кімнати, яким не вистачило зони на макеті) */}
+            {rooms.length > 0 && (
+                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', marginTop: '-8px' }}>
+                    {rooms.map((r, i) => {
+                        const isActive = r.id === activeId;
+                        const area = parseFloat(r.measurements?.floor) || 0;
+                        return (
+                            <button key={r.id} onClick={() => selectRoom(r.id)}
+                                style={{
+                                    flex: '0 0 auto', display: 'flex', alignItems: 'baseline', gap: '5px',
+                                    padding: '7px 12px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                                    background: 'var(--card-bg)', color: 'var(--text-color)',
+                                    border: `1.5px solid ${isActive ? '#e31e24' : 'var(--border-color)'}`,
+                                    borderRadius: '20px',
+                                }}>
+                                <span>{i + 1}. {r.name}</span>
+                                {area > 0 && <span style={{ color: '#e31e24', fontWeight: 700 }}>{area} м²</span>}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
 
             {activeRoom && (
                 <div style={{ borderTop: '2px dashed var(--border-color)', paddingTop: '20px', animation: 'fadeIn 0.3s ease' }}>

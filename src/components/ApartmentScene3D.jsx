@@ -1,93 +1,81 @@
 // src/components/ApartmentScene3D.jsx
-// Ізометричний план квартири у стилі Kapitel:
-//  - ортографічна камера з ФІКСОВАНИМ кутом (обертання вимкнене);
-//  - білі стіни + суцільний чорний "зріз" зверху (план читається чорними лініями);
-//  - білі плашки-лейбли «1. Кухня  35 м²» (площа — червоним), завжди повернуті до камери;
-//  - активна кімната підсвічена червоною рамкою;
-//  - чистий білий фон, без сірого "подіуму";
-//  - контроли: − / % / + / скидання виду (як на референсі).
+// Ізометричний план квартири на основі ФІКСОВАНОГО шаблону
+// (src/data/apartmentTemplate.js) — як у Kapitel: планування намальоване
+// один раз руками, а кімнати користувача лише "підписують" зони макета.
+//
+// Інтерактив:
+//  - клік по зоні З кімнатою — вибирає її;
+//  - клік по ПОРОЖНІЙ зоні — батьківський компонент СТВОРЮЄ кімнату
+//    цього типу (onZonePress вирішує);
+//  - плашки-лейбли теж клікабельні;
+//  - неактивні плашки компактні («2. Кімната»), активна — повна, з
+//    червоною площею, тому підписи не затуляють модель.
 import React, { useMemo, useState, useEffect } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { Plus, Minus, RotateCcw } from 'lucide-react';
-import { computeApartmentLayout } from '../utils/layoutEngine';
 import { useMaterialFill } from '../utils/materialFill';
-import { OutlinedBox, OutlinedSurface } from './three/Outlined';
-import { WALL_HEIGHT, EXTERIOR_THICKNESS, INTERIOR_THICKNESS, FLOOR_THICKNESS } from './three/sceneConstants';
-import RoomFurniture3D from './RoomFurniture3D';
+import { OutlinedBox, OutlinedCylinder, OutlinedSurface } from './three/Outlined';
+import { FLOOR_THICKNESS } from './three/sceneConstants';
+import { SLOT_SIZE } from '../utils/layoutEngine';
+import { FURNITURE_LAYOUTS } from '../data/furnitureLayouts';
+import {
+    ZONES, WALLS, BOUNDS_MAIN, BOUNDS_FULL,
+    TEMPLATE_WALL_HEIGHT as WALL_H, SILL_HEIGHT,
+    EXT_THICKNESS, INT_THICKNESS,
+    assignRoomsToZones,
+} from '../data/apartmentTemplate';
 
-// ====== НАЛАШТУВАННЯ ВИГЛЯДУ (крути ці числа, щоб підігнати картинку) ======
-const ELEVATION_DEG = 35;   // кут погляду зверху (35° ≈ класична ізометрія Kapitel)
-const AZIMUTH_DEG = 45;     // поворот навколо будинку (45° = дивимось "з кута")
-const FIT_FRACTION = 0.75;  // яку частку в'юпорта займає модель (0.75 = 75%)
-const MIN_ZOOM = 0.5;       // 50%
-const MAX_ZOOM = 2.5;       // 250%
+// ====== НАЛАШТУВАННЯ ВИГЛЯДУ ======
+const ELEVATION_DEG = 42;   // кут погляду зверху
+const AZIMUTH_DEG = 45;     // поворот навколо будинку
+const FIT_FRACTION = 0.85;  // частка в'юпорта, яку займає модель
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 2.5;
 const ZOOM_STEP = 0.25;
 
-const ACCENT = '#e31e24';        // фірмовий червоний (як у Kapitel)
-const WALL_COLOR = '#ffffff';    // стіни — білі площини
-const WALL_CAP_COLOR = '#141414';// чорний зріз стіни зверху
-const CAP_HEIGHT = 0.07;         // товщина чорного зрізу (метри)
-const CAP_OVERHANG = 0.02;       // наскільки зріз ширший за стіну (щоб лінія була жирною)
-const IDLE_FLOOR_COLOR = '#f6f6f4'; // підлога, поки матеріал не обрано (нейтральна, як у Kapitel)
+const ACCENT = '#e31e24';          // фірмовий червоний
+const WALL_COLOR = '#ffffff';
+const WALL_CAP_COLOR = '#141414';  // чорний зріз стін = лінії плану
+const CAP_HEIGHT = 0.07;
+const CAP_OVERHANG = 0.02;
+const FLOOR_EMPTY = '#f1f1ee';     // зона без кімнати користувача
+const FLOOR_ASSIGNED = '#fbfbfa';  // кімната є, матеріал ще не обрано
 
-// Старі пастельні кольори за типом кімнати. Якщо захочеш повернути їх для
-// необраних підлог — постав USE_TYPE_TINT = true.
-const USE_TYPE_TINT = false;
-const TYPE_FALLBACK_COLOR = {
-    room: '#cfe3ff', kitchen: '#ffe6bf', bath: '#c7f0e0',
-    hallway: '#e7e7ec', balcony: '#d8f0c3', wardrobe: '#f0d8f4',
-    basement: '#dcd3c8', attic: '#e3dccb',
-};
-
-// ====== КАМЕРА ======
-// Ортографічна камера не має перспективи: розмір моделі на екрані залежить
-// тільки від camera.zoom (пікселів на метр), а НЕ від відстані. Тому "зум"
-// тут — це просто множник zoom, а позиція камери фіксована під потрібним кутом.
-function IsoCamera({ building, userZoom }) {
+// ====== КАМЕРА (ортографічна, фіксований кут; зум = camera.zoom) ======
+function IsoCamera({ bounds, userZoom }) {
     const { camera, size } = useThree();
 
-    // Мутувати camera напряму — стандартний патерн react-three-fiber
-    // (three.js-об'єкти імперативні за своєю природою). Нове суворе правило
-    // react-hooks/immutability цього не знає, тому вимикаємо його для блоку.
-    /* eslint-disable react-hooks/immutability */
+    /* eslint-disable react-hooks/immutability -- three.js імперативний, мутація камери тут — норма r3f */
     useEffect(() => {
-        const width = Math.max(building.width, 3);
-        const depth = Math.max(building.depth, 3);
+        const { width, depth } = bounds;
         const el = THREE.MathUtils.degToRad(ELEVATION_DEG);
         const az = THREE.MathUtils.degToRad(AZIMUTH_DEG);
-
-        // Ставимо камеру на фіксований напрямок. Дистанція D для ортографіки
-        // впливає лише на площини відсікання (near/far), не на масштаб.
         const D = Math.max(width, depth) * 4;
+
         camera.position.set(
             Math.cos(el) * Math.cos(az) * D,
             Math.sin(el) * D,
             Math.cos(el) * Math.sin(az) * D
         );
-        camera.lookAt(0, WALL_HEIGHT * 0.4, 0);
+        camera.lookAt(0, WALL_H * 0.35, 0);
         camera.near = 0.1;
         camera.far = D * 3;
 
-        // Скільки метрів займає будинок на екрані у цій проєкції:
-        // ширина ≈ (w + d) * cos45°, висота ≈ ширина * sin(нахилу) + висота стін.
         const projW = (width + depth) * Math.SQRT1_2;
-        const projH = projW * Math.sin(el) + WALL_HEIGHT * Math.cos(el) + 0.8; // +0.8м запасу під лейбли
+        const projH = projW * Math.sin(el) + WALL_H * Math.cos(el) + 0.6;
         const fitZoom = Math.min(size.width / projW, size.height / projH) * FIT_FRACTION;
 
         camera.zoom = fitZoom * userZoom;
         camera.updateProjectionMatrix();
-    }, [camera, size.width, size.height, building.width, building.depth, userZoom]);
+    }, [camera, size.width, size.height, bounds.width, bounds.depth, userZoom]);
     /* eslint-enable react-hooks/immutability */
 
     return null;
 }
 
-// ====== СТІНА "ЯК НА ПЛАНІ" ======
-// Біле тіло стіни (з тонким контуром із Outlined.jsx) + чорна "кришка" зверху.
-// Кришка трохи ширша за стіну і не реагує на світло (meshBasicMaterial),
-// тому зверху план читається як жирні чорні лінії — головний прийом Kapitel.
+// ====== СТІНА: біле тіло + чорна "кришка" (лінія плану) ======
 function PlanWall({ args, position }) {
     const [w, h, d] = args;
     const [x, y, z] = position;
@@ -102,58 +90,101 @@ function PlanWall({ args, position }) {
     );
 }
 
-function RoomFloor({ room, isActive, onSelect }) {
-    const fill = useMaterialFill(room.type, 'floor', room.floor, room.width, room.depth);
-    const idleColor = USE_TYPE_TINT ? (TYPE_FALLBACK_COLOR[room.type] || '#e9e9ec') : IDLE_FLOOR_COLOR;
-    const color = room.floor ? fill.color : idleColor;
-    const centerX = room.x + room.width / 2;
-    const centerZ = room.y + room.depth / 2;
+// Перетворює сегмент шаблону {a, b, kind} на бокс потрібної товщини/висоти.
+// Кінці подовжуємо на півтовщини, щоб кути стін змикались без щілин.
+function WallSegment({ wall }) {
+    const t = wall.kind === 'int' ? INT_THICKNESS : EXT_THICKNESS;
+    const h = wall.kind === 'sill' ? SILL_HEIGHT : WALL_H;
+    const alongX = Math.abs(wall.a[1] - wall.b[1]) < 1e-6;
+    const len = alongX ? Math.abs(wall.b[0] - wall.a[0]) : Math.abs(wall.b[1] - wall.a[1]);
+    const cx = (wall.a[0] + wall.b[0]) / 2;
+    const cz = (wall.a[1] + wall.b[1]) / 2;
+    const args = alongX ? [len + t, h, t] : [t, h, len + t];
+    return <PlanWall args={args} position={[cx, h / 2, cz]} />;
+}
+
+// ====== ПІДЛОГА ЗОНИ (клікабельна) ======
+function ZoneFloor({ zone, room, isActive, onPress }) {
+    // Хуки викликаються завжди (навіть коли кімнати нема) — правило React.
+    const fill = useMaterialFill(zone.type, 'floor', room?.floor ?? null, zone.w, zone.d);
+    const color = room?.floor ? fill.color : (room ? FLOOR_ASSIGNED : FLOOR_EMPTY);
+    const cx = zone.x + zone.w / 2;
+    const cz = zone.z + zone.d / 2;
 
     return (
         <>
-            {/* Червона рамка активної кімнати: трохи більша червона пластина
-                під підлогою — по периметру визирає тонка червона смуга. */}
             {isActive && (
-                <mesh position={[centerX, 0.002, centerZ]}>
-                    <boxGeometry args={[room.width + 0.1, 0.012, room.depth + 0.1]} />
+                <mesh position={[cx, 0.002, cz]}>
+                    <boxGeometry args={[zone.w + 0.1, 0.012, zone.d + 0.1]} />
                     <meshBasicMaterial color={ACCENT} />
                 </mesh>
             )}
             <OutlinedSurface
-                args={[room.width - 0.02, FLOOR_THICKNESS, room.depth - 0.02]}
-                position={[centerX, FLOOR_THICKNESS / 2 + (isActive ? 0.008 : 0), centerZ]}
+                args={[zone.w - 0.02, FLOOR_THICKNESS, zone.d - 0.02]}
+                position={[cx, FLOOR_THICKNESS / 2 + (isActive ? 0.008 : 0), cz]}
                 color={color}
-                texture={fill.texture}
-                onClick={(e) => { e.stopPropagation(); onSelect(room.id); }}
+                texture={room?.floor ? fill.texture : null}
+                onClick={(e) => { e.stopPropagation(); onPress(zone.id); }}
             />
         </>
     );
 }
 
-// Лейбл у стилі Kapitel: біла плашка, «N. Назва» чорним, площа — червоним.
-// <Html> з drei — це звичайний DOM поверх канви, тож плашка ЗАВЖДИ дивиться
-// на камеру і не масштабується зумом (без distanceFactor розмір сталий).
-function RoomLabel({ room, index, isActive }) {
-    const centerX = room.x + room.width / 2;
-    const centerZ = room.y + room.depth / 2;
+// ====== МЕБЛІ ======
+// Розкладки з furnitureLayouts.js зроблені під комірки SLOT_SIZE, а зони
+// шаблону більші — тому масштабуємо ПОЗИЦІЇ (не розміри) і про всяк випадок
+// затискаємо центри, щоб предмети не вилазили за межі зони.
+function ZoneFurniture({ zone }) {
+    const pieces = FURNITURE_LAYOUTS[zone.type];
+    if (!pieces) return null;
+    const slot = SLOT_SIZE[zone.type] || { width: 2.0, depth: 1.8 };
+    const sx = zone.w / slot.width;
+    const sz = zone.d / slot.depth;
+    const clamp = (v, max) => Math.min(Math.max(v, 0.35), max - 0.35);
+
     return (
-        <Html position={[centerX, WALL_HEIGHT + 0.3, centerZ]} center zIndexRange={[20, 0]}>
-            <div style={{
-                display: 'flex', alignItems: 'baseline', gap: '6px',
-                background: '#ffffff', padding: '4px 10px', borderRadius: '8px',
-                boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
-                border: `1.5px solid ${isActive ? ACCENT : 'rgba(0,0,0,0.08)'}`,
-                fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap',
-                color: '#141414', pointerEvents: 'none',
-            }}>
+        <group position={[zone.x, 0, zone.z]}>
+            {pieces.map((p, i) => {
+                const pos = [clamp(p.pos[0] * sx, zone.w), p.pos[1], clamp(p.pos[2] * sz, zone.d)];
+                return p.shape === 'cylinder' ? (
+                    <OutlinedCylinder key={i} args={p.args} position={pos} rotation={p.rotation} color={p.color} />
+                ) : (
+                    <OutlinedBox key={i} args={p.args} position={pos} rotation={p.rotation} color={p.color} />
+                );
+            })}
+        </group>
+    );
+}
+
+// ====== ЛЕЙБЛ (клікабельний; компактний, поки не активний) ======
+function ZoneLabel({ zone, room, index, isActive, onPress }) {
+    const [lx, lz] = zone.label;
+    const [shiftX = 0, shiftY = 0] = zone.labelShift || [];
+    const area = parseFloat(room.measurements?.floor) || 0;
+    return (
+        <Html position={[lx, WALL_H + 0.25, lz]} center zIndexRange={[20, 0]}>
+            <button
+                type="button"
+                onClick={() => onPress(zone.id)}
+                style={{
+                    display: 'flex', alignItems: 'baseline', gap: '5px',
+                    transform: `translate(${shiftX}px, ${shiftY}px)`,
+                    background: '#ffffff', color: '#141414',
+                    padding: isActive ? '4px 10px' : '2px 8px',
+                    borderRadius: '8px', cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+                    border: `1.5px solid ${isActive ? ACCENT : 'rgba(0,0,0,0.08)'}`,
+                    fontSize: isActive ? '12px' : '10px', fontWeight: 700,
+                    whiteSpace: 'nowrap', fontFamily: 'inherit',
+                }}
+            >
                 <span>{index}. {room.name}</span>
-                {room.area > 0 && <span style={{ color: ACCENT }}>{room.area} м²</span>}
-            </div>
+                {isActive && area > 0 && <span style={{ color: ACCENT }}>{area} м²</span>}
+            </button>
         </Html>
     );
 }
 
-// ====== КОНТРОЛИ ЗУМУ (звичайний DOM поверх канви, не Three.js) ======
 function ZoomControls({ zoom, onZoom, onReset }) {
     const btn = {
         width: '32px', height: '32px', borderRadius: '50%', border: '1px solid #e5e5ea',
@@ -162,95 +193,73 @@ function ZoomControls({ zoom, onZoom, onReset }) {
         padding: 0,
     };
     return (
-        <div style={{
-            position: 'absolute', top: '10px', right: '10px', display: 'flex',
-            alignItems: 'center', gap: '8px', zIndex: 30,
-        }}>
-            <button type="button" style={btn} onClick={() => onZoom(-ZOOM_STEP)} aria-label="Зменшити">
-                <Minus size={16} />
-            </button>
+        <div style={{ position: 'absolute', top: '10px', right: '10px', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 30 }}>
+            <button type="button" style={btn} onClick={() => onZoom(-ZOOM_STEP)} aria-label="Зменшити"><Minus size={16} /></button>
             <span style={{
                 minWidth: '46px', textAlign: 'center', fontSize: '13px', fontWeight: 600,
                 color: '#1c1c1e', background: '#fff', border: '1px solid #e5e5ea',
                 borderRadius: '16px', padding: '5px 8px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-            }}>
-                {Math.round(zoom * 100)}%
-            </span>
-            <button type="button" style={btn} onClick={() => onZoom(ZOOM_STEP)} aria-label="Збільшити">
-                <Plus size={16} />
-            </button>
-            <button type="button" style={btn} onClick={onReset} aria-label="Скинути вид">
-                <RotateCcw size={15} />
-            </button>
+            }}>{Math.round(zoom * 100)}%</span>
+            <button type="button" style={btn} onClick={() => onZoom(ZOOM_STEP)} aria-label="Збільшити"><Plus size={16} /></button>
+            <button type="button" style={btn} onClick={onReset} aria-label="Скинути вид"><RotateCcw size={15} /></button>
         </div>
     );
 }
 
-export default function ApartmentScene3D({ rooms, activeId, onSelectRoom }) {
-    const layout = useMemo(() => computeApartmentLayout(rooms), [rooms]);
-    const { width, depth } = layout.building;
-    const { interiorHorizontal, interiorVertical, exterior } = layout.walls;
+export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
     const [zoom, setZoom] = useState(1);
+    const { roomByZoneId } = useMemo(() => assignRoomsToZones(rooms), [rooms]);
 
-    if (layout.rooms.length === 0) return null;
+    // Підвал/мансарду малюємо, лише коли їх додав користувач; від цього
+    // залежать і межі сцени (щоб порожній макет не мав дірки праворуч).
+    const showDetached = ZONES.some((z) => z.detached && roomByZoneId[z.id]);
+    const bounds = showDetached ? BOUNDS_FULL : BOUNDS_MAIN;
+    const visibleZones = ZONES.filter((z) => !z.detached || roomByZoneId[z.id]);
+    const visibleWalls = WALLS.filter((w) => !w.zoneId || roomByZoneId[w.zoneId]);
 
     const changeZoom = (delta) =>
         setZoom((z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, +(z + delta).toFixed(2))));
 
     return (
-        <div style={{ position: 'relative', width: '100%', height: '320px', background: '#ffffff', borderRadius: '12px' }}>
+        <div style={{ position: 'relative', width: '100%', height: '380px', background: '#ffffff', borderRadius: '12px' }}>
             <Canvas orthographic dpr={[1, 2]} style={{ width: '100%', height: '100%' }}>
-                <IsoCamera building={layout.building} userZoom={zoom} />
+                <IsoCamera bounds={bounds} userZoom={zoom} />
                 <ambientLight intensity={0.9} />
                 <directionalLight position={[10, 16, 8]} intensity={0.5} />
 
-                <group position={[-width / 2, 0, -depth / 2]}>
-                    {layout.rooms.map((room) => (
-                        <RoomFloor key={room.id} room={room} isActive={room.id === activeId} onSelect={onSelectRoom} />
-                    ))}
-
-                    {layout.rooms.map((room) => (
-                        <RoomFurniture3D key={`f_${room.id}`} room={room} />
-                    ))}
-
-                    {/* Зовнішній (східчастий) контур будівлі */}
-                    {exterior.map((w, i) =>
-                        w.type === 'vertical' ? (
-                            <PlanWall
-                                key={`ext_v${i}`}
-                                args={[EXTERIOR_THICKNESS, WALL_HEIGHT, w.y1 - w.y0 + EXTERIOR_THICKNESS]}
-                                position={[w.x, WALL_HEIGHT / 2, (w.y0 + w.y1) / 2]}
-                            />
-                        ) : (
-                            <PlanWall
-                                key={`ext_h${i}`}
-                                args={[w.x1 - w.x0 + EXTERIOR_THICKNESS, WALL_HEIGHT, EXTERIOR_THICKNESS]}
-                                position={[(w.x0 + w.x1) / 2, WALL_HEIGHT / 2, w.y]}
-                            />
-                        )
-                    )}
-
-                    {/* Внутрішні перегородки між рядами (зонами) */}
-                    {interiorHorizontal.map((w, i) => (
-                        <PlanWall
-                            key={`inth${i}`}
-                            args={[w.x1 - w.x0, WALL_HEIGHT, INTERIOR_THICKNESS]}
-                            position={[(w.x0 + w.x1) / 2, WALL_HEIGHT / 2, w.y]}
+                <group position={[-bounds.width / 2, 0, -bounds.depth / 2]}>
+                    {visibleZones.map((zone) => (
+                        <ZoneFloor
+                            key={zone.id}
+                            zone={zone}
+                            room={roomByZoneId[zone.id]}
+                            isActive={roomByZoneId[zone.id]?.id === activeId}
+                            onPress={onZonePress}
                         />
                     ))}
 
-                    {/* Внутрішні перегородки між кімнатами в ряду */}
-                    {interiorVertical.map((w, i) => (
-                        <PlanWall
-                            key={`intv${i}`}
-                            args={[INTERIOR_THICKNESS, WALL_HEIGHT, w.y1 - w.y0]}
-                            position={[w.x, WALL_HEIGHT / 2, (w.y0 + w.y1) / 2]}
-                        />
+                    {visibleZones.map((zone) => (
+                        <ZoneFurniture key={`f_${zone.id}`} zone={zone} />
                     ))}
 
-                    {layout.rooms.map((room, i) => (
-                        <RoomLabel key={`label_${room.id}`} room={room} index={i + 1} isActive={room.id === activeId} />
+                    {visibleWalls.map((wall, i) => (
+                        <WallSegment key={i} wall={wall} />
                     ))}
+
+                    {visibleZones.map((zone) => {
+                        const room = roomByZoneId[zone.id];
+                        if (!room) return null; // порожні зони — без підпису
+                        return (
+                            <ZoneLabel
+                                key={`label_${zone.id}`}
+                                zone={zone}
+                                room={room}
+                                index={rooms.indexOf(room) + 1}
+                                isActive={room.id === activeId}
+                                onPress={onZonePress}
+                            />
+                        );
+                    })}
                 </group>
             </Canvas>
 

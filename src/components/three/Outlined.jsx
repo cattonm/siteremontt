@@ -10,11 +10,11 @@ import * as THREE from 'three';
 const OUTLINE = 0.018; // товщина контуру, метри
 const OUTLINE_COLOR = '#161616';
 
-export function OutlinedBox({ args, position = [0, 0, 0], rotation, color, roughness = 0.9, onClick, opacity = 1 }) {
+export function OutlinedBox({ args, position = [0, 0, 0], rotation, color, roughness = 0.9, onClick, opacity = 1, castShadow = true, receiveShadow = true }) {
     const [w, h, d] = args;
     return (
         <group position={position} rotation={rotation}>
-            <mesh onClick={onClick}>
+            <mesh onClick={onClick} castShadow={castShadow} receiveShadow={receiveShadow}>
                 <boxGeometry args={args} />
                 <meshStandardMaterial color={color} roughness={roughness} transparent={opacity < 1} opacity={opacity} />
             </mesh>
@@ -26,12 +26,12 @@ export function OutlinedBox({ args, position = [0, 0, 0], rotation, color, rough
     );
 }
 
-export function OutlinedCylinder({ args, position = [0, 0, 0], rotation, color, roughness = 0.9 }) {
+export function OutlinedCylinder({ args, position = [0, 0, 0], rotation, color, roughness = 0.9, castShadow = true, receiveShadow = true }) {
     // args: [radiusTop, radiusBottom, height, radialSegments]
     const [rt, rb, h, seg = 20] = args;
     return (
         <group position={position} rotation={rotation}>
-            <mesh>
+            <mesh castShadow={castShadow} receiveShadow={receiveShadow}>
                 <cylinderGeometry args={[rt, rb, h, seg]} />
                 <meshStandardMaterial color={color} roughness={roughness} />
             </mesh>
@@ -45,11 +45,14 @@ export function OutlinedCylinder({ args, position = [0, 0, 0], rotation, color, 
 
 // Текстуроване покриття (підлога з реальним фото матеріалу) — той самий
 // принцип контуру, але приймає map/колір з materialFill.
-export function OutlinedSurface({ args, position = [0, 0, 0], color, texture, onClick }) {
+// castShadow/receiveShadow (дефолт true) стосуються ТІЛЬКИ основного меша:
+// чорний контур-дубль тіней не кидає й не приймає, інакше кожен об'єкт
+// давав би подвійну "жирну" тінь.
+export function OutlinedSurface({ args, position = [0, 0, 0], color, texture, onClick, castShadow = true, receiveShadow = true }) {
     const [w, h, d] = args;
     return (
         <group position={position}>
-            <mesh onClick={onClick}>
+            <mesh onClick={onClick} castShadow={castShadow} receiveShadow={receiveShadow}>
                 <boxGeometry args={args} />
                 <meshStandardMaterial
                     key={texture ? texture.uuid : color}

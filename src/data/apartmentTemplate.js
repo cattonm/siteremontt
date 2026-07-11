@@ -37,11 +37,11 @@ export const ZONES = [
     { id: 'room2',    type: 'room',     x: 0.0, z: 3.8, w: 3.6, d: 3.8, label: [1.8, 5.6] },
     { id: 'hallway',  type: 'hallway',  x: 3.6, z: 3.8, w: 2.4, d: 3.8, label: [4.8, 6.7], labelShift: [0, 6] },
     { id: 'bath',     type: 'bath',     x: 6.0, z: 3.8, w: 2.2, d: 2.2, label: [7.2, 4.6], labelShift: [14, -6] },
-    { id: 'wardrobe', type: 'wardrobe', x: 6.0, z: 6.0, w: 2.2, d: 1.6, label: [7.2, 6.9], labelShift: [22, 8] },
+    { id: 'wardrobe', type: 'wardrobe', x: 6.0, z: 6.0, w: 2.2, d: 1.6, label: [7.2, 6.9], labelShift: [-14, 16] },
     // Підвал і мансарда — фізично інші поверхи, тому малюємо їх ОКРЕМИМИ
     // блоками збоку (detached). З'являються лише коли користувач їх додав.
-    { id: 'basement', type: 'basement', x: 9.2, z: 4.6, w: 2.0, d: 1.6, label: [10.2, 5.2], detached: true },
-    { id: 'attic',    type: 'attic',    x: 9.2, z: 6.6, w: 2.0, d: 1.6, label: [10.2, 7.2], detached: true },
+    { id: 'basement', type: 'basement', x: 9.2, z: 4.6, w: 2.0, d: 1.6, label: [10.2, 5.2], labelShift: [30, -4], detached: true },
+    { id: 'attic',    type: 'attic',    x: 9.2, z: 6.6, w: 2.0, d: 1.6, label: [10.2, 7.2], labelShift: [34, 12], detached: true },
 ];
 
 // ---- Стіни ----

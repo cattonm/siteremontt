@@ -29,6 +29,7 @@
 // трохи покрутити й наблизити кімнату ("вільно переглядати", як у Kapitel),
 // але не може заглянути за стіни чи перевернути сцену.
 import React from 'react';
+import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
 import { Html, OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { OutlinedBox, OutlinedCylinder, OutlinedSurface } from './three/Outlined';
@@ -79,8 +80,11 @@ function firstMapped(fieldId, raw) {
 
 // { color, texture } для однієї поверхні. widthM/heightM — реальні метри
 // поверхні, з них рахується кількість повторів текстури (repeatsFor).
-function surfaceFill(fieldId, value, widthM, heightM, fallback = '#efeeeb') {
-    const kind = getSurfaceKind(fieldId, value);
+// fallbackKind — вид текстури, коли користувач ЩЕ нічого не обрав
+// (підлога показує "чорнову стяжку" замість мертвої сірої заливки).
+function surfaceFill(fieldId, value, widthM, heightM, fallback = '#efeeeb', fallbackKind = null) {
+    let kind = getSurfaceKind(fieldId, value);
+    if (!kind && fallbackKind) kind = fallbackKind;
     if (!kind) return { color: fallback, texture: null };
     return {
         color: getSurfaceColor(kind),
@@ -113,6 +117,38 @@ function CameraRig({ W, D }) {
                 minAzimuthAngle={rad(8)}
                 maxAzimuthAngle={rad(84)}
                 rotateSpeed={0.55}
+            />
+        </>
+    );
+}
+
+// ====== СОНЦЕ З ТІНЯМИ ======
+// Directional light, НАЦІЛЕНИЙ на центр кімнати (target треба явно додати
+// в сцену через <primitive>, інакше three ігнорує його позицію).
+// Ортографічна "камера тіней" накриває кімнату із запасом — інакше тіні
+// обрізаються по краях. mapSize 1024 достатньо для такої маленької сцени.
+function SunLight({ W, D }) {
+    const target = React.useMemo(() => new THREE.Object3D(), []);
+    const R = Math.max(W, D);
+    const ext = R * 0.85 + 1.5; // пів-розмір коробки тіней
+    return (
+        <>
+            <primitive object={target} position={[W / 2, 0, D / 2]} />
+            <directionalLight
+                castShadow
+                target={target}
+                position={[W / 2 + R * 1.1 + 1.2, R * 1.5 + 4, D / 2 + R * 0.9 + 1]}
+                intensity={1.15}
+                shadow-mapSize-width={1024}
+                shadow-mapSize-height={1024}
+                shadow-camera-left={-ext}
+                shadow-camera-right={ext}
+                shadow-camera-top={ext}
+                shadow-camera-bottom={-ext}
+                shadow-camera-near={1}
+                shadow-camera-far={40}
+                shadow-bias={-0.0004}
+                shadow-normalBias={0.03}
             />
         </>
     );
@@ -540,7 +576,7 @@ function buildHotspots(type, W, D, groups) {
     const busyWalls = type === 'kitchen' || type === 'bath'; // задня стіна зайнята гарнітуром/сантехнікою
 
     add('Підлога', [W * 0.6, 0.07, D * 0.68]);
-    add('Стіни', busyWalls ? [0.06, 1.72, D * 0.6] : [W * 0.78, 1.62, 0.06]);
+    add('Стіни', busyWalls ? [0.06, 1.7, D * 0.42] : [W * 0.78, 1.62, 0.06]);
     if (type === 'kitchen') {
         const setW = Math.min(W - 0.3 - (W >= 2.55 ? 0.76 : 0), 3.4);
         add('Фартух', [0.15 + setW * 0.68, 1.15, 0.09]);
@@ -548,7 +584,7 @@ function buildHotspots(type, W, D, groups) {
     }
     if (type === 'bath') add('Сантехніка', [W * 0.55, 0.85, D * 0.5]);
     add('Стеля', [W * 0.5, WALL_H - 0.14, D * 0.38]);
-    add('Освітлення', [W * 0.5, WALL_H - 0.42, D * 0.55]);
+    add('Освітлення', [W * 0.5, WALL_H - 0.5, D * 0.5]);
     if (type === 'room' && W >= 1.9) add('Підвіконня', [Math.min(W * 0.62, W - 0.85), 1.02, 0.22]);
     add('Декор', [0.7, 1.55, 0.1]);
     return list;
@@ -563,7 +599,7 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick }) {
     const wallField = type === 'bath' ? 'wall_tile' : 'walls';
     const wallVal = firstMapped(wallField, room[wallField]);
 
-    const floorFill = surfaceFill('floor', room.floor, W, D, '#ececee');
+    const floorFill = surfaceFill('floor', room.floor, W, D, '#ececee', 'screed');
     const backFill = surfaceFill(wallField, wallVal, W, WALL_H, '#f2f1ee');
     const leftFill = surfaceFill(wallField, wallVal, D, WALL_H, '#f2f1ee');
 
@@ -585,10 +621,26 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick }) {
                 на екрані ДВА канваси — без цього обидва крутили б 60 fps
                 постійно і садили батарею в Telegram WebView. Damping вимкнено
                 вище, бо інерція вимагає безперервних кадрів. */}
-            <Canvas dpr={[1, 2]} frameloop="demand">
+            <Canvas dpr={[1, 2]} frameloop="demand" shadows="soft">
                 <CameraRig key={`${W.toFixed(1)}x${D.toFixed(1)}`} W={W} D={D} />
-                <ambientLight intensity={0.85} />
-                <directionalLight position={[7, 12, 9]} intensity={0.7} />
+                {/* Світло трьома шарами: ambient (загальний рівень) + hemisphere
+                    (м'який градієнт небо/земля, "оживляє" білі поверхні) +
+                    directional з тінями (об'єм). Разом ≈ старій яскравості,
+                    але тепер форми читаються тінями, а не лише контуром. */}
+                <ambientLight intensity={0.45} />
+                <hemisphereLight intensity={0.5} color="#ffffff" groundColor="#cfcac2" />
+                <SunLight W={W} D={D} />
+
+                {/* Невидима площина під подіумом ловить м'яку тінь моделі —
+                    "макет" перестає висіти в білому вакуумі */}
+                <mesh
+                    rotation-x={-Math.PI / 2}
+                    position={[W / 2, -FLOOR_T - 0.125, D / 2]}
+                    receiveShadow
+                >
+                    <planeGeometry args={[W + 7, D + 7]} />
+                    <shadowMaterial transparent opacity={0.16} />
+                </mesh>
 
                 <Shell W={W} D={D} floorFill={floorFill} backFill={backFill} leftFill={leftFill} />
 
@@ -621,7 +673,7 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick }) {
                                 aria-label={h.group}
                                 onClick={() => { vibe('light'); onHotspotClick?.(h.group); }}
                             >
-                                <Icon size={17} />
+                                <Icon size={16} />
                             </button>
                         </Html>
                     );

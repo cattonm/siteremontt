@@ -1,8 +1,10 @@
 // src/components/RoomVisualizer.jsx
 // Що змінилось порівняно з попередньою версією:
-//  1. Замість SelectedMaterialsSummary для кімнат, у яких є готові
-//     зображення (hasRoomPreview), рендериться RoomPhotoPreview —
-//     фото з шарами матеріалів і хотспотами.
+//  1. Прев'ю кімнати тепер ЗАВЖДИ живе: якщо для типу кімнати є готові
+//     фото-рендери (hasRoomPreview) — RoomPhotoPreview (фото з шарами),
+//     інакше — RoomPreview3D (кімната з примітивів + процедурні текстури,
+//     миттєво реагує на вибір матеріалів). Смужка мініатюр
+//     SelectedMaterialsSummary більше не використовується тут.
 //  2. Акордеон став "керованим" (openGroup у стейті): клік по хотспоту
 //     на фото відкриває відповідну секцію і плавно скролить до неї.
 //     Відкритою може бути одна секція за раз — на мобільному так охайніше.
@@ -14,7 +16,7 @@ import React, { useState, useRef } from 'react';
 import useStore from '../store/useStore';
 import { Trash2 } from 'lucide-react';
 import { vibe } from '../utils/telegram';
-import SelectedMaterialsSummary from './SelectedMaterialsSummary';
+import RoomPreview3D from './RoomPreview3D';
 import RoomPhotoPreview from './RoomPhotoPreview';
 import { hasRoomPreview } from '../data/roomPreviewLayers';
 import AccordionGroup from './AccordionGroup';
@@ -50,6 +52,7 @@ export default function RoomVisualizer() {
         const typeDef = ROOM_TYPES.find(t => t.id === typeId);
         const count = rooms.filter(r => r.type === typeId).length + 1;
         const newName = `${typeDef.name} ${count > 1 ? count : ''}`.trim();
+        // eslint-disable-next-line react-hooks/purity -- id генерується в обробнику кліку, а не під час рендеру; тут Date.now() легальний
         const newId = `zone_${typeId}_${Date.now()}`;
         addRoom({
             id: newId, type: typeId, name: newName,
@@ -155,8 +158,11 @@ export default function RoomVisualizer() {
 
                     <div className="visualizer-split">
                         <div className="visualizer-preview-col">
-                            {/* Фото-прев'ю з шарами, якщо для типу кімнати вже є зображення;
-                                інакше — попередній рядок обраних матеріалів */}
+                            {/* Пріоритет: фото-прев'ю з шарами (коли для типу кімнати
+                                будуть готові рендери, enabled: true у roomPreviewLayers).
+                                Поки їх немає — ЖИВЕ 3D-прев'ю: кімната з примітивів,
+                                процедурні текстури миттєво реагують на вибір матеріалів,
+                                камеру можна крутити пальцем (аналог Kapitel). */}
                             {hasRoomPreview(activeRoom.type) ? (
                                 <RoomPhotoPreview
                                     room={activeRoom}
@@ -164,7 +170,11 @@ export default function RoomVisualizer() {
                                     onHotspotClick={openGroupFromHotspot}
                                 />
                             ) : (
-                                <SelectedMaterialsSummary room={activeRoom} />
+                                <RoomPreview3D
+                                    room={activeRoom}
+                                    activeGroup={openGroup}
+                                    onHotspotClick={openGroupFromHotspot}
+                                />
                             )}
 
                             <div className="measurement-box" style={{ marginTop: '16px' }}>

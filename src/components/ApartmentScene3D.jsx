@@ -15,7 +15,7 @@ import { Canvas, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { Plus, Minus, RotateCcw } from 'lucide-react';
-import { useMaterialFill } from '../utils/materialFill';
+import { getSurfaceKind, getSurfaceColor, getSurfaceTexture, repeatsFor } from '../utils/proceduralTextures';
 import { OutlinedBox, OutlinedCylinder, OutlinedSurface } from './three/Outlined';
 import { FLOOR_THICKNESS } from './three/sceneConstants';
 import { SLOT_SIZE } from '../utils/layoutEngine';
@@ -30,7 +30,7 @@ import {
 // ====== НАЛАШТУВАННЯ ВИГЛЯДУ ======
 const ELEVATION_DEG = 42;   // кут погляду зверху
 const AZIMUTH_DEG = 45;     // поворот навколо будинку
-const FIT_FRACTION = 0.85;  // частка в'юпорта, яку займає модель
+const FIT_FRACTION = 0.9;   // частка в'юпорта, яку займає модель
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2.5;
 const ZOOM_STEP = 0.25;
@@ -107,10 +107,16 @@ function WallSegment({ wall }) {
 }
 
 // ====== ПІДЛОГА ЗОНИ (клікабельна) ======
+// Матеріал підлоги малюється ТІЄЮ Ж процедурною текстурою, що і в 3D-прев'ю
+// кімнати (proceduralTextures) — на плані видно міні-ялинку паркету, сітку
+// плитки і т.д. Раніше тут був середній колір фото з каталогу (materialFill),
+// але лайфстайл-кадри давали брудно-коричневу заливку.
 function ZoneFloor({ zone, room, isActive, onPress }) {
-    // Хуки викликаються завжди (навіть коли кімнати нема) — правило React.
-    const fill = useMaterialFill(zone.type, 'floor', room?.floor ?? null, zone.w, zone.d);
-    const color = room?.floor ? fill.color : (room ? FLOOR_ASSIGNED : FLOOR_EMPTY);
+    const kind = getSurfaceKind('floor', room?.floor ?? null);
+    const texture = kind
+        ? getSurfaceTexture(kind, repeatsFor(kind, zone.w), repeatsFor(kind, zone.d))
+        : null;
+    const color = kind ? getSurfaceColor(kind) : (room ? FLOOR_ASSIGNED : FLOOR_EMPTY);
     const cx = zone.x + zone.w / 2;
     const cz = zone.z + zone.d / 2;
 
@@ -126,7 +132,7 @@ function ZoneFloor({ zone, room, isActive, onPress }) {
                 args={[zone.w - 0.02, FLOOR_THICKNESS, zone.d - 0.02]}
                 position={[cx, FLOOR_THICKNESS / 2 + (isActive ? 0.008 : 0), cz]}
                 color={color}
-                texture={room?.floor ? fill.texture : null}
+                texture={texture}
                 onClick={(e) => { e.stopPropagation(); onPress(zone.id); }}
             />
         </>
@@ -229,8 +235,8 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
                 змінах (зум, вибір зони, матеріали) — див. invalidate() в IsoCamera. */}
             <Canvas orthographic dpr={[1, 2]} frameloop="demand" shadows="soft" style={{ width: '100%', height: '100%' }}>
                 <IsoCamera bounds={bounds} userZoom={zoom} />
-                <ambientLight intensity={0.55} />
-                <hemisphereLight intensity={0.35} color="#ffffff" groundColor="#d6d2ca" />
+                <ambientLight intensity={0.6} />
+                <hemisphereLight intensity={0.4} color="#ffffff" groundColor="#d6d2ca" />
                 {/* Сонце з тінями: сцена відцентрована в origin (група нижче
                     зміщена на -bounds/2), тому дефолтний target (0,0,0) — те,
                     що треба. Коробка тіней накриває план із запасом. */}

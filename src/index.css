@@ -153,6 +153,41 @@ input:focus, select:focus { border-color: var(--link-color); box-shadow: 0 0 0 3
 .rpp-hotspot:active { transform: translate(-50%, -50%) scale(0.9); }
 .rpp-hotspot.active { background: #e31e24; color: #fff; }
 
+/* ==== RoomPreview3D: живе 3D-прев'ю кімнати ==== */
+/* aspect-ratio задає висоту Canvas (інакше вона нульова і сцену не видно). */
+.r3d-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    min-height: 260px;
+    max-height: 400px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #ffffff;               /* білий фон під стиль плану/Kapitel */
+    border: 1px solid var(--border-color);
+}
+.r3d-wrap canvas { display: block; }
+
+/* Хотспот сидить усередині <Html center> від drei — той сам центрує обгортку,
+   тому тут БЕЗ translate(-50%), на відміну від .rpp-hotspot. */
+.r3d-hotspot {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: #fff; color: #1c1c1e; border: none; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25); cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.r3d-hotspot:active { transform: scale(0.9); }
+.r3d-hotspot.active { background: #e31e24; color: #fff; }
+
+.r3d-badge {
+    position: absolute; left: 10px; bottom: 10px; z-index: 25;
+    font-size: 11px; font-weight: 600; color: #6d6d72;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid #e5e5ea; border-radius: 14px;
+    padding: 4px 10px; pointer-events: none;
+}
+
 /* ==== Двоколонковий режим візуалізатора на широких екранах ==== */
 @media (min-width: 900px) {
     .visualizer-split { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; align-items: start; }

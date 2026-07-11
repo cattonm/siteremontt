@@ -137,8 +137,9 @@ function SunLight({ W, D }) {
             <directionalLight
                 castShadow
                 target={target}
+                color="#fff6ea"
                 position={[W / 2 + R * 1.1 + 1.2, R * 1.5 + 4, D / 2 + R * 0.9 + 1]}
-                intensity={1.15}
+                intensity={1.35}
                 shadow-mapSize-width={1024}
                 shadow-mapSize-height={1024}
                 shadow-camera-left={-ext}
@@ -576,7 +577,7 @@ function buildHotspots(type, W, D, groups) {
     const busyWalls = type === 'kitchen' || type === 'bath'; // задня стіна зайнята гарнітуром/сантехнікою
 
     add('Підлога', [W * 0.6, 0.07, D * 0.68]);
-    add('Стіни', busyWalls ? [0.06, 1.7, D * 0.42] : [W * 0.78, 1.62, 0.06]);
+    add('Стіни', busyWalls ? [0.06, 1.7, D * 0.42] : [Math.min(W * 0.92, W - 0.3), 1.55, 0.06]);
     if (type === 'kitchen') {
         const setW = Math.min(W - 0.3 - (W >= 2.55 ? 0.76 : 0), 3.4);
         add('Фартух', [0.15 + setW * 0.68, 1.15, 0.09]);
@@ -600,8 +601,8 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick }) {
     const wallVal = firstMapped(wallField, room[wallField]);
 
     const floorFill = surfaceFill('floor', room.floor, W, D, '#ececee', 'screed');
-    const backFill = surfaceFill(wallField, wallVal, W, WALL_H, '#f2f1ee');
-    const leftFill = surfaceFill(wallField, wallVal, D, WALL_H, '#f2f1ee');
+    const backFill = surfaceFill(wallField, wallVal, W, WALL_H, '#f7f5f0');
+    const leftFill = surfaceFill(wallField, wallVal, D, WALL_H, '#f7f5f0');
 
     const lightArr = Array.isArray(room.light) ? room.light : (room.light ? [room.light] : []);
 
@@ -627,8 +628,8 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick }) {
                     (м'який градієнт небо/земля, "оживляє" білі поверхні) +
                     directional з тінями (об'єм). Разом ≈ старій яскравості,
                     але тепер форми читаються тінями, а не лише контуром. */}
-                <ambientLight intensity={0.45} />
-                <hemisphereLight intensity={0.5} color="#ffffff" groundColor="#cfcac2" />
+                <ambientLight intensity={0.5} />
+                <hemisphereLight intensity={0.55} color="#ffffff" groundColor="#d8d3ca" />
                 <SunLight W={W} D={D} />
 
                 {/* Невидима площина під подіумом ловить м'яку тінь моделі —

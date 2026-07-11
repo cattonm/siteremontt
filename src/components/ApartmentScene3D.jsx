@@ -227,10 +227,33 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
         <div style={{ position: 'relative', width: '100%', height: '380px', background: '#ffffff', borderRadius: '12px' }}>
             {/* frameloop="demand": сцена статична, тож рендеримо кадр лише при
                 змінах (зум, вибір зони, матеріали) — див. invalidate() в IsoCamera. */}
-            <Canvas orthographic dpr={[1, 2]} frameloop="demand" style={{ width: '100%', height: '100%' }}>
+            <Canvas orthographic dpr={[1, 2]} frameloop="demand" shadows="soft" style={{ width: '100%', height: '100%' }}>
                 <IsoCamera bounds={bounds} userZoom={zoom} />
-                <ambientLight intensity={0.9} />
-                <directionalLight position={[10, 16, 8]} intensity={0.5} />
+                <ambientLight intensity={0.55} />
+                <hemisphereLight intensity={0.35} color="#ffffff" groundColor="#d6d2ca" />
+                {/* Сонце з тінями: сцена відцентрована в origin (група нижче
+                    зміщена на -bounds/2), тому дефолтний target (0,0,0) — те,
+                    що треба. Коробка тіней накриває план із запасом. */}
+                <directionalLight
+                    castShadow
+                    position={[10, 16, 8]}
+                    intensity={0.95}
+                    shadow-mapSize-width={2048}
+                    shadow-mapSize-height={2048}
+                    shadow-camera-left={-(Math.max(bounds.width, bounds.depth) * 0.72 + 1.5)}
+                    shadow-camera-right={Math.max(bounds.width, bounds.depth) * 0.72 + 1.5}
+                    shadow-camera-top={Math.max(bounds.width, bounds.depth) * 0.72 + 1.5}
+                    shadow-camera-bottom={-(Math.max(bounds.width, bounds.depth) * 0.72 + 1.5)}
+                    shadow-camera-near={2}
+                    shadow-camera-far={50}
+                    shadow-bias={-0.0004}
+                    shadow-normalBias={0.03}
+                />
+                {/* Площина-тінеловка: план кидає м'яку тінь на "стіл" під собою */}
+                <mesh rotation-x={-Math.PI / 2} position={[0, -0.02, 0]} receiveShadow>
+                    <planeGeometry args={[bounds.width * 2.4, bounds.depth * 2.4]} />
+                    <shadowMaterial transparent opacity={0.13} />
+                </mesh>
 
                 <group position={[-bounds.width / 2, 0, -bounds.depth / 2]}>
                     {visibleZones.map((zone) => (

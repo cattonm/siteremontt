@@ -284,14 +284,47 @@ const KINDS = {
     wallpaper: {
         m: 1.06, color: '#efe9df',
         paint: (ctx, s, rng) => {
-            ctx.fillStyle = '#efe9df';
+            ctx.fillStyle = '#f0ebe1';
             ctx.fillRect(0, 0, s, s);
-            ctx.fillStyle = 'rgba(120,105,85,0.07)'; // ледь помітні вертикальні смуги
-            const stripes = 6;
-            for (let i = 0; i < stripes; i++) {
-                ctx.fillRect((i * s) / stripes, 0, s / stripes / 2, s);
+            // Три ШИРОКІ ледь помітні смуги (замість частих вузьких, які на
+            // стіні зливались у "решітку")
+            ctx.fillStyle = 'rgba(146,130,106,0.05)';
+            const bands = 3;
+            for (let i = 0; i < bands; i++) {
+                ctx.fillRect((i + 0.25) * (s / bands), 0, (s / bands) * 0.5, s);
             }
-            noiseDots(ctx, s, rng, 500, ['#d9d0c1'], 0.35);
+            // Зерно паперу
+            noiseDots(ctx, s, rng, 900, ['#e4dccd', '#f7f3ea'], 0.3);
+            // Делікатний мотив — дрібні крапки в шаховому порядку
+            ctx.fillStyle = 'rgba(148,132,108,0.16)';
+            const step = s / 8;
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const x = c * step + (r % 2 ? step / 2 : 0);
+                    ctx.beginPath();
+                    ctx.arc(x, r * step + step / 2, 1.6, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        },
+    },
+    screed: { // чорнова стяжка — ДЕФОЛТ підлоги, поки матеріал не обрано
+        m: 1.2, color: '#e3e1dd',
+        paint: (ctx, s, rng) => {
+            ctx.fillStyle = '#e4e2de';
+            ctx.fillRect(0, 0, s, s);
+            noiseDots(ctx, s, rng, 2000, ['#d8d5cf', '#eeece8', '#cfccc5'], 0.4);
+            // Сліди затирання — широкі ледь темніші дуги
+            ctx.strokeStyle = 'rgba(120,116,108,0.05)';
+            ctx.lineWidth = 7;
+            ctx.lineCap = 'round';
+            withWrap(ctx, s, () => {
+                for (let i = 0; i < 7; i++) {
+                    ctx.beginPath();
+                    ctx.arc(rng() * s, rng() * s, s * (0.15 + rng() * 0.25), rng() * 6.3, rng() * 6.3);
+                    ctx.stroke();
+                }
+            });
         },
     },
     plaster: { // декоративна штукатурка — піщане зерно

@@ -45,7 +45,7 @@ const FLOOR_ASSIGNED = '#fbfbfa';  // кімната є, матеріал ще �
 
 // ====== КАМЕРА (ортографічна, фіксований кут; зум = camera.zoom) ======
 function IsoCamera({ bounds, userZoom }) {
-    const { camera, size } = useThree();
+    const { camera, size, invalidate } = useThree();
 
     /* eslint-disable react-hooks/immutability -- three.js імперативний, мутація камери тут — норма r3f */
     useEffect(() => {
@@ -69,7 +69,10 @@ function IsoCamera({ bounds, userZoom }) {
 
         camera.zoom = fitZoom * userZoom;
         camera.updateProjectionMatrix();
-    }, [camera, size.width, size.height, bounds.width, bounds.depth, userZoom]);
+        // У frameloop="demand" зміна camera.zoom НЕ зачіпає scene graph,
+        // тож r3f сам кадр не запланує — просимо явно.
+        invalidate();
+    }, [camera, size.width, size.height, bounds.width, bounds.depth, userZoom, invalidate]);
     /* eslint-enable react-hooks/immutability */
 
     return null;
@@ -222,7 +225,9 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
 
     return (
         <div style={{ position: 'relative', width: '100%', height: '380px', background: '#ffffff', borderRadius: '12px' }}>
-            <Canvas orthographic dpr={[1, 2]} style={{ width: '100%', height: '100%' }}>
+            {/* frameloop="demand": сцена статична, тож рендеримо кадр лише при
+                змінах (зум, вибір зони, матеріали) — див. invalidate() в IsoCamera. */}
+            <Canvas orthographic dpr={[1, 2]} frameloop="demand" style={{ width: '100%', height: '100%' }}>
                 <IsoCamera bounds={bounds} userZoom={zoom} />
                 <ambientLight intensity={0.9} />
                 <directionalLight position={[10, 16, 8]} intensity={0.5} />

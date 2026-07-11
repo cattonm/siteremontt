@@ -3,6 +3,21 @@ import { Check } from 'lucide-react';
 import { vibe, vibeSelect } from '../utils/telegram';
 
 export default function Survey({ question, answers, setAnswers, client, openImage, compact = false }) {
+    const qId = question?.id;
+
+    // --- АВТОЗАПОВНЕННЯ (наприклад, площа стяжки) ---
+    // ВАЖЛИВО: хук стоїть ДО раннього return (правило хуків React —
+    // однаковий порядок викликів на кожному рендері, інакше при зміні
+    // question → null ловимо "Rendered fewer hooks than expected").
+    // Читаємо/пишемо через функціональний setAnswers(prev) — тому в
+    // залежностях лише стабільні значення, без val.
+    useEffect(() => {
+        if (qId !== 'screed_area') return;
+        setAnswers(prev => (prev.screed_area === undefined
+            ? { ...prev, screed_area: parseFloat(client?.area) || '' }
+            : prev));
+    }, [qId, setAnswers, client?.area]);
+
     if (!question) return null;
 
     // Поточне значення для цього питання
@@ -10,13 +25,6 @@ export default function Survey({ question, answers, setAnswers, client, openImag
 
     // Базовий обробник для збереження
     const setAnswer = (newVal) => setAnswers(prev => ({ ...prev, [question.id]: newVal }));
-
-    // --- АВТОЗАПОВНЕННЯ (наприклад, площа стяжки) ---
-    useEffect(() => {
-        if (question.id === 'screed_area' && val === undefined) {
-            setAnswer(parseFloat(client.area) || '');
-        }
-    }, [question.id]);
 
     // --- РЕНДЕРИ РІЗНИХ ТИПІВ ПИТАНЬ ---
 
@@ -45,7 +53,7 @@ export default function Survey({ question, answers, setAnswers, client, openImag
                         <div key={opt.val} className={`card ${val === opt.val ? 'selected' : ''}`} onClick={() => { vibe(); setAnswer(opt.val); }}>
                             {opt.img && (
                                 <div className="img-wrapper">
-                                    <img src={opt.img} alt={opt.label} onError={(e) => e.target.parentElement.style.display = 'none'} />
+                                    <img src={opt.img} alt={opt.label} loading="lazy" decoding="async" onError={(e) => e.target.parentElement.style.display = 'none'} />
                                     <div className="zoom-icon" onClick={(e) => { e.stopPropagation(); if(openImage) openImage(opt.img); }}>🔍</div>
                                 </div>
                             )}
@@ -116,7 +124,7 @@ export default function Survey({ question, answers, setAnswers, client, openImag
                         <div key={opt.val} className={`card ${currentArr.includes(opt.val) ? 'selected' : ''}`} onClick={() => handleSelect(opt.val)}>
                             {opt.img && (
                                 <div className="img-wrapper">
-                                    <img src={opt.img} alt={opt.label} onError={(e) => e.target.parentElement.style.display = 'none'} />
+                                    <img src={opt.img} alt={opt.label} loading="lazy" decoding="async" onError={(e) => e.target.parentElement.style.display = 'none'} />
                                     <div className="zoom-icon" onClick={(e) => { e.stopPropagation(); if(openImage) openImage(opt.img); }}>🔍</div>
                                 </div>
                             )}
@@ -181,7 +189,7 @@ export default function Survey({ question, answers, setAnswers, client, openImag
                             <div key={opt.val} className={`card ${isSel ? 'selected' : ''}`} onClick={() => handleCardClick(opt)}>
                                 {opt.img && (
                                     <div className="img-wrapper">
-                                        <img src={opt.img} alt={opt.label} onError={(e) => e.target.parentElement.style.display = 'none'} />
+                                        <img src={opt.img} alt={opt.label} loading="lazy" decoding="async" onError={(e) => e.target.parentElement.style.display = 'none'} />
                                         <div className="zoom-icon" onClick={(e) => { e.stopPropagation(); if(openImage) openImage(opt.img); }}>🔍</div>
                                     </div>
                                 )}

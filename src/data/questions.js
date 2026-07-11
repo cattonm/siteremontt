@@ -75,7 +75,7 @@ export function getRoomQuestions() { return []; }
 export const ROOM_QUESTIONS_CONFIG = {
     room: [
         { id: "floor", group: "Підлога", text: "Тип підлоги.", type: "cards", options: [
-            { label: "Ламінат", val: "Ламінат", img: "/img/laminat.jpeg" }, { label: "Паркет", val: "Паркет", img: "/img/parket.jpeg" },
+            { label: "Ламінат", val: "Ламінат", img: "/img/laminat.webp" }, { label: "Паркет", val: "Паркет", img: "/img/parket.webp" },
             { label: "Кварц вініл", val: "Кварц вініл", img: "/img/kvarzvinil.webp" }, { label: "Керамограніт", val: "Керамограніт", img: "/img/keramogranit.webp" }
         ]},
         { id: "walls", group: "Стіни", text: "Стіни.", type: "cards_multiselect", options: [
@@ -133,7 +133,7 @@ export const ROOM_QUESTIONS_CONFIG = {
             {label:"Точкове світло",val:"Точкове світло",img:"/img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"/img/lustra.webp"}, {label:"Трек / Лінія",val:"Трек / Лінія"}, {label:"Декор підсвітка",val:"Декор підсвітка",img:"/img/dekorpidsv.webp"}
         ]},
         { id: "floor", group: "Підлога", text: "Підлога.", type: "cards", options: [
-            {label:"Керамограніт",val:"Керамограніт",img:"/img/kitchenkeramo.webp"}, {label:"Кварц-вініл",val:"Кварц-вініл",img:"/img/kitchenkvarzv.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.jpeg"}
+            {label:"Керамограніт",val:"Керамограніт",img:"/img/kitchenkeramo.webp"}, {label:"Кварц-вініл",val:"Кварц-вініл",img:"/img/kitchenkvarzv.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.webp"}
         ]},
         { id: "apron", group: "Фартух", text: "Фартух.", type: "cards", options: [
             {label:"Керамограніт",val:"Керамограніт",img:"/img/fartukkeramo.webp"}, {label:"Матеріал стільниці",val:"Матеріал стільниці",img:"/img/fartukstiln.jpeg"}
@@ -147,7 +147,7 @@ export const ROOM_QUESTIONS_CONFIG = {
     ],
     hallway: [
         { id: "floor", group: "Підлога", text: "Тип підлоги.", type: "cards", options: [
-            {label:"Керамограніт",val:"Керамограніт",img:"/img/keramogranit.webp"}, {label:"Кварцвініл",val:"Кварцвініл",img:"/img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.jpeg"}
+            {label:"Керамограніт",val:"Керамограніт",img:"/img/keramogranit.webp"}, {label:"Кварцвініл",val:"Кварцвініл",img:"/img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.webp"}
         ]},
         { id: "walls", group: "Стіни", text: "Стіни.", type: "cards_multiselect", options: [
             {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"/img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}
@@ -161,10 +161,10 @@ export const ROOM_QUESTIONS_CONFIG = {
     ],
     balcony: [
         { id: "floor", group: "Підлога", text: "Тип підлоги.", type: "cards", options: [
-            {label:"Керамограніт",val:"Керамограніт",img:"/img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"/img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.jpeg"}, {label:"Ні",val:"Ні"}
+            {label:"Керамограніт",val:"Керамограніт",img:"/img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"/img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.webp"}, {label:"Ні",val:"Ні"}
         ]},
         { id: "walls", group: "Стіни", text: "Стіни.", type: "cards_multiselect", options: [
-            {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"/img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}, {label:"Вагонка",val:"Вагонка",img:"/img/vagonka.jpg"}, {label:"Короїд",val:"Короїд",img:"/img/koroid.jpg"}
+            {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"/img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}, {label:"Вагонка",val:"Вагонка",img:"/img/vagonka.webp"}, {label:"Короїд",val:"Короїд",img:"/img/koroid.webp"}
         ]},
         { id: "light", group: "Освітлення", text: "Освітлення", type: "cards_multiselect", options: [
             {label:"Точкове світло",val:"Точкове світло",img:"/img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"/img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"/img/ledpidsv.webp"}, {label:"Ні",val:"Ні"}
@@ -178,7 +178,7 @@ export const ROOM_QUESTIONS_CONFIG = {
     ],
     wardrobe: [
         { id: "floor", group: "Підлога", text: "Тип підлоги.", type: "cards", options: [
-            {label:"Керамограніт",val:"Керамограніт",img:"/img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"/img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.jpeg"}
+            {label:"Керамограніт",val:"Керамограніт",img:"/img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"/img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.webp"}
         ]},
         { id: "walls", group: "Стіни", text: "Стіни.", type: "cards_multiselect", options: [
             {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"/img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування",img:"/img/gruntovka.webp"}
@@ -206,7 +206,7 @@ export const ROOM_QUESTIONS_CONFIG = {
             {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Обшивка деревʼяними рейками",val:"Обшивка деревʼяними рейками",img:"/img/obshivkaderev.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbzgipso.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}, {label:"ні",val:"ні"}
         ]},
         { id: "floor", group: "Підлога", text: "Тип підлоги.", type: "cards", options: [
-            {label:"Керамограніт",val:"Керамограніт",img:"/img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"/img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.jpeg"}, {label:"Інше",val:"Інше"}
+            {label:"Керамограніт",val:"Керамограніт",img:"/img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"/img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.webp"}, {label:"Інше",val:"Інше"}
         ]},
         { id: "light", group: "Освітлення", text: "Освітлення", type: "cards_multiselect", options: [
             {label:"Точкове світло",val:"Точкове світло",img:"/img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"/img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"/img/ledpidsv.webp"}

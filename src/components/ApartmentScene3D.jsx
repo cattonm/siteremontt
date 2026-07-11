@@ -72,7 +72,7 @@ function IsoCamera({ bounds, userZoom }) {
         // У frameloop="demand" зміна camera.zoom НЕ зачіпає scene graph,
         // тож r3f сам кадр не запланує — просимо явно.
         invalidate();
-    }, [camera, size.width, size.height, bounds.width, bounds.depth, userZoom, invalidate]);
+    }, [camera, size.width, size.height, bounds, userZoom, invalidate]);
     /* eslint-enable react-hooks/immutability */
 
     return null;

@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import useStore from './store/useStore'; 
 import ClientForm from './components/ClientForm';
-import RoomVisualizer from './components/RoomVisualizer';
 import Survey from './components/Survey';
 import Measurements from './components/Measurements';
 import CustomWorks from './components/CustomWorks';
@@ -9,6 +8,12 @@ import Summary from './components/Summary';
 import AnimatedPrice from './components/AnimatedPrice';
 import { vibe, vibeError, tg } from './utils/telegram';
 import { Menu, Moon, Sun, ShoppingCart, ArrowLeft, Send, Trash2, Loader2 } from 'lucide-react';
+
+// ЛІНИВИЙ імпорт: RoomVisualizer тягне за собою three.js + drei (~850 КБ
+// сирого JS). Без lazy усе це вантажилось КОЖНОМУ користувачу одразу на
+// формі імені — тепер чанк їде з мережі, лише коли людина доходить до
+// кроку структури квартири (а форму вона заповнює швидше, ніж він тягнеться).
+const RoomVisualizer = lazy(() => import('./components/RoomVisualizer'));
 
 import { 
     blockSetup, blockTriggerMeas, blockDemolition, blockGeneral, 
@@ -28,26 +33,41 @@ export default function App() {
     } = useStore();
 
     // === 2. ЛОКАЛЬНІ СТАНИ UI (Не йдуть на сервер) ===
-    const [isLoadingEdit, setIsLoadingEdit] = useState(false);
+    // edit_id відомий ще ДО першого рендера — спінер вмикаємо одразу,
+    // без синхронного setState всередині ефекту (каскадний ре-рендер).
+    const [isLoadingEdit, setIsLoadingEdit] = useState(() => !!new URLSearchParams(window.location.search).get('edit_id'));
     const [isEditingFromSummary, setIsEditingFromSummary] = useState(false);
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [modalImg, setModalImg] = useState(null);
-    const [isDark, setIsDark] = useState(false);
-    const [showDraftPrompt, setShowDraftPrompt] = useState(false); 
+    // Лінива ініціалізація замість setState в ефекті (setState синхронно
+    // в ефекті = зайвий каскадний рендер на старті + помилка лінтера).
+    const [isDark, setIsDark] = useState(() => localStorage.getItem('remont_theme') === 'dark');
+    const [showDraftPrompt, setShowDraftPrompt] = useState(() => {
+        const isEdit = new URLSearchParams(window.location.search).get('edit_id');
+        return !isEdit && useStore.getState().currentStep > -1; // persist гідратується синхронно
+    });
     const [totals, setTotals] = useState({ work: 0, mat_min: 0 });
+
+    // Тема: один ефект синхронізує клас на body і localStorage
+    useEffect(() => {
+        document.body.classList.toggle('dark-theme', isDark);
+        localStorage.setItem('remont_theme', isDark ? 'dark' : 'light');
+    }, [isDark]);
 
     // === 3. ГОЛОВНА ЛОГІКА ЗАПУСКУ ===
     useEffect(() => {
         if (tg) tg.expand();
-        const savedTheme = localStorage.getItem('remont_theme');
-        if (savedTheme === 'dark') { setIsDark(true); document.body.classList.add('dark-theme'); }
+
+        // Прогрів бекенду: free-план Render засинає, перший live_calc міг
+        // чекати холодний старт ~30-50 с. Будимо сервер, поки людина
+        // заповнює ім'я/площу — до кроку кімнат ціни вже рахуються миттєво.
+        fetch(`${BACKEND_URL}/ping`, { mode: 'no-cors' }).catch(() => {});
 
         const editId = new URLSearchParams(window.location.search).get('edit_id');
         
         if (editId) {
-            // РЕЖИМ РЕДАГУВАННЯ
-            setIsLoadingEdit(true);
+            // РЕЖИМ РЕДАГУВАННЯ (isLoadingEdit уже true з лінивого ініту)
             fetch(`${BACKEND_URL}/api/get_order?edit_id=${editId}`, {
                 headers: { 'X-Telegram-Init-Data': tg?.initData || '' } 
             })
@@ -72,14 +92,9 @@ export default function App() {
                     if(tg) tg.showAlert("Не вдалося завантажити анкету для редагування.");
                 })
                 .finally(() => setIsLoadingEdit(false));
-
-        } else {
-            // РЕЖИМ СТВОРЕННЯ: Перевіряємо локальну чернетку з Zustand
-            if (currentStep > -1) {
-                setShowDraftPrompt(true);
-            }
         }
-    }, []);
+        // Режим створення: prompt чернетки виставлений лінивим useState вище.
+    }, [setClient, setAnswers, setCurrentStep]); // zustand-сеттери стабільні — ефект фактично one-shot
 
     // Повне скидання чернетки (UI + Store)
     const handleResetDraftSilent = () => {
@@ -99,9 +114,7 @@ export default function App() {
 
     const toggleTheme = () => {
         vibe('medium');
-        const next = !isDark; setIsDark(next);
-        if (next) { document.body.classList.add('dark-theme'); localStorage.setItem('remont_theme', 'dark'); }
-        else { document.body.classList.remove('dark-theme'); localStorage.setItem('remont_theme', 'light'); }
+        setIsDark(d => !d); // клас на body і localStorage синхронізує ефект вище
     };
 
     // === 4. ЛОГІКА ПИТАНЬ ===
@@ -139,6 +152,10 @@ export default function App() {
     // === 5. LIVE CALC: ЖИВИЙ РОЗРАХУНОК ===
     useEffect(() => {
         if (currentStep < 0 && currentStep !== 9999) return; 
+        // AbortController проти гонки відповідей: без нього повільний
+        // старий запит (напр., холодний старт Render) міг прилетіти ПІСЛЯ
+        // швидкого нового і перезаписати кошик застарілими сумами.
+        const ctrl = new AbortController();
         const delay = setTimeout(async () => {
             if(!navigator.onLine || !client.area) return;
             try {
@@ -148,15 +165,16 @@ export default function App() {
                 const res = await fetch(`${BACKEND_URL}/api/live_calc`, { 
                     method: 'POST', 
                     headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify({ client, answers: payloadAnswers }) 
+                    body: JSON.stringify({ client, answers: payloadAnswers }),
+                    signal: ctrl.signal,
                 });
                 if (res.ok) { 
                     const data = await res.json(); 
                     setTotals({ work: data.work, mat_min: data.mat_min }); 
                 }
-            } catch(e) { console.log("Calc error", e); }
+            } catch(e) { if (e.name !== 'AbortError') console.log("Calc error", e); }
         }, 500);
-        return () => clearTimeout(delay);
+        return () => { clearTimeout(delay); ctrl.abort(); };
     }, [client, answers, rooms, currentStep]);
 
     // === 6. НАВІГАЦІЯ ===
@@ -253,7 +271,17 @@ export default function App() {
                     ))}
                 </div>
                 
-                {q.type === 'trigger_meas' ? <RoomVisualizer /> : 
+                {q.type === 'trigger_meas' ? (
+                    <Suspense fallback={
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '320px', color: 'var(--hint-color)' }}>
+                            <Loader2 size={34} style={{ animation: 'spin 1s linear infinite' }} />
+                            <div style={{ marginTop: '12px', fontSize: '14px', fontWeight: 600 }}>Завантаження 3D-планувальника…</div>
+                            <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
+                        </div>
+                    }>
+                        <RoomVisualizer />
+                    </Suspense>
+                ) : 
                  q.type === 'custom_works_builder' ? <CustomWorks answers={answers} setAnswers={setAnswers} /> : 
                  <Survey question={q} answers={answers} setAnswers={setAnswers} client={client} openImage={setModalImg} />}
             </>

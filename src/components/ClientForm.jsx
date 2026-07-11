@@ -1,5 +1,4 @@
 import React from 'react';
-import { vibe } from '../utils/telegram';
 
 export default function ClientForm({ client, setClient }) {
     

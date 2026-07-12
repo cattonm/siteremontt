@@ -35,6 +35,7 @@ function formatRoomValue(q, val) {
 
 export default function Summary({ client, answers, finalQuestions, shouldSkip, editStep, totals }) {
     const [openZones, setOpenZones] = useState({ "👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ": true, "🏠 ПРИМІЩЕННЯ": true });
+    const [openRooms, setOpenRooms] = useState({});   // які кімнати розгорнуті построчно
     const rooms = useStore((s) => s.rooms);
     const liveBreakdown = useStore((s) => s.liveBreakdown);
     const requestVisualizerFocus = useStore((s) => s.requestVisualizerFocus);
@@ -117,7 +118,9 @@ export default function Summary({ client, answers, finalQuestions, shouldSkip, e
                                 .map((q) => ({ label: (q.group === 'Інше' ? 'Інше' : q.text.replace(/\.$/, '')), value: formatRoomValue(q, room[q.id]) }))
                                 .filter((l) => l.value);
                             const rp = liveBreakdown?.rooms?.[room.id];
+                            const priceLines = liveBreakdown?.roomLines?.[room.id] || [];
                             const area = parseFloat(room.measurements?.floor) || 0;
+                            const isOpen = !!openRooms[room.id];
                             return (
                                 <div key={room.id} style={{ padding: '12px 0', borderBottom: rIdx === rooms.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -141,6 +144,37 @@ export default function Summary({ client, answers, finalQuestions, shouldSkip, e
                                         </div>
                                     ) : (
                                         <div style={{ fontSize: '13px', color: 'var(--hint-color)', marginTop: '6px' }}><i>Роботи в цьому приміщенні не обрані</i></div>
+                                    )}
+
+                                    {/* ПОСТРОЧНИЙ КОШТОРИС: «Ламінат · 18 м² × 405 ₴ = 7 290 ₴».
+                                        Найсильніший аргумент проти «а чому так дорого?» —
+                                        клієнт бачить, з чого складається цифра. */}
+                                    {priceLines.length > 0 && (
+                                        <>
+                                            <div
+                                                onClick={() => { vibe(); setOpenRooms((p) => ({ ...p, [room.id]: !p[room.id] })); }}
+                                                style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: 'var(--link-color, #0a84ff)' }}
+                                            >
+                                                {isOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                                                {isOpen ? 'Згорнути розрахунок' : `Детальний розрахунок (${priceLines.length})`}
+                                            </div>
+                                            {isOpen && (
+                                                <div style={{ marginTop: '8px', background: 'var(--secondary-bg, rgba(127,127,127,0.07))', borderRadius: '10px', padding: '10px 12px' }}>
+                                                    {priceLines.map((pl, i) => (
+                                                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontSize: '12.5px', padding: '4px 0', borderBottom: i === priceLines.length - 1 ? 'none' : '1px dashed var(--border-color)' }}>
+                                                            <span style={{ minWidth: 0 }}>
+                                                                {pl.label}{pl.tier ? ` (${pl.tier})` : ''}
+                                                                <span style={{ color: 'var(--hint-color)' }}> · {pl.qty} {pl.unit} × {Number(pl.rate).toLocaleString()} ₴</span>
+                                                            </span>
+                                                            <span style={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{Number(pl.work).toLocaleString()} ₴</span>
+                                                        </div>
+                                                    ))}
+                                                    <div style={{ fontSize: '11.5px', color: 'var(--hint-color)', marginTop: '7px' }}>
+                                                        Ціни — за роботу. Матеріали рахуються окремо («від» — стандарт-сегмент).
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             );

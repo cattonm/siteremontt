@@ -22,6 +22,41 @@ const useStore = create(
       requestVisualizerFocus: (roomId, group = null) =>
         set({ visualizerFocus: { roomId, group, ts: Date.now() } }),
 
+      // Останнє видалене приміщення — для «Скасувати» (снекбар 5 сек).
+      // Зберігаємо і сам об'єкт, і його позицію, щоб повернути на місце.
+      lastRemoved: null,
+      duplicateRoom: (id) => set((state) => {
+        const src = state.rooms.find((r) => r.id === id);
+        if (!src) return {};
+        // Глибока копія: інакше нова кімната ділила б масиви (walls, light)
+        // зі старою — правки в одній міняли б обидві.
+        const copy = JSON.parse(JSON.stringify(src));
+        copy.id = `zone_${src.type}_${Date.now()}`;
+        const sameType = state.rooms.filter((r) => r.type === src.type).length;
+        const base = src.name.replace(/\s+\d+$/, '');   // «Кімната 2» → «Кімната»
+        copy.name = `${base} ${sameType + 1}`;
+        const idx = state.rooms.findIndex((r) => r.id === id);
+        const rooms = [...state.rooms];
+        rooms.splice(idx + 1, 0, copy);                  // одразу поруч з оригіналом
+        return { rooms, lastDuplicatedId: copy.id };
+      }),
+      lastDuplicatedId: null,
+      removeRoomWithUndo: (id) => set((state) => {
+        const idx = state.rooms.findIndex((r) => r.id === id);
+        if (idx === -1) return {};
+        return {
+          rooms: state.rooms.filter((r) => r.id !== id),
+          lastRemoved: { room: state.rooms[idx], index: idx, ts: Date.now() },
+        };
+      }),
+      undoRemove: () => set((state) => {
+        if (!state.lastRemoved) return {};
+        const rooms = [...state.rooms];
+        rooms.splice(state.lastRemoved.index, 0, state.lastRemoved.room);
+        return { rooms, lastRemoved: null };
+      }),
+      clearLastRemoved: () => set({ lastRemoved: null }),
+
       // --- ЕКШЕНИ (Замінники setClient, setAnswers) ---
       setCurrentStep: (step) => set({ currentStep: step }),
       
@@ -48,7 +83,9 @@ const useStore = create(
         currentStep: -1,
         client: { name: '', phone: '', object_type: 'Квартира (Новобудова)', address: '', area: '', floor: '1', elevator: 'Немає' },
         answers: {},
-        rooms: []
+        rooms: [],
+        lastRemoved: null,
+        liveBreakdown: { rooms: {}, general: null },
       })
     }),
     {

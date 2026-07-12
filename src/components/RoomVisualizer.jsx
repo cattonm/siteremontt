@@ -14,7 +14,7 @@
 //     налаштування праворуч; на мобільному (TMA) — все в стовпчик, як було.
 import React, { useState, useRef } from 'react';
 import useStore from '../store/useStore';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Copy, Undo2 } from 'lucide-react';
 import { vibe } from '../utils/telegram';
 import RoomPreview3D from './RoomPreview3D';
 import RoomPhotoPreview from './RoomPhotoPreview';
@@ -36,12 +36,24 @@ const ROOM_TYPES = [
 // і для бейджів «Необхідно обрати» тут, і для валідації «Далі» в App.
 
 export default function RoomVisualizer() {
-    const { client, rooms, addRoom, updateRoom, removeRoom } = useStore();
+    const { client, rooms, addRoom, updateRoom } = useStore();
+    const duplicateRoom = useStore((s) => s.duplicateRoom);
+    const removeRoomWithUndo = useStore((s) => s.removeRoomWithUndo);
+    const undoRemove = useStore((s) => s.undoRemove);
+    const clearLastRemoved = useStore((s) => s.clearLastRemoved);
+    const lastRemoved = useStore((s) => s.lastRemoved);
     const liveBreakdown = useStore((s) => s.liveBreakdown);
     const focus = useStore((s) => s.visualizerFocus);
     const [activeId, setActiveId] = useState(null);
     const [openGroup, setOpenGroup] = useState(null); // яка секція акордеону відкрита
     const groupRefs = useRef({}); // DOM-вузли секцій — щоб скролити до них з хотспота
+
+    // Снекбар «Скасувати» живе 5 секунд, далі видалення стає остаточним.
+    React.useEffect(() => {
+        if (!lastRemoved) return;
+        const t = setTimeout(() => clearLastRemoved(), 5000);
+        return () => clearTimeout(t);
+    }, [lastRemoved, clearLastRemoved]);
 
     // Зовнішній запит «покажи цю кімнату/групу»: шле валідація з App
     // (перша проблемна кімната) або кнопка «Змінити» біля кімнати в Summary.
@@ -180,7 +192,27 @@ export default function RoomVisualizer() {
                                 );
                             })()}
                         </div>
-                        <Trash2 size={20} color="#ff3b30" style={{ cursor: 'pointer', flexShrink: 0, marginTop: '2px' }} onClick={() => { vibe('heavy'); removeRoom(activeId); setActiveId(null); }} />
+                        <div style={{ display: 'flex', gap: '14px', flexShrink: 0, marginTop: '2px' }}>
+                            <Copy
+                                size={19} color="var(--hint-color)" style={{ cursor: 'pointer' }}
+                                title="Дублювати приміщення"
+                                onClick={() => {
+                                    vibe('medium');
+                                    duplicateRoom(activeId);
+                                    // Одразу перемикаємось на копію — саме її користувач
+                                    // зараз редагуватиме («ще одна така сама спальня»).
+                                    setTimeout(() => {
+                                        const dupId = useStore.getState().lastDuplicatedId;
+                                        if (dupId) setActiveId(dupId);
+                                    }, 0);
+                                }}
+                            />
+                            <Trash2
+                                size={19} color="#ff3b30" style={{ cursor: 'pointer' }}
+                                title="Видалити приміщення"
+                                onClick={() => { vibe('heavy'); removeRoomWithUndo(activeId); setActiveId(null); }}
+                            />
+                        </div>
                     </div>
 
                     <div className="visualizer-split">
@@ -240,6 +272,33 @@ export default function RoomVisualizer() {
                             ))}
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* СНЕКБАР «СКАСУВАТИ»: 5 секунд на передумати після видалення.
+                Видалення кімнати з усіма налаштуваннями — найдорожча помилка
+                в цьому інтерфейсі, тож даємо шлях назад. */}
+            {lastRemoved && (
+                <div style={{
+                    position: 'fixed', left: '50%', bottom: '90px', transform: 'translateX(-50%)',
+                    zIndex: 90, display: 'flex', alignItems: 'center', gap: '14px',
+                    background: '#1c1c1e', color: '#fff', padding: '11px 16px',
+                    borderRadius: '12px', boxShadow: '0 6px 24px rgba(0,0,0,0.3)',
+                    fontSize: '14px', maxWidth: '92vw', animation: 'fadeIn 0.2s ease',
+                }}>
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        «{lastRemoved.room.name}» видалено
+                    </span>
+                    <button
+                        onClick={() => { vibe('medium'); undoRemove(); setActiveId(lastRemoved.room.id); }}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: '5px', background: 'none',
+                            border: 'none', color: '#0a84ff', fontWeight: 700, fontSize: '14px',
+                            cursor: 'pointer', padding: 0, flexShrink: 0,
+                        }}
+                    >
+                        <Undo2 size={16} /> Скасувати
+                    </button>
                 </div>
             )}
         </div>

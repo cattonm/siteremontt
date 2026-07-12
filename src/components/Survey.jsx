@@ -1,9 +1,13 @@
 import React, { useEffect } from 'react';
 import { Check } from 'lucide-react';
+import useStore from '../store/useStore';
 import { vibe, vibeSelect } from '../utils/telegram';
 
 export default function Survey({ question, answers, setAnswers, client, openImage, compact = false }) {
     const qId = question?.id;
+    // Кімнати зі стору — для питань, що будують опції з реальних приміщень
+    // (тепла підлога). Хук ЗАВЖДИ викликається до раннього return.
+    const storeRooms = useStore((s) => s.rooms);
 
     // --- АВТОЗАПОВНЕННЯ (наприклад, площа стяжки) ---
     // ВАЖЛИВО: хук стоїть ДО раннього return (правило хуків React —
@@ -88,10 +92,11 @@ export default function Survey({ question, answers, setAnswers, client, openImag
         const currentArr = Array.isArray(val) ? val : [];
         const handleSelect = (optVal) => {
             vibe();
-            const isNi = optVal.toLowerCase() === "ні" || optVal.startsWith("Не");
-            if (isNi) { setAnswer([optVal]); return; }
+            // «Ні» / «Не...» / «Без змін» — взаємовиключні з рештою опцій
+            const isNi = (v) => v.toLowerCase() === "ні" || v.startsWith("Не") || v === "Без змін";
+            if (isNi(optVal)) { setAnswer([optVal]); return; }
             
-            let next = currentArr.filter(v => !(v.toLowerCase() === "ні" || v.startsWith("Не")));
+            let next = currentArr.filter(v => !isNi(v));
             if (next.includes(optVal)) next = next.filter(v => v !== optVal);
             else next.push(optVal);
             setAnswer(next);
@@ -215,14 +220,11 @@ export default function Survey({ question, answers, setAnswers, client, openImag
     }
 
     if (question.type === 'multiselect_dynamic') {
-        const aux = answers['aux_rooms'] || [];
-        const rooms = parseInt(answers['rooms_count']) || 0;
-        const baths = parseInt(answers['baths_count']) || 0;
-        
-        let opts = [...aux];
-        for(let i=1; i<=rooms; i++) opts.push(`Кімната ${i}`);
-        for(let i=1; i<=baths; i++) opts.push(`Санвузол ${i}`);
-        opts.push("Не потребується");
+        // Опції — НАЗВИ реальних приміщень з візуалізатора (масив rooms).
+        // Раніше список будувався з rooms_count/baths_count/aux_rooms, які
+        // видалені з анкети, — питання лишалося з єдиним «Не потребується».
+        // Бекенд матчить обрані назви на кімнати і бере їхню реальну площу.
+        const opts = [...storeRooms.map((r) => r.name), "Не потребується"];
 
         const currentArr = Array.isArray(val) ? val.filter(v => opts.includes(v)) : [];
 

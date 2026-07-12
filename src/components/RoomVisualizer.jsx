@@ -20,7 +20,7 @@ import RoomPreview3D from './RoomPreview3D';
 import RoomPhotoPreview from './RoomPhotoPreview';
 import { hasRoomPreview } from '../data/roomPreviewLayers';
 import AccordionGroup from './AccordionGroup';
-import { ROOM_QUESTIONS_CONFIG } from '../data/questions';
+import { ROOM_QUESTIONS_CONFIG, REQUIRED_GROUPS } from '../data/questions';
 import { groupQuestions } from '../utils/groupQuestions';
 import Survey from './Survey';
 import ApartmentScene3D from './ApartmentScene3D';
@@ -32,15 +32,30 @@ const ROOM_TYPES = [
     { id: 'basement', name: 'Підвал' }, { id: 'attic', name: 'Мансарда' }
 ];
 
-// Секції, без вибору в яких показуємо «Необхідно обрати» (стиль Kapitel).
-// Додай/прибери назви груп за потреби.
-const REQUIRED_GROUPS = new Set(['Підлога', 'Стеля', 'Стіни', 'Освітлення', 'Фартух']);
+// REQUIRED_GROUPS живе в data/questions.js — ЄДИНЕ джерело правди
+// і для бейджів «Необхідно обрати» тут, і для валідації «Далі» в App.
 
 export default function RoomVisualizer() {
     const { client, rooms, addRoom, updateRoom, removeRoom } = useStore();
+    const liveBreakdown = useStore((s) => s.liveBreakdown);
+    const focus = useStore((s) => s.visualizerFocus);
     const [activeId, setActiveId] = useState(null);
     const [openGroup, setOpenGroup] = useState(null); // яка секція акордеону відкрита
     const groupRefs = useRef({}); // DOM-вузли секцій — щоб скролити до них з хотспота
+
+    // Зовнішній запит «покажи цю кімнату/групу»: шле валідація з App
+    // (перша проблемна кімната) або кнопка «Змінити» біля кімнати в Summary.
+    React.useEffect(() => {
+        if (!focus) return;
+        setActiveId(focus.roomId);
+        if (focus.group) {
+            setOpenGroup(focus.group);
+            setTimeout(() => {
+                groupRefs.current[focus.group]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 80);
+        }
+        useStore.setState({ visualizerFocus: null }); // одноразовий сигнал
+    }, [focus]);
 
     const totalClientArea = parseFloat(client.area) || 0;
     const distributedArea = rooms.reduce((sum, r) => sum + (parseFloat(r.measurements?.floor) || 0), 0);
@@ -151,9 +166,21 @@ export default function RoomVisualizer() {
 
             {activeRoom && (
                 <div style={{ borderTop: '2px dashed var(--border-color)', paddingTop: '20px', animation: 'fadeIn 0.3s ease' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                        <h4 style={{ margin: 0, fontSize: '18px', color: 'var(--text-color)', textTransform: 'uppercase', fontWeight: 800 }}>{activeRoom.name}</h4>
-                        <Trash2 size={20} color="#ff3b30" style={{ cursor: 'pointer' }} onClick={() => { vibe('heavy'); removeRoom(activeId); setActiveId(null); }} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
+                        <div>
+                            <h4 style={{ margin: 0, fontSize: '18px', color: 'var(--text-color)', textTransform: 'uppercase', fontWeight: 800 }}>{activeRoom.name}</h4>
+                            {(() => {
+                                // Жива ціна САМЕ цієї кімнати з розбивки live_calc
+                                const rp = liveBreakdown?.rooms?.[activeRoom.id];
+                                if (!rp || (rp.work <= 0 && rp.mat_min <= 0)) return null;
+                                return (
+                                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#34c759', marginTop: '3px' }}>
+                                        Робота {Number(rp.work).toLocaleString()} ₴ · Матеріали від {Number(rp.mat_min).toLocaleString()} ₴
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                        <Trash2 size={20} color="#ff3b30" style={{ cursor: 'pointer', flexShrink: 0, marginTop: '2px' }} onClick={() => { vibe('heavy'); removeRoom(activeId); setActiveId(null); }} />
                     </div>
 
                     <div className="visualizer-split">

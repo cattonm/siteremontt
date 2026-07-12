@@ -10,6 +10,18 @@ const useStore = create(
       answers: {}, // Для старих плоских відповідей (стяжка, загальні питання)
       rooms: [],   // НОВИЙ МАСИВ для візуалізатора
 
+      // Жива розбивка цін від live_calc: { rooms: {roomId: {work, mat_min}}, general: {work, mat_min} }
+      // НЕ персиститься (partialize нижче) — це кеш відповіді сервера.
+      liveBreakdown: { rooms: {}, general: null },
+      setLiveBreakdown: (bd) => set({ liveBreakdown: bd }),
+
+      // Канал «сфокусуй візуалізатор»: валідація в App і кнопки Summary
+      // просять RoomVisualizer вибрати кімнату/відкрити групу.
+      // ts — щоб повторний запит на ту саму кімнату теж спрацював.
+      visualizerFocus: null,
+      requestVisualizerFocus: (roomId, group = null) =>
+        set({ visualizerFocus: { roomId, group, ts: Date.now() } }),
+
       // --- ЕКШЕНИ (Замінники setClient, setAnswers) ---
       setCurrentStep: (step) => set({ currentStep: step }),
       
@@ -41,6 +53,14 @@ const useStore = create(
     }),
     {
       name: 'remont_draft_storage', // Усі дані автоматично зберігатимуться під цим ключем
+      // У localStorage їде лише сама анкета; liveBreakdown/visualizerFocus —
+      // службові й живуть тільки в пам'яті сесії.
+      partialize: (s) => ({
+        currentStep: s.currentStep,
+        client: s.client,
+        answers: s.answers,
+        rooms: s.rooms,
+      }),
     }
   )
 );

@@ -76,14 +76,14 @@ export const ROOM_QUESTIONS_CONFIG = {
     room: [
         { id: "floor", group: "Підлога", text: "Тип підлоги.", type: "cards", options: [
             { label: "Ламінат", val: "Ламінат", img: "/img/laminat.webp" }, { label: "Паркет", val: "Паркет", img: "/img/parket.webp" },
-            { label: "Кварц вініл", val: "Кварц вініл", img: "/img/kvarzvinil.webp" }, { label: "Керамограніт", val: "Керамограніт", img: "/img/keramogranit.webp" }
+            { label: "Кварц вініл", val: "Кварц вініл", img: "/img/kvarzvinil.webp" }, { label: "Керамограніт", val: "Керамограніт", img: "/img/keramogranit.webp" }, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "walls", group: "Стіни", text: "Стіни.", type: "cards_multiselect", options: [
-            {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"/img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}
+            {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"/img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "light", group: "Освітлення", text: "Освітлення.", type: "cards_multiselect", options: [
             {label:"Точкове світло",val:"Точкове світло",img:"/img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"/img/lustra.webp"}, 
-            {label:"Трек / Лінія",val:"Трек / Лінія"}, {label:"LED підсвітка",val:"LED підсвітка",img:"/img/ledpidsv.webp"}
+            {label:"Трек / Лінія",val:"Трек / Лінія"}, {label:"LED підсвітка",val:"LED підсвітка",img:"/img/ledpidsv.webp"}, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "sills", group: "Підвіконня", text: "Підвіконня.", type: "cards", options: [
             {label:"Пластик",val:"Пластик"}, {label:"Дерево",val:"Дерево"}, 
@@ -98,10 +98,10 @@ export const ROOM_QUESTIONS_CONFIG = {
     ],
     bath: [
         { id: "floor", group: "Підлога", text: "Плитка на підлогу (формат)", type: "cards", options: [
-            { label: "Мозаїка", val: "Мозаїка" }, { label: "Плитка до 120*60", val: "Керамограніт/Плитка до 120*60" }, { label: "Великоформатний", val: "Великоформатний керамограніт" }
+            { label: "Мозаїка", val: "Мозаїка" }, { label: "Плитка до 120*60", val: "Керамограніт/Плитка до 120*60" }, { label: "Великоформатний", val: "Великоформатний керамограніт" }, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "wall_tile", group: "Стіни", text: "Плитка на стіни (формат)", type: "cards", options: [
-            { label: "Мозаїка", val: "Мозаїка" }, { label: "Плитка до 120*60", val: "Керамограніт/Плитка до 120*60" }, { label: "Великоформатний", val: "Великоформатний керамограніт" }
+            { label: "Мозаїка", val: "Мозаїка" }, { label: "Плитка до 120*60", val: "Керамограніт/Плитка до 120*60" }, { label: "Великоформатний", val: "Великоформатний керамограніт" }, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "shower", group: "Сантехніка", text: "Душ.", type: "cards_multiselect", options: [
             {label:"Піддон (акрил/камінь)",val:"Піддон (акрил/камінь)",img:"/img/piddon.webp"}, {label:"Душовий трап (з плитки)",val:"Душовий трап (з плитки)",img:"/img/plitkadush.webp"}, 
@@ -127,16 +127,16 @@ export const ROOM_QUESTIONS_CONFIG = {
     ],
     kitchen: [
         { id: "walls", group: "Стіни", text: "Стіни.", type: "cards_multiselect", options: [
-            {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"/img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}
+            {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"/img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "light", group: "Освітлення", text: "Освітлення", type: "cards_multiselect", options: [
-            {label:"Точкове світло",val:"Точкове світло",img:"/img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"/img/lustra.webp"}, {label:"Трек / Лінія",val:"Трек / Лінія"}, {label:"Декор підсвітка",val:"Декор підсвітка",img:"/img/dekorpidsv.webp"}
+            {label:"Точкове світло",val:"Точкове світло",img:"/img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"/img/lustra.webp"}, {label:"Трек / Лінія",val:"Трек / Лінія"}, {label:"Декор підсвітка",val:"Декор підсвітка",img:"/img/dekorpidsv.webp"}, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "floor", group: "Підлога", text: "Підлога.", type: "cards", options: [
-            {label:"Керамограніт",val:"Керамограніт",img:"/img/kitchenkeramo.webp"}, {label:"Кварц-вініл",val:"Кварц-вініл",img:"/img/kitchenkvarzv.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.webp"}
+            {label:"Керамограніт",val:"Керамограніт",img:"/img/kitchenkeramo.webp"}, {label:"Кварц-вініл",val:"Кварц-вініл",img:"/img/kitchenkvarzv.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.webp"}, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "apron", group: "Фартух", text: "Фартух.", type: "cards", options: [
-            {label:"Керамограніт",val:"Керамограніт",img:"/img/fartukkeramo.webp"}, {label:"Матеріал стільниці",val:"Матеріал стільниці",img:"/img/fartukstiln.jpeg"}
+            {label:"Керамограніт",val:"Керамограніт",img:"/img/fartukkeramo.webp"}, {label:"Матеріал стільниці",val:"Матеріал стільниці",img:"/img/fartukstiln.jpeg"}, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "mixer_std", group: "Сантехніка", text: "Кількість звичайних змішувачів (шт)", type: "input_number", placeholder: "0" },
         { id: "mixer_hidden", group: "Сантехніка", text: "Змішувачі прихованого монтажу (шт)", type: "input_number", placeholder: "0" },
@@ -147,13 +147,13 @@ export const ROOM_QUESTIONS_CONFIG = {
     ],
     hallway: [
         { id: "floor", group: "Підлога", text: "Тип підлоги.", type: "cards", options: [
-            {label:"Керамограніт",val:"Керамограніт",img:"/img/keramogranit.webp"}, {label:"Кварцвініл",val:"Кварцвініл",img:"/img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.webp"}
+            {label:"Керамограніт",val:"Керамограніт",img:"/img/keramogranit.webp"}, {label:"Кварцвініл",val:"Кварцвініл",img:"/img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.webp"}, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "walls", group: "Стіни", text: "Стіни.", type: "cards_multiselect", options: [
-            {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"/img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}
+            {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"/img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "light", group: "Освітлення", text: "Освітлення", type: "cards_multiselect", options: [
-            {label:"Точкове світло",val:"Точкове світло",img:"/img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"/img/lustra.webp"}, {label:"Трек / Лінія",val:"Трек / Лінія"}, {label:"Декор підсвітка",val:"Декор підсвітка",img:"/img/dekorpidsv.webp"}
+            {label:"Точкове світло",val:"Точкове світло",img:"/img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"/img/lustra.webp"}, {label:"Трек / Лінія",val:"Трек / Лінія"}, {label:"Декор підсвітка",val:"Декор підсвітка",img:"/img/dekorpidsv.webp"}, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "decor", group: "Декор", text: "Декор", type: "cards", options: [
             {label:"ДСП панелі",val:"ДСП панелі",img:"/img/dsppaneli.webp"}, {label:"Панелі гіпсові",val:"Панелі гіпсові",img:"/img/gipspankimn.webp"}, {label:"Ні",val:"Ні"}
@@ -164,7 +164,7 @@ export const ROOM_QUESTIONS_CONFIG = {
             {label:"Керамограніт",val:"Керамограніт",img:"/img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"/img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.webp"}, {label:"Ні",val:"Ні"}
         ]},
         { id: "walls", group: "Стіни", text: "Стіни.", type: "cards_multiselect", options: [
-            {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"/img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}, {label:"Вагонка",val:"Вагонка",img:"/img/vagonka.webp"}, {label:"Короїд",val:"Короїд",img:"/img/koroid.webp"}
+            {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"/img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}, {label:"Вагонка",val:"Вагонка",img:"/img/vagonka.webp"}, {label:"Короїд",val:"Короїд",img:"/img/koroid.webp"}, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "light", group: "Освітлення", text: "Освітлення", type: "cards_multiselect", options: [
             {label:"Точкове світло",val:"Точкове світло",img:"/img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"/img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"/img/ledpidsv.webp"}, {label:"Ні",val:"Ні"}
@@ -178,27 +178,27 @@ export const ROOM_QUESTIONS_CONFIG = {
     ],
     wardrobe: [
         { id: "floor", group: "Підлога", text: "Тип підлоги.", type: "cards", options: [
-            {label:"Керамограніт",val:"Керамограніт",img:"/img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"/img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.webp"}
+            {label:"Керамограніт",val:"Керамограніт",img:"/img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"/img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.webp"}, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "walls", group: "Стіни", text: "Стіни.", type: "cards_multiselect", options: [
-            {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"/img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування",img:"/img/gruntovka.webp"}
+            {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"/img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування",img:"/img/gruntovka.webp"}, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "light", group: "Освітлення", text: "Освітлення", type: "cards_multiselect", options: [
-            {label:"Точкове світло",val:"Точкове світло",img:"/img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"/img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"/img/ledgarderob.webp"}
+            {label:"Точкове світло",val:"Точкове світло",img:"/img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"/img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"/img/ledgarderob.webp"}, {label:"Без змін",val:"Без змін"}
         ]}
     ],
     basement: [
         { id: "floor", group: "Підлога", text: "Тип підлоги.", type: "cards", options: [
-            {label:"Керамограніт",val:"Керамограніт",img:"/img/keramogranit.webp"}, {label:"Лінолеум",val:"Лінолеум",img:"/img/linoleum.webp"}
+            {label:"Керамограніт",val:"Керамограніт",img:"/img/keramogranit.webp"}, {label:"Лінолеум",val:"Лінолеум",img:"/img/linoleum.webp"}, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "walls", group: "Стіни", text: "Стіни.", type: "cards_multiselect", options: [
-            {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"/img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}
+            {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Декоративна штукатурка",val:"Декоративна штукатурка",img:"/img/dekorstuk.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbuvannya.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "ceiling", group: "Стеля", text: "Тип стелі.", type: "cards", options: [
-            {label:"Натяжна",val:"Натяжна"}, {label:"Гіпсокартон",val:"Гіпсокартон"}, {label:"Побілка",val:"Побілка"}
+            {label:"Натяжна",val:"Натяжна"}, {label:"Гіпсокартон",val:"Гіпсокартон"}, {label:"Побілка",val:"Побілка"}, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "light", group: "Освітлення", text: "Освітлення", type: "cards_multiselect", options: [
-            {label:"Точкове світло",val:"Точкове світло",img:"/img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"/img/lustra.webp"}
+            {label:"Точкове світло",val:"Точкове світло",img:"/img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"/img/lustra.webp"}, {label:"Без змін",val:"Без змін"}
         ]}
     ],
     attic: [
@@ -206,10 +206,67 @@ export const ROOM_QUESTIONS_CONFIG = {
             {label:"Шпалери",val:"Шпалери",img:"/img/spaleri.jpeg"}, {label:"Обшивка деревʼяними рейками",val:"Обшивка деревʼяними рейками",img:"/img/obshivkaderev.webp"}, {label:"Фарбування",val:"Фарбування",img:"/img/farbzgipso.webp"}, {label:"Грунтовка без фарбування",val:"Грунтовка без фарбування"}, {label:"ні",val:"ні"}
         ]},
         { id: "floor", group: "Підлога", text: "Тип підлоги.", type: "cards", options: [
-            {label:"Керамограніт",val:"Керамограніт",img:"/img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"/img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.webp"}, {label:"Інше",val:"Інше"}
+            {label:"Керамограніт",val:"Керамограніт",img:"/img/keramogranit.webp"}, {label:"Кварц вініл",val:"Кварц вініл",img:"/img/kvarzvinil.webp"}, {label:"Ламінат",val:"Ламінат",img:"/img/laminat.webp"}, {label:"Інше",val:"Інше"}, {label:"Без змін",val:"Без змін"}
         ]},
         { id: "light", group: "Освітлення", text: "Освітлення", type: "cards_multiselect", options: [
-            {label:"Точкове світло",val:"Точкове світло",img:"/img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"/img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"/img/ledpidsv.webp"}
+            {label:"Точкове світло",val:"Точкове світло",img:"/img/tochkove.webp"}, {label:"Люстра",val:"Люстра",img:"/img/lustra.webp"}, {label:"LED підсвітка",val:"LED підсвітка",img:"/img/ledpidsv.webp"}, {label:"Без змін",val:"Без змін"}
         ]}
     ]
 };
+// ==========================================
+// 4. ВАЛІДАЦІЯ ТА ДОВІДНИКИ ДЛЯ ВІЗУАЛІЗАТОРА
+// ==========================================
+
+export const ROOM_TYPE_LABELS = {
+    room: 'Кімната', kitchen: 'Кухня', bath: 'Санвузол', hallway: 'Передпокій',
+    balcony: 'Балкон', wardrobe: 'Гардероб', basement: 'Підвал', attic: 'Мансарда',
+};
+
+// Групи, без вибору в яких не пускаємо «Далі» (бейдж «Необхідно обрати»,
+// стиль Kapitel). Для типу кімнати діють лише групи, що Є в його конфізі:
+// «Фартух» вимагається тільки на кухні, «Стеля» — лише в підвалі і т.д.
+// Примусової покупки немає: у кожному списку тепер є чесний «Без змін».
+export const REQUIRED_GROUPS = new Set(['Підлога', 'Стеля', 'Стіни', 'Освітлення', 'Фартух']);
+
+// Чи дано відповідь на конкретне питання (з урахуванням типу).
+export function isQuestionAnswered(q, val) {
+    if (val === undefined || val === null || val === '') return false;
+    switch (q.type) {
+        case 'cards_multiselect':
+        case 'multiselect_dynamic':
+            return Array.isArray(val) && val.length > 0;
+        case 'cards_with_tier':
+            return !!(val && typeof val === 'object' && val.type);
+        case 'multiselect_complex':
+            return typeof val === 'object' && Object.keys(val).length > 0;
+        case 'input_number':
+            return val !== '' && !Number.isNaN(parseFloat(val));
+        default:
+            return true; // 'cards' зі строковим значенням уже пройшов перевірки вище
+    }
+}
+
+// Проблеми по кімнатах перед «Далі» з кроку структури квартири.
+// Повертає [{ roomId, roomName, missing: [назви груп], badArea }].
+// Група вважається заповненою, якщо відповідь є ХОЧА Б на одне її питання.
+export function getRoomIssues(rooms) {
+    const issues = [];
+    for (const room of rooms || []) {
+        const cfg = ROOM_QUESTIONS_CONFIG[room.type] || [];
+        const groupsHere = new Map();
+        for (const q of cfg) {
+            if (!REQUIRED_GROUPS.has(q.group)) continue;
+            if (!groupsHere.has(q.group)) groupsHere.set(q.group, []);
+            groupsHere.get(q.group).push(q);
+        }
+        const missing = [];
+        for (const [name, qs] of groupsHere) {
+            if (!qs.some((q) => isQuestionAnswered(q, room[q.id]))) missing.push(name);
+        }
+        const badArea = !(parseFloat(room.measurements?.floor) > 0);
+        if (missing.length || badArea) {
+            issues.push({ roomId: room.id, roomName: room.name, missing, badArea });
+        }
+    }
+    return issues;
+}

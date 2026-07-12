@@ -1,10 +1,43 @@
 import React, { useState } from 'react';
 import AnimatedPrice from './AnimatedPrice';
+import useStore from '../store/useStore';
+import { ROOM_QUESTIONS_CONFIG } from '../data/questions';
 import { vibe } from '../utils/telegram';
-import { ChevronDown, ChevronUp, User, Ruler, Settings, Wrench, Edit3, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, User, Home, Settings, Wrench, Edit3, CheckCircle2 } from 'lucide-react';
+
+// Значення, які означають «нічого не робимо» — у підсумку їх не показуємо,
+// щоб список кімнати містив лише реальні роботи.
+const SKIP_VALUES = new Set(['Ні', 'ні', 'Без змін', 'Не потребується', 'Не обладнувати']);
+
+// Людський підпис значення питання кімнати (val → label з опцій, tier-об'єкти,
+// словники «Інше»). null = рядок не показуємо.
+function formatRoomValue(q, val) {
+    const optLabel = (v) => (q.options?.find((o) => o.val === v)?.label) ?? v;
+    if (val === undefined || val === null || val === '') return null;
+    if (q.type === 'cards_with_tier') {
+        if (!val?.type || SKIP_VALUES.has(val.type)) return null;
+        return `${optLabel(val.type)}${val.tier && val.tier !== '-' ? ` (${val.tier})` : ''}`;
+    }
+    if (Array.isArray(val)) {
+        const items = val.filter((v) => !SKIP_VALUES.has(v)).map(optLabel);
+        return items.length ? items.join(', ') : null;
+    }
+    if (typeof val === 'object') {
+        const parts = Object.entries(val)
+            .filter(([k, v]) => v && v !== 0 && !SKIP_VALUES.has(k))
+            .map(([k, v]) => (v === 'Так' ? k : `${k} (${v})`));
+        return parts.length ? parts.join(', ') : null;
+    }
+    if (SKIP_VALUES.has(val)) return null;
+    if (q.type === 'input_number') return parseFloat(val) > 0 ? `${val} шт` : null;
+    return String(optLabel(val));
+}
 
 export default function Summary({ client, answers, finalQuestions, shouldSkip, editStep, totals }) {
-    const [openZones, setOpenZones] = useState({ "👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ": true });
+    const [openZones, setOpenZones] = useState({ "👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ": true, "🏠 ПРИМІЩЕННЯ": true });
+    const rooms = useStore((s) => s.rooms);
+    const liveBreakdown = useStore((s) => s.liveBreakdown);
+    const requestVisualizerFocus = useStore((s) => s.requestVisualizerFocus);
 
     const toggleZone = (zoneName) => {
         vibe('light');
@@ -68,27 +101,56 @@ export default function Summary({ client, answers, finalQuestions, shouldSkip, e
                 </div>
             </div>
 
-            {answers.measurements && Object.keys(answers.measurements).length > 0 && (
+            {/* 🏠 ПРИМІЩЕННЯ: серце анкети. Кожна кімната — назва, площа,
+                жива ціна з розбивки live_calc і людський перелік обраного.
+                «Змінити» веде на крок структури і ФОКУСУЄ саме цю кімнату. */}
+            {rooms.length > 0 && (
                 <div className="summary-box" style={{ padding: '0 20px' }}>
-                    <div className="accordion-header" onClick={() => toggleZone("📏 ТОЧНІ ЗАМІРИ")}>
-                        <div className="accordion-title"><Ruler size={18} /> ТОЧНІ ЗАМІРИ</div>
-                        {openZones["📏 ТОЧНІ ЗАМІРИ"] ? <ChevronUp size={20} color="var(--hint-color)" /> : <ChevronDown size={20} color="var(--hint-color)" />}
+                    <div className="accordion-header" onClick={() => toggleZone("🏠 ПРИМІЩЕННЯ")}>
+                        <div className="accordion-title"><Home size={18} /> ПРИМІЩЕННЯ ({rooms.length})</div>
+                        {openZones["🏠 ПРИМІЩЕННЯ"] ? <ChevronUp size={20} color="var(--hint-color)" /> : <ChevronDown size={20} color="var(--hint-color)" />}
                     </div>
-                    <div className={`accordion-content ${openZones["📏 ТОЧНІ ЗАМІРИ"] ? 'open' : ''}`}>
-                        <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'10px' }}><div className="edit-btn" onClick={() => editStep(measIndex)}><Edit3 size={14}/> Змінити</div></div>
-                        {Object.entries(answers.measurements).map(([zoneId, meas]) => {
-                            const zoneNames = { 'hallway': 'Передпокій', 'kitchen': 'Кухня', 'balcony': 'Балкон', 'wardrobe': 'Гардероб', 'basement': 'Підвал', 'attic': 'Горище' };
-                            let displayName = zoneNames[zoneId] || (zoneId.startsWith('room_') ? `Кімната ${zoneId.split('_')[1]}` : `Санвузол ${zoneId.split('_')[1]}`);
-                            if (meas.floor > 0 || meas.walls > 0) {
-                                return (
-                                    <div key={zoneId} className="summary-item" style={{ fontSize: '14px' }}>
-                                        <span>{displayName}:</span> <span style={{ textAlign:'right' }}>Підлога: {meas.floor} м²<br/>Стіни: {meas.walls} м²</span>
+                    <div className={`accordion-content ${openZones["🏠 ПРИМІЩЕННЯ"] ? 'open' : ''}`}>
+                        {rooms.map((room, rIdx) => {
+                            const cfg = ROOM_QUESTIONS_CONFIG[room.type] || [];
+                            const lines = cfg
+                                .map((q) => ({ label: (q.group === 'Інше' ? 'Інше' : q.text.replace(/\.$/, '')), value: formatRoomValue(q, room[q.id]) }))
+                                .filter((l) => l.value);
+                            const rp = liveBreakdown?.rooms?.[room.id];
+                            const area = parseFloat(room.measurements?.floor) || 0;
+                            return (
+                                <div key={room.id} style={{ padding: '12px 0', borderBottom: rIdx === rooms.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                        <div>
+                                            <div style={{ fontWeight: 700 }}>{room.name} <span style={{ color: 'var(--hint-color)', fontWeight: 500, fontSize: '13px' }}>· {area} м²</span></div>
+                                            {rp && (rp.work > 0 || rp.mat_min > 0) && (
+                                                <div style={{ fontSize: '13px', fontWeight: 700, color: '#34c759', marginTop: '2px' }}>
+                                                    Робота {Number(rp.work).toLocaleString()} ₴ · Матеріали від {Number(rp.mat_min).toLocaleString()} ₴
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="edit-btn" onClick={() => { requestVisualizerFocus(room.id, null); editStep(measIndex); }}><Edit3 size={14}/></div>
                                     </div>
-                                );
-                            }
-                            return null;
+                                    {lines.length > 0 ? (
+                                        <div style={{ marginTop: '6px' }}>
+                                            {lines.map((l, i) => (
+                                                <div key={i} style={{ fontSize: '13px', margin: '3px 0' }}>
+                                                    <span style={{ color: 'var(--hint-color)' }}>{l.label}: </span>{l.value}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div style={{ fontSize: '13px', color: 'var(--hint-color)', marginTop: '6px' }}><i>Роботи в цьому приміщенні не обрані</i></div>
+                                    )}
+                                </div>
+                            );
                         })}
-                        <div style={{height: '15px'}}></div>
+                        {liveBreakdown?.general && (liveBreakdown.general.work > 0 || liveBreakdown.general.mat_min > 0) && (
+                            <div style={{ padding: '12px 0 15px', borderTop: '1px dashed var(--border-color)', fontSize: '13px' }}>
+                                <span style={{ color: 'var(--hint-color)' }}>Загальні роботи (демонтаж, стяжка, стеля, двері, розводки): </span>
+                                <b>Робота {Number(liveBreakdown.general.work).toLocaleString()} ₴ · Матеріали від {Number(liveBreakdown.general.mat_min).toLocaleString()} ₴</b>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

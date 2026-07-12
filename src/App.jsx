@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import useStore from './store/useStore'; 
 import ClientForm from './components/ClientForm';
 import Survey from './components/Survey';
-import Measurements from './components/Measurements';
 import CustomWorks from './components/CustomWorks';
 import Summary from './components/Summary';
 import AnimatedPrice from './components/AnimatedPrice';
@@ -18,7 +17,8 @@ const RoomVisualizer = lazy(() => import('./components/RoomVisualizer'));
 import { 
     blockSetup, blockTriggerMeas, blockDemolition, blockGeneral, 
     blockHallway, blockKitchen, blockBalcony, blockWardrobe, 
-    blockBasement, blockAttic, blockCustomWorks, getBathQuestions, getRoomQuestions 
+    blockBasement, blockAttic, blockCustomWorks, getBathQuestions, getRoomQuestions,
+    getRoomIssues
 } from './data/questions';
 
 const BACKEND_URL = "https://remontnikuav.onrender.com";
@@ -171,6 +171,13 @@ export default function App() {
                 if (res.ok) { 
                     const data = await res.json(); 
                     setTotals({ work: data.work, mat_min: data.mat_min }); 
+                    // Розбивка по приміщеннях + «загальні роботи» — для чипа
+                    // ціни в візуалізаторі та секції приміщень у підсумку.
+                    // Старий бекенд цих полів не має — тоді просто порожньо.
+                    useStore.getState().setLiveBreakdown({
+                        rooms: data.rooms || {},
+                        general: data.general || null,
+                    });
                 }
             } catch(e) { if (e.name !== 'AbortError') console.log("Calc error", e); }
         }, 500);
@@ -207,6 +214,29 @@ export default function App() {
                 if(tg && tg.sendData) tg.sendData(JSON.stringify(data)); 
             }
             return;
+        }
+
+        // ВАЛІДАЦІЯ КРОКУ СТРУКТУРИ КВАРТИРИ: без приміщень і з незаповненими
+        // обов'язковими групами далі не пускаємо. Перша проблемна кімната
+        // автоматично відкривається через requestVisualizerFocus.
+        if (finalQuestions[currentStep]?.type === 'trigger_meas') {
+            const alertFn = tg?.showAlert ? tg.showAlert.bind(tg) : window.alert;
+            if (rooms.length === 0) {
+                vibeError();
+                alertFn("Додайте хоча б одне приміщення — торкніться плану або кнопки «+» вгорі.");
+                return;
+            }
+            const issues = getRoomIssues(rooms);
+            if (issues.length > 0) {
+                vibeError();
+                const first = issues[0];
+                useStore.getState().requestVisualizerFocus(first.roomId, first.missing[0] || null);
+                const lines = issues.slice(0, 3).map(i =>
+                    `• ${i.roomName}: ${[...i.missing, ...(i.badArea ? ['Площа'] : [])].join(', ')}`
+                );
+                alertFn(`Заповніть обов'язкове:\n${lines.join('\n')}${issues.length > 3 ? '\n…' : ''}`);
+                return;
+            }
         }
 
         if (isEditingFromSummary) { setIsEditingFromSummary(false); setCurrentStep(finalQuestions.length); return; }

@@ -48,6 +48,9 @@ export default function App() {
         return !isEdit && useStore.getState().currentStep > -1; // persist гідратується синхронно
     });
     const [totals, setTotals] = useState({ work: 0, mat_min: 0 });
+    // Чернетка, знайдена на сервері (інший пристрій) — показуємо банер
+    // «Продовжити?», а не мовчки підміняємо стан.
+    const [serverDraft, setServerDraft] = useState(null);
 
     // Тема: один ефект синхронізує клас на body і localStorage
     useEffect(() => {
@@ -92,6 +95,21 @@ export default function App() {
                     if(tg) tg.showAlert("Не вдалося завантажити анкету для редагування.");
                 })
                 .finally(() => setIsLoadingEdit(false));
+        } else if (useStore.getState().currentStep <= -1 && tg?.initData) {
+            // РЕЖИМ СТВОРЕННЯ, локальної чернетки НЕМА (новий пристрій, чистий
+            // кеш, перевстановлений Telegram) — питаємо серверну.
+            fetch(`${BACKEND_URL}/api/get_draft`, {
+                headers: { 'X-Telegram-Init-Data': tg.initData },
+            })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((d) => {
+                    const draft = d?.draft;
+                    if (!draft?.payload) return;
+                    // Не перетираємо роботу, яку користувач уже почав у цій сесії.
+                    if (useStore.getState().currentStep > -1) return;
+                    setServerDraft(draft);
+                })
+                .catch(() => {});
         }
         // Режим створення: prompt чернетки виставлений лінивим useState вище.
     }, [setClient, setAnswers, setCurrentStep]); // zustand-сеттери стабільні — ефект фактично one-shot
@@ -177,11 +195,37 @@ export default function App() {
                     useStore.getState().setLiveBreakdown({
                         rooms: data.rooms || {},
                         general: data.general || null,
+                        roomLines: data.room_lines || {},
+                        generalLines: data.general_lines || [],
                     });
                 }
             } catch(e) { if (e.name !== 'AbortError') console.log("Calc error", e); }
         }, 500);
         return () => { clearTimeout(delay); ctrl.abort(); };
+    }, [client, answers, rooms, currentStep]);
+
+    // === 5.1 СЕРВЕРНА ЧЕРНЕТКА ===
+    // Раніше чернетка жила ЛИШЕ в localStorage телефона: зміна пристрою або
+    // чистка кешу — і робота зникала. Тепер вона дублюється на сервер:
+    //  • можна продовжити з іншого пристрою;
+    //  • бот нагадає про незавершену заявку через 24 год.
+    // Дебаунс 3 с (довший за live-calc: тут ходимо в Google Sheets, не варто
+    // смикати на кожен клік). Режим редагування не чіпаємо — там уже є заявка.
+    useEffect(() => {
+        const editId = new URLSearchParams(window.location.search).get('edit_id');
+        if (editId || currentStep < 0 || !tg?.initData) return;
+        if (!client.name && !client.area && rooms.length === 0) return; // порожню не шлемо
+
+        const ctrl = new AbortController();
+        const t = setTimeout(() => {
+            fetch(`${BACKEND_URL}/api/save_draft`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+                body: JSON.stringify({ currentStep, client, answers: { ...answers, rooms } }),
+                signal: ctrl.signal,
+            }).catch(() => {}); // мовчазний фейл: локальна чернетка все одно лишається
+        }, 3000);
+        return () => { clearTimeout(t); ctrl.abort(); };
     }, [client, answers, rooms, currentStep]);
 
     // === 6. НАВІГАЦІЯ ===
@@ -202,7 +246,15 @@ export default function App() {
             const payloadAnswers = { ...answers, rooms: rooms };
             const data = { edit_id: editId, client, answers: payloadAnswers };
             
-            if (!editId) handleResetDraftSilent(); 
+            if (!editId) {
+                handleResetDraftSilent();
+                // Заявку здано — прибираємо серверну чернетку, щоб через 24 год
+                // бот не нагадував про вже завершену роботу.
+                fetch(`${BACKEND_URL}/api/delete_draft`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' },
+                }).catch(() => {});
+            }
 
             if (editId) { 
                 fetch(`${BACKEND_URL}/api/save_order`, { 
@@ -329,6 +381,50 @@ export default function App() {
 
     return (
         <>
+            {/* СЕРВЕРНА ЧЕРНЕТКА: знайдена на бекенді, локальної нема.
+                Типовий кейс — менеджер почав на телефоні, продовжує на планшеті. */}
+            {serverDraft && (
+                <>
+                    <div className="sheet-overlay open" style={{ zIndex: 9998 }}></div>
+                    <div className="image-modal open" style={{ zIndex: 9999, padding: '25px', textAlign: 'center', background: 'var(--modal-bg)' }}>
+                        <h3 style={{ marginTop: 0, fontSize: '20px' }}>Незавершена заявка</h3>
+                        <p style={{ color: 'var(--hint-color)', fontSize: '15px', lineHeight: '1.4', marginBottom: 0 }}>
+                            На сервері збережена анкета
+                            {serverDraft.payload?.client?.name ? <> клієнта <b>{serverDraft.payload.client.name}</b></> : null}
+                            {serverDraft.updated_at ? <> від {new Date(serverDraft.updated_at).toLocaleString('uk-UA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}</> : null}.
+                            Продовжити з місця зупинки?
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
+                            <button
+                                onClick={() => {
+                                    vibe('medium');
+                                    const p = serverDraft.payload;
+                                    if (p.client) setClient(p.client);
+                                    if (p.answers) {
+                                        setAnswers(p.answers);
+                                        if (p.answers.rooms) useStore.setState({ rooms: p.answers.rooms });
+                                    }
+                                    setCurrentStep(typeof p.currentStep === 'number' ? p.currentStep : 0);
+                                    setServerDraft(null);
+                                }}
+                                style={{ background: 'var(--link-color)', color: 'white', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}
+                            >Продовжити</button>
+                            <button
+                                onClick={() => {
+                                    vibe('light');
+                                    setServerDraft(null);
+                                    fetch(`${BACKEND_URL}/api/delete_draft`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' },
+                                    }).catch(() => {});
+                                }}
+                                style={{ background: 'rgba(255, 59, 48, 0.1)', color: '#ff3b30', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}
+                            >Почати нову</button>
+                        </div>
+                    </div>
+                </>
+            )}
+
             {showDraftPrompt && (
                 <>
                     <div className="sheet-overlay open" style={{ zIndex: 9998 }}></div>

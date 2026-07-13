@@ -11,7 +11,7 @@ import CustomWorks from './components/CustomWorks';
 import Summary from './components/Summary';
 import AnimatedPrice from './components/AnimatedPrice';
 import { vibe, vibeError, tg } from './utils/telegram';
-import { Menu, Moon, Sun, ShoppingCart, ArrowLeft, Send, Trash2, Loader2 } from 'lucide-react';
+import { Menu, Moon, Sun, ShoppingCart, ArrowLeft, Send, Trash2, Loader2, ShieldCheck } from 'lucide-react';
 
 // ЛІНИВИЙ імпорт: RoomVisualizer тягне за собою three.js + drei (~850 КБ
 // сирого JS). Без lazy усе це вантажилось КОЖНОМУ користувачу одразу на
@@ -78,7 +78,13 @@ export default function App() {
     // її немає — там особу підтверджує initData.
     const [session, setSessionState] = useState(() => getSession());
     // Режим сайту: 'calc' — калькулятор, 'login' — вхід, 'dashboard' — кабінет.
-    const [view, setView] = useState(() => (getSession() ? 'dashboard' : 'calc'));
+    const [view, setView] = useState(() => {
+        // ?panel=1 — пряме посилання на кабінет: зручно тримати в закладках
+        // і давати менеджерам замість «шукай кнопку в меню».
+        const wantsPanel = new URLSearchParams(window.location.search).has('panel');
+        if (getSession()) return 'dashboard';
+        return wantsPanel ? 'login' : 'calc';
+    });
     // Гість — лише той, у кого немає НІ веб-сесії, НІ доступу через Telegram.
     const isGuest = role === 'guest' && !session;
     const [isSendingLead, setIsSendingLead] = useState(false);
@@ -613,7 +619,22 @@ export default function App() {
                 {menuZones.map((z, i) => (
                     <div key={i} className="menu-item" onClick={() => jumpToMenuStep(z.step)}> {z.name} </div>
                 ))}
-                <div className="menu-item" style={{ color: '#ff3b30', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px', borderTop: '1px solid var(--border-color)', borderBottom: 'none' }} onClick={resetDraft}>
+
+                {/* ВХІД / ПОВЕРНЕННЯ В КАБІНЕТ — доступні ЗАВЖДИ.
+                    Раніше посилання жило лише на екрані онбордингу, а той
+                    показується один раз: після першого проходження кнопка
+                    ставала недосяжною, і потрапити в кабінет було ніяк. */}
+                {!tg?.initData && (
+                    <div
+                        className="menu-item"
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px', borderTop: '1px solid var(--border-color)', color: 'var(--link-color, #0a84ff)', fontWeight: 600 }}
+                        onClick={() => { vibe('medium'); setIsMenuOpen(false); setView(session ? 'dashboard' : 'login'); }}
+                    >
+                        <ShieldCheck size={18} /> {session ? 'Кабінет менеджера' : 'Вхід для менеджерів'}
+                    </div>
+                )}
+
+                <div className="menu-item" style={{ color: '#ff3b30', display: 'flex', alignItems: 'center', gap: '8px', marginTop: tg?.initData ? '20px' : '0', borderTop: tg?.initData ? '1px solid var(--border-color)' : 'none', borderBottom: 'none' }} onClick={resetDraft}>
                     <Trash2 size={18} /> Почати заново
                 </div>
             </div>

@@ -90,12 +90,17 @@ export default function App() {
     const [isSendingLead, setIsSendingLead] = useState(false);
     const [leadSent, setLeadSent] = useState(false);
     // Онбординг показуємо один раз на пристрій — і тільки на самому початку.
-    const [showOnboarding, setShowOnboarding] = useState(() => {
-        const isEdit = new URLSearchParams(window.location.search).get('edit_id');
-        return !isEdit
-            && useStore.getState().currentStep <= -1
-            && !localStorage.getItem('remont_onboarded');
-    });
+    // ОНБОРДИНГ показуємо ЗАВЖДИ на початку нової анкети — це і пояснення
+    // процесу, і головна точка входу в кабінет. Виняток лише два:
+    // режим редагування (edit_id) і продовження незавершеної чернетки.
+    // ОНБОРДИНГ — ЗАВЖДИ перший екран сесії.
+    // Раніше він ховався, якщо в localStorage лежала незавершена чернетка
+    // (currentStep >= 0) — тобто після першого ж проходження людина більше
+    // ніколи його не бачила. Тепер показуємо при кожному відкритті; не
+    // показуємо лише в режимі редагування заявки (edit_id), де він недоречний.
+    const [showOnboarding, setShowOnboarding] = useState(
+        () => !new URLSearchParams(window.location.search).get('edit_id')
+    );
 
     // Тема: один ефект синхронізує клас на body і localStorage
     useEffect(() => {
@@ -436,11 +441,14 @@ export default function App() {
             />
         );
     }
-    if (view === 'dashboard' && session) {
+    // Кабінет: у браузері — після входу (session), у Telegram — одразу за роллю.
+    const panelSession = session || (role === 'manager' || role === 'admin'
+        ? { role, name: '' } : null);
+    if (view === 'dashboard' && panelSession) {
         return (
             <div style={{ minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-color)' }}>
                 <Dashboard
-                    session={session}
+                    session={panelSession}
                     onNewOrder={() => { handleResetDraftSilent(); setView('calc'); }}
                 />
             </div>
@@ -456,7 +464,6 @@ export default function App() {
                 <Onboarding
                     isGuest={isGuest}
                     onStart={() => {
-                        localStorage.setItem('remont_onboarded', '1');
                         setShowOnboarding(false);
                         // ВАЖЛИВО: гість теж проходить перший крок — там площа
                         // об'єкта, без якої кошторис не рахується взагалі.
@@ -465,16 +472,14 @@ export default function App() {
                 />
                 {/* Вхід для своїх. Свідомо непомітний: клієнту він ні до чого,
                     а менеджер знає, куди тиснути. */}
-                {isGuest && !tg?.initData && (
-                    <div style={{ textAlign: 'center', paddingBottom: '30px' }}>
-                        <button
-                            onClick={() => setView('login')}
-                            style={{ background: 'none', border: 'none', color: 'var(--hint-color)', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}
-                        >
-                            Я менеджер — увійти в кабінет
-                        </button>
-                    </div>
-                )}
+                <div style={{ textAlign: 'center', paddingBottom: '30px' }}>
+                    <button
+                        onClick={() => setView(session ? 'dashboard' : 'login')}
+                        style={{ background: 'none', border: 'none', color: 'var(--hint-color)', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                        {session ? 'Відкрити кабінет менеджера' : 'Я менеджер — увійти в кабінет'}
+                    </button>
+                </div>
             </div>
         );
     }
@@ -624,17 +629,15 @@ export default function App() {
                     Раніше посилання жило лише на екрані онбордингу, а той
                     показується один раз: після першого проходження кнопка
                     ставала недосяжною, і потрапити в кабінет було ніяк. */}
-                {!tg?.initData && (
-                    <div
-                        className="menu-item"
-                        style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px', borderTop: '1px solid var(--border-color)', color: 'var(--link-color, #0a84ff)', fontWeight: 600 }}
-                        onClick={() => { vibe('medium'); setIsMenuOpen(false); setView(session ? 'dashboard' : 'login'); }}
-                    >
-                        <ShieldCheck size={18} /> {session ? 'Кабінет менеджера' : 'Вхід для менеджерів'}
-                    </div>
-                )}
+                <div
+                    className="menu-item"
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px', borderTop: '1px solid var(--border-color)', color: 'var(--link-color, #0a84ff)', fontWeight: 600 }}
+                    onClick={() => { vibe('medium'); setIsMenuOpen(false); setView((session || role === 'manager' || role === 'admin') ? 'dashboard' : 'login'); }}
+                >
+                    <ShieldCheck size={18} /> {(session || role === 'manager' || role === 'admin') ? 'Кабінет менеджера' : 'Вхід для менеджерів'}
+                </div>
 
-                <div className="menu-item" style={{ color: '#ff3b30', display: 'flex', alignItems: 'center', gap: '8px', marginTop: tg?.initData ? '20px' : '0', borderTop: tg?.initData ? '1px solid var(--border-color)' : 'none', borderBottom: 'none' }} onClick={resetDraft}>
+                <div className="menu-item" style={{ color: '#ff3b30', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: 'none' }} onClick={resetDraft}>
                     <Trash2 size={18} /> Почати заново
                 </div>
             </div>

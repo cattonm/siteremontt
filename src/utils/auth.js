@@ -29,11 +29,16 @@ export function clearSession() {
 /** fetch, який сам підставляє сесійний токен і вилітає на вхід при 401. */
 export async function authFetch(path, options = {}) {
     const s = getSession();
+    // Усередині міні-апки сесії немає — там особу підтверджує initData.
+    // Бекенд (auth_request) розуміє обидва заголовки, тож кабінет однаково
+    // працює і в браузері після входу, і прямо в Telegram без нього.
+    const initData = window.Telegram?.WebApp?.initData || '';
     const res = await fetch(`${BACKEND_URL}${path}`, {
         ...options,
         headers: {
             'Content-Type': 'application/json',
             ...(s?.token ? { 'X-Session-Token': s.token } : {}),
+            ...(initData ? { 'X-Telegram-Init-Data': initData } : {}),
             ...(options.headers || {}),
         },
     });

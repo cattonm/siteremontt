@@ -17,6 +17,7 @@ import { authFetch, clearSession } from '../utils/auth';
 import {
     Search, RefreshCw, LogOut, Users, BarChart3, Inbox, Copy, Check, X,
     Hand, Trash2, Calculator, ExternalLink, ChevronDown, ChevronUp, Phone,
+    Undo2, Flame, AlertTriangle,
 } from 'lucide-react';
 
 const DEAL_LABELS = {
@@ -163,6 +164,21 @@ function OrdersTab({ role }) {
         }
     };
 
+    // У КОШИК: заявка зникає зі списку миттєво, запит летить фоном.
+    // Це soft delete — дані лишаються в таблиці й відновлюються з «Кошика».
+    const toTrash = async (row, name) => {
+        if (!window.confirm(`Перемістити заявку «${name || 'Без імені'}» у кошик?\n\nВона зникне зі списку, але її можна буде відновити.`)) return;
+        const before = orders;
+        setOrders((prev) => prev.filter((o) => o.row !== row));
+        try {
+            const res = await authFetch('/api/order_delete', { method: 'POST', body: JSON.stringify({ row }) });
+            if (!res.ok) throw new Error('fail');
+        } catch {
+            setOrders(before);
+            alert('Не вдалося видалити. Спробуйте ще раз.');
+        }
+    };
+
     return (
         <div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
@@ -251,6 +267,11 @@ function OrdersTab({ role }) {
                             <a href={`?edit_id=${o.row}`} style={{ ...btnSmall, textDecoration: 'none' }}>
                                 <ExternalLink size={13} /> Анкета
                             </a>
+                            <button
+                                onClick={() => toTrash(o.row, o.name)}
+                                style={{ ...btnSmall, color: '#ff3b30', borderColor: 'rgba(255,59,48,0.35)', marginLeft: 'auto' }}
+                                title="У кошик"
+                            ><Trash2 size={13} /></button>
                         </div>
 
                         {isOpen && <OrderDetail row={o.row} />}
@@ -398,6 +419,142 @@ function StatsTab() {
     );
 }
 
+
+/* ---------------- Вкладка «Кошик» ---------------- */
+// Два рівні видалення — свідоме рішення:
+//  • «У кошик» доступне менеджеру: помилковий клік не знищує контакт клієнта;
+//  • ОСТАТОЧНЕ видалення — лише адміну, з подвійним підтвердженням, і лише
+//    для того, що вже в кошику. Активну заявку знищити неможливо в принципі
+//    (сервер ігнорує будь-який рядок, не позначений як «видалена»).
+function TrashTab({ role }) {
+    const [items, setItems] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [selected, setSelected] = useState(new Set());
+    const [reloadKey, setReloadKey] = useState(0);
+    const [busy, setBusy] = useState(false);
+    const isAdmin = role === 'admin';
+
+    useEffect(() => {
+        let alive = true;
+        (async () => {
+            setLoading(true);
+            try {
+                const res = await authFetch('/api/trash');
+                const d = await res.json();
+                if (alive) { setItems(d.orders || []); setSelected(new Set()); }
+            } catch { /* 401 обробить authFetch */ }
+            if (alive) setLoading(false);
+        })();
+        return () => { alive = false; };
+    }, [reloadKey]);
+
+    const reload = () => setReloadKey((k) => k + 1);
+
+    const restore = async (row) => {
+        setItems((p) => p.filter((o) => o.row !== row));
+        try {
+            const res = await authFetch('/api/order_restore', { method: 'POST', body: JSON.stringify({ row }) });
+            if (!res.ok) throw new Error();
+        } catch { reload(); alert('Не вдалося відновити.'); }
+    };
+
+    const toggle = (row) => setSelected((s) => {
+        const n = new Set(s);
+        if (n.has(row)) n.delete(row); else n.add(row);
+        return n;
+    });
+
+    const purgeSelected = async () => {
+        const rows = [...selected];
+        if (!rows.length) return;
+        if (!window.confirm(`ОСТАТОЧНО видалити ${rows.length} заявок?\n\nЦе НЕОБОРОТНО — дані зникнуть із таблиці назавжди.`)) return;
+        if (!window.confirm('Точно? Відновити їх буде вже неможливо.')) return;
+        setBusy(true);
+        try {
+            const res = await authFetch('/api/purge', { method: 'POST', body: JSON.stringify({ rows }) });
+            const d = await res.json();
+            alert(`Видалено назавжди: ${d.deleted || 0}`);
+        } catch { alert('Не вдалося очистити.'); }
+        setBusy(false);
+        reload();
+    };
+
+    const purgeOld = async () => {
+        if (!window.confirm('Остаточно видалити з кошика все, що старше за 30 днів?\n\nЦе НЕОБОРОТНО.')) return;
+        setBusy(true);
+        try {
+            const res = await authFetch('/api/purge', { method: 'POST', body: JSON.stringify({ older_than_days: 30 }) });
+            const d = await res.json();
+            alert(`Видалено назавжди: ${d.deleted || 0}`);
+        } catch { alert('Не вдалося очистити.'); }
+        setBusy(false);
+        reload();
+    };
+
+    if (loading) return <div style={{ ...skeleton, height: '90px' }} />;
+
+    if (items.length === 0) {
+        return (
+            <div style={{ textAlign: 'center', color: 'var(--hint-color)', padding: '40px 0' }}>
+                <Trash2 size={32} style={{ marginBottom: '10px', opacity: 0.5 }} />
+                <div>Кошик порожній</div>
+            </div>
+        );
+    }
+
+    return (
+        <div>
+            <div style={{ ...card, background: 'rgba(255,149,0,0.08)', borderColor: 'rgba(255,149,0,0.35)', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                <AlertTriangle size={18} color="#ff9500" style={{ flexShrink: 0, marginTop: '1px' }} />
+                <div style={{ fontSize: '13px', lineHeight: 1.45 }}>
+                    Заявки тут <b>не втрачені</b> — їх можна повернути.
+                    {isAdmin ? ' Остаточне видалення знищує рядок у таблиці назавжди.' : ' Остаточно видаляти може лише адміністратор.'}
+                </div>
+            </div>
+
+            {isAdmin && (
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                    <button onClick={purgeSelected} disabled={!selected.size || busy}
+                        style={{ ...btnSmall, background: selected.size ? '#ff3b30' : 'transparent', color: selected.size ? '#fff' : 'var(--hint-color)', border: 'none', opacity: busy ? 0.5 : 1 }}>
+                        <Flame size={13} /> Видалити назавжди ({selected.size})
+                    </button>
+                    <button onClick={purgeOld} disabled={busy} style={{ ...btnSmall, opacity: busy ? 0.5 : 1 }}>
+                        Очистити старші за 30 днів
+                    </button>
+                    <button
+                        onClick={() => setSelected(selected.size === items.length ? new Set() : new Set(items.map((o) => o.row)))}
+                        style={btnSmall}
+                    >
+                        {selected.size === items.length ? 'Зняти виділення' : 'Виділити все'}
+                    </button>
+                </div>
+            )}
+
+            {items.map((o) => (
+                <div key={o.row} style={{ ...card, display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {isAdmin && (
+                        <input
+                            type="checkbox"
+                            checked={selected.has(o.row)}
+                            onChange={() => toggle(o.row)}
+                            style={{ width: '18px', height: '18px', flexShrink: 0, cursor: 'pointer' }}
+                        />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600 }}>{o.name || 'Без імені'}</div>
+                        <div style={{ fontSize: '12.5px', color: 'var(--hint-color)' }}>
+                            {o.phone} · {o.date}{o.manager_name ? ` · 👔 ${o.manager_name}` : ''}
+                        </div>
+                    </div>
+                    <button onClick={() => restore(o.row)} style={btnSmall} title="Відновити">
+                        <Undo2 size={13} /> Відновити
+                    </button>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 export default function Dashboard({ session, onNewOrder }) {
     const isAdmin = session.role === 'admin';
     const [tab, setTab] = useState('orders');
@@ -423,11 +580,13 @@ export default function Dashboard({ session, onNewOrder }) {
                 <Tab active={tab === 'orders'} onClick={() => setTab('orders')}><Inbox size={15} /> Заявки</Tab>
                 {isAdmin && <Tab active={tab === 'team'} onClick={() => setTab('team')}><Users size={15} /> Команда</Tab>}
                 {isAdmin && <Tab active={tab === 'stats'} onClick={() => setTab('stats')}><BarChart3 size={15} /> Статистика</Tab>}
+                <Tab active={tab === 'trash'} onClick={() => setTab('trash')}><Trash2 size={15} /> Кошик</Tab>
             </div>
 
             {tab === 'orders' && <OrdersTab role={session.role} />}
             {tab === 'team' && isAdmin && <AdminTab />}
             {tab === 'stats' && isAdmin && <StatsTab />}
+            {tab === 'trash' && <TrashTab role={session.role} />}
 
             <style>{`
                 @keyframes spin { 100% { transform: rotate(360deg); } }

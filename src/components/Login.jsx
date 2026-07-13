@@ -15,7 +15,7 @@ import { useEffect, useRef, useState } from 'react';
 import { BACKEND_URL, setSession } from '../utils/auth';
 import { ShieldCheck, KeyRound, ArrowLeft } from 'lucide-react';
 
-const BOT_USERNAME = 'remontnik_ua_bot';   // без @
+const BOT_USERNAME = 'remontnikuav_bot';   // без @
 
 export default function Login({ onSuccess, onBack }) {
     const holder = useRef(null);

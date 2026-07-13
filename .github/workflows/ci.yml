@@ -1,0 +1,44 @@
+name: CI
+
+# Лінт + збірка на кожен пуш. Vercel деплоїть автоматично, тож зламана
+# збірка тут = зламаний прод. Краще впасти в CI, ніж у клієнта.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  frontend:
+    name: Лінт · Збірка
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Встановити залежності
+        run: npm ci
+
+      - name: ESLint
+        run: npx eslint src
+
+      - name: Збірка
+        run: npm run build
+
+      # Стеження за вагою: three.js має лишатись ОКРЕМИМ лінивим чанком.
+      # Якщо хтось випадково імпортує 3D у головний бандл — впаде тут,
+      # а не в користувача на 3G.
+      - name: Головний бандл не роздувся
+        run: |
+          MAIN_KB=$(du -k dist/assets/index-*.js | cut -f1)
+          echo "Головний чанк: ${MAIN_KB} КБ"
+          if [ "$MAIN_KB" -gt 150 ]; then
+            echo "::error::Головний бандл ${MAIN_KB} КБ > 150 КБ — схоже, three.js потрапив у нього. Перевір lazy-імпорт RoomVisualizer."
+            exit 1
+          fi

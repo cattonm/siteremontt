@@ -3,6 +3,9 @@ import useStore from './store/useStore';
 import ClientForm from './components/ClientForm';
 import Onboarding from './components/Onboarding';
 import TierSwitch from './components/TierSwitch';
+import Login from './components/Login';
+import Dashboard from './components/Dashboard';
+import { getSession } from './utils/auth';
 import Survey from './components/Survey';
 import CustomWorks from './components/CustomWorks';
 import Summary from './components/Summary';
@@ -24,6 +27,20 @@ import {
 } from './data/questions';
 
 const BACKEND_URL = "https://remontnikuav.onrender.com";
+
+// Єдина точка показу алертів. У Telegram беремо нативний showAlert (обов'язково
+// прив'язаний до tg — відв'язаний метод втрачає this), у браузері (гість) —
+// звичайний window.alert.
+const showAlert = (msg) => (tg?.showAlert ? tg.showAlert.bind(tg) : window.alert)(msg);
+
+// Заголовки авторизації: міні-апка йде з initData, веб-кабінет — із сесійним
+// токеном. Сервер розуміє обидва (auth_request) — тому фронтенд просто шле те,
+// що має.
+const authHeaders = () => ({
+    'Content-Type': 'application/json',
+    'X-Telegram-Init-Data': tg?.initData || '',
+    ...(getSession()?.token ? { 'X-Session-Token': getSession().token } : {}),
+});
 
 export default function App() {
     // === 1. ГЛОБАЛЬНИЙ СТАН З ZUSTAND ===
@@ -57,7 +74,13 @@ export default function App() {
     // Визначається бекендом за initData — фронтенд їй лише вірить у частині
     // UI; усі перевірки доступу однаково робляться на сервері.
     const [role, setRole] = useState(null);
-    const isGuest = role === 'guest';
+    // ВЕБ-СЕСІЯ (вхід на сайті через Telegram Login Widget). У міні-апці
+    // її немає — там особу підтверджує initData.
+    const [session, setSessionState] = useState(() => getSession());
+    // Режим сайту: 'calc' — калькулятор, 'login' — вхід, 'dashboard' — кабінет.
+    const [view, setView] = useState(() => (getSession() ? 'dashboard' : 'calc'));
+    // Гість — лише той, у кого немає НІ веб-сесії, НІ доступу через Telegram.
+    const isGuest = role === 'guest' && !session;
     const [isSendingLead, setIsSendingLead] = useState(false);
     const [leadSent, setLeadSent] = useState(false);
     // Онбординг показуємо один раз на пристрій — і тільки на самому початку.
@@ -86,7 +109,10 @@ export default function App() {
         // Хто я? Гість (сайт у браузері) бачить вільний калькулятор і форму
         // контакту в кінці; менеджер — повний потік із відправкою в бота.
         fetch(`${BACKEND_URL}/api/me`, {
-            headers: { 'X-Telegram-Init-Data': tg?.initData || '' },
+            headers: {
+                'X-Telegram-Init-Data': tg?.initData || '',
+                ...(getSession()?.token ? { 'X-Session-Token': getSession().token } : {}),
+            },
         })
             .then((r) => (r.ok ? r.json() : { role: 'guest' }))
             .then((d) => setRole(d.role || 'guest'))
@@ -120,12 +146,10 @@ export default function App() {
                     if(tg) tg.showAlert("Не вдалося завантажити анкету для редагування.");
                 })
                 .finally(() => setIsLoadingEdit(false));
-        } else if (useStore.getState().currentStep <= -1 && tg?.initData) {
+        } else if (useStore.getState().currentStep <= -1 && (tg?.initData || getSession())) {
             // РЕЖИМ СТВОРЕННЯ, локальної чернетки НЕМА (новий пристрій, чистий
             // кеш, перевстановлений Telegram) — питаємо серверну.
-            fetch(`${BACKEND_URL}/api/get_draft`, {
-                headers: { 'X-Telegram-Init-Data': tg.initData },
-            })
+            fetch(`${BACKEND_URL}/api/get_draft`, { headers: authHeaders() })
                 .then((r) => (r.ok ? r.json() : null))
                 .then((d) => {
                     const draft = d?.draft;
@@ -166,8 +190,12 @@ export default function App() {
         const bCount = parseInt(answers.baths_count) || 0;
         const bQ = []; for(let i=1; i<=bCount; i++) bQ.push(...getBathQuestions(i));
         const rQ = []; for(let i=1; i<=rCount; i++) rQ.push(...getRoomQuestions(i));
-        return [ ...blockSetup, ...blockTriggerMeas, ...blockDemolition, ...blockGeneral, ...blockHallway, ...bQ, ...blockKitchen, ...rQ, ...blockBalcony, ...blockWardrobe, ...blockBasement, ...blockAttic, ...blockCustomWorks ];
-    }, [answers.rooms_count, answers.baths_count]);
+        // «Нестандартні роботи» — МЕНЕДЖЕРСЬКИЙ інструмент: там вручну
+        // вводяться ціни за роботу й матеріали. Гостю його показувати не можна:
+        // він міг би сам собі накрутити або обнулити кошторис.
+        const custom = isGuest ? [] : blockCustomWorks;
+        return [ ...blockSetup, ...blockTriggerMeas, ...blockDemolition, ...blockGeneral, ...blockHallway, ...bQ, ...blockKitchen, ...rQ, ...blockBalcony, ...blockWardrobe, ...blockBasement, ...blockAttic, ...custom ];
+    }, [answers.rooms_count, answers.baths_count, isGuest]);
 
     const shouldSkip = (q, ans) => {
         if (!q) return false;
@@ -238,28 +266,29 @@ export default function App() {
     // смикати на кожен клік). Режим редагування не чіпаємо — там уже є заявка.
     useEffect(() => {
         const editId = new URLSearchParams(window.location.search).get('edit_id');
-        if (editId || currentStep < 0 || !tg?.initData) return;
+        if (editId || currentStep < 0) return;
+        if (!tg?.initData && !session) return;   // гість чернетки на сервері не має
         if (!client.name && !client.area && rooms.length === 0) return; // порожню не шлемо
 
         const ctrl = new AbortController();
         const t = setTimeout(() => {
             fetch(`${BACKEND_URL}/api/save_draft`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg.initData },
+                headers: authHeaders(),
                 body: JSON.stringify({ currentStep, client, answers: { ...answers, rooms } }),
                 signal: ctrl.signal,
             }).catch(() => {}); // мовчазний фейл: локальна чернетка все одно лишається
         }, 3000);
         return () => { clearTimeout(t); ctrl.abort(); };
-    }, [client, answers, rooms, currentStep]);
+    }, [client, answers, rooms, currentStep, session]);
 
     // === 6. НАВІГАЦІЯ ===
     const goNext = () => {
         vibe('medium');
         if (currentStep === -1) {
             // Гість на вході дає лише площу — контакти запитаємо в кінці.
-            if (!client.area || parseFloat(client.area) <= 0) { vibeError(); tg?.showAlert("Вкажіть площу об'єкта!"); return; }
-            if (!isGuest && !client.name.trim()) { vibeError(); tg?.showAlert("Заповніть Ім'я та Площу!"); return; }
+            if (!client.area || parseFloat(client.area) <= 0) { vibeError(); showAlert("Вкажіть площу об'єкта!"); return; }
+            if (!isGuest && !client.name.trim()) { vibeError(); showAlert("Заповніть Ім'я та Площу!"); return; }
             if (isEditingFromSummary) { setIsEditingFromSummary(false); setCurrentStep(finalQuestions.length); return; }
             setCurrentStep(0); return;
         }
@@ -271,18 +300,21 @@ export default function App() {
                 const digits = (client.phone || '').replace(/\D/g, '');
                 if (!client.name?.trim() || digits.length < 9) {
                     vibeError();
-                    (tg?.showAlert || window.alert)("Вкажіть ім'я та телефон — менеджер зателефонує й уточнить деталі.");
+                    showAlert("Вкажіть ім'я та телефон — менеджер зателефонує й уточнить деталі.");
                     return;
                 }
                 vibe('heavy');
                 setIsSendingLead(true);
+                const { website: hp, ...clientClean } = client;   // hp — honeypot, у заявку не пишемо
                 fetch(`${BACKEND_URL}/api/submit_lead`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        client,
+                        client: clientClean,
                         answers: { ...answers, rooms },
-                        website: '',   // honeypot: справжня людина лишає порожнім
+                        // Honeypot: приховане поле форми. РАНІШЕ тут стояла порожня
+                        // константа — тобто пастка не спрацьовувала взагалі ніколи.
+                        website: hp || '',
                     }),
                 })
                     .then((r) => {
@@ -290,7 +322,7 @@ export default function App() {
                         setLeadSent(true);
                         handleResetDraftSilent();
                     })
-                    .catch(() => (tg?.showAlert || window.alert)('Не вдалося надіслати. Спробуйте ще раз.'))
+                    .catch(() => showAlert('Не вдалося надіслати. Спробуйте ще раз.'))
                     .finally(() => setIsSendingLead(false));
                 return;
             }
@@ -308,18 +340,30 @@ export default function App() {
                 // бот не нагадував про вже завершену роботу.
                 fetch(`${BACKEND_URL}/api/delete_draft`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' },
+                    headers: authHeaders(),
                 }).catch(() => {});
             }
 
             if (editId) { 
                 fetch(`${BACKEND_URL}/api/save_order`, { 
                     method: 'POST', 
-                    headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' }, 
+                    headers: authHeaders(), 
                     body: JSON.stringify(data) 
-                }).then(() => tg?.close()); 
-            } else { 
-                if(tg && tg.sendData) tg.sendData(JSON.stringify(data)); 
+                }).then(() => (tg?.close ? tg.close() : setView('dashboard'))); 
+            } else if (tg?.sendData) {
+                // Міні-апка: заявку ловить бот через web_app_data.
+                tg.sendData(JSON.stringify(data));
+            } else {
+                // ВЕБ-КАБІНЕТ: tg.sendData у браузері не існує — раніше заявка
+                // менеджера тут просто зникала б у нікуди. Зберігаємо через API
+                // (авторство сервер бере з сесії, а не з тіла запиту).
+                fetch(`${BACKEND_URL}/api/create_order`, {
+                    method: 'POST',
+                    headers: authHeaders(),
+                    body: JSON.stringify(data),
+                })
+                    .then((r) => { if (!r.ok) throw new Error('fail'); setView('dashboard'); })
+                    .catch(() => showAlert('Не вдалося зберегти заявку. Спробуйте ще раз.'));
             }
             return;
         }
@@ -328,10 +372,9 @@ export default function App() {
         // обов'язковими групами далі не пускаємо. Перша проблемна кімната
         // автоматично відкривається через requestVisualizerFocus.
         if (finalQuestions[currentStep]?.type === 'trigger_meas') {
-            const alertFn = tg?.showAlert ? tg.showAlert.bind(tg) : window.alert;
             if (rooms.length === 0) {
                 vibeError();
-                alertFn("Додайте хоча б одне приміщення — торкніться плану або кнопки «+» вгорі.");
+                showAlert("Додайте хоча б одне приміщення — торкніться плану або кнопки «+» вгорі.");
                 return;
             }
             const issues = getRoomIssues(rooms);
@@ -342,7 +385,7 @@ export default function App() {
                 const lines = issues.slice(0, 3).map(i =>
                     `• ${i.roomName}: ${[...i.missing, ...(i.badArea ? ['Площа'] : [])].join(', ')}`
                 );
-                alertFn(`Заповніть обов'язкове:\n${lines.join('\n')}${issues.length > 3 ? '\n…' : ''}`);
+                showAlert(`Заповніть обов'язкове:\n${lines.join('\n')}${issues.length > 3 ? '\n…' : ''}`);
                 return;
             }
         }
@@ -377,6 +420,59 @@ export default function App() {
         );
     }
 
+    // --- РЕЖИМИ САЙТУ (у міні-апці Telegram не використовуються) ---
+    // Вхід менеджера: підпис Telegram → сесійний токен → кабінет.
+    if (view === 'login') {
+        return (
+            <Login
+                onSuccess={(s) => { setSessionState(s); setRole(s.role); setView('dashboard'); }}
+                onBack={() => setView('calc')}
+            />
+        );
+    }
+    if (view === 'dashboard' && session) {
+        return (
+            <div style={{ minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-color)' }}>
+                <Dashboard
+                    session={session}
+                    onNewOrder={() => { handleResetDraftSilent(); setView('calc'); }}
+                />
+            </div>
+        );
+    }
+
+    // ОНБОРДИНГ — окремий повноекранний крок. Раніше він рендерився
+    // ВСЕРЕДИНІ анкети, і під ним лишалася чужа кнопка «Далі» (два
+    // конкурентні заклики до дії на одному екрані).
+    if (showOnboarding) {
+        return (
+            <div style={{ minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-color)' }}>
+                <Onboarding
+                    isGuest={isGuest}
+                    onStart={() => {
+                        localStorage.setItem('remont_onboarded', '1');
+                        setShowOnboarding(false);
+                        // ВАЖЛИВО: гість теж проходить перший крок — там площа
+                        // об'єкта, без якої кошторис не рахується взагалі.
+                        // Контакти в тій формі для гостя приховані (isGuest).
+                    }}
+                />
+                {/* Вхід для своїх. Свідомо непомітний: клієнту він ні до чого,
+                    а менеджер знає, куди тиснути. */}
+                {isGuest && !tg?.initData && (
+                    <div style={{ textAlign: 'center', paddingBottom: '30px' }}>
+                        <button
+                            onClick={() => setView('login')}
+                            style={{ background: 'none', border: 'none', color: 'var(--hint-color)', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}
+                        >
+                            Я менеджер — увійти в кабінет
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
     const renderCurrentStep = () => {
         // Гість надіслав контакти — далі йому нічого робити, дякуємо і
         // чесно кажемо, що буде далі.
@@ -391,22 +487,6 @@ export default function App() {
                         Точну ціну підтверджує безкоштовний замір.
                     </p>
                 </div>
-            );
-        }
-        // Онбординг — найперший екран: пояснює, що буде далі й скільки триватиме.
-        if (showOnboarding) {
-            return (
-                <Onboarding
-                    isGuest={isGuest}
-                    onStart={() => {
-                        localStorage.setItem('remont_onboarded', '1');
-                        setShowOnboarding(false);
-                        // ГІСТЬ одразу йде рахувати: питати контакти на вході —
-                        // найшвидший спосіб втратити людину. Телефон попросимо
-                        // в кінці, коли вона вже побачила свій кошторис.
-                        if (isGuest) setCurrentStep(0);
-                    }}
-                />
             );
         }
         if (currentStep === -1) return <ClientForm client={client} setClient={setClient} isGuest={isGuest} />;

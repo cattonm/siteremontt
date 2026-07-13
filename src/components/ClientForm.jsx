@@ -28,10 +28,14 @@ export default function ClientForm({ client, setClient, isGuest = false }) {
 
     return (
         <div className="animated-step">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h3 style={{ margin: 0 }}>👷 Інформація про об'єкт</h3>
-                {/* Перемикач теми зробимо пізніше глобально */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <h3 style={{ margin: 0 }}>{isGuest ? '🏠 Ваш об’єкт' : "👷 Інформація про об'єкт"}</h3>
             </div>
+            <p style={{ color: 'var(--hint-color)', fontSize: '13.5px', marginTop: 0, marginBottom: '20px' }}>
+                {isGuest
+                    ? 'Площа потрібна, щоб порахувати чорнові роботи. Контакти — аж у кінці, за бажанням.'
+                    : 'Базові дані об’єкта: за ними рахуються стяжка, електрика та логістика.'}
+            </p>
 
             {!isGuest && (<>
             <label>Ім'я клієнта</label>

@@ -1,15 +1,22 @@
 // src/components/Dashboard.jsx
-// ВЕБ-КАБІНЕТ. Те саме, що в боті, але зручніше: воронка заявок, пошук,
-// зміна статусів, а для адміна — керування менеджерами і статистика.
+// ВЕБ-КАБІНЕТ: воронка заявок, пошук, статуси; для адміна — команда і статистика.
 //
-// Безпека: усі перевірки ролі — НА СЕРВЕРІ. Тут роль впливає лише на те,
-// які вкладки малювати; підміна ролі в localStorage не дає нічого,
-// бо /api/admin/* однаково поверне 403.
-import { useEffect, useState } from 'react';
+// Що тут оптимізовано (кожен пункт — реальна проблема, а не «про всяк випадок»):
+//  1. ПОШУК ІЗ ДЕБАУНСОМ. Було: запит на КОЖНУ літеру. Слово «Наталія» = 7
+//     звернень до Google Sheets, а там квота 60 читань/хв на весь проєкт —
+//     кілька менеджерів одночасно клали кабінет у 429. Тепер — 400 мс тиші.
+//  2. ПАГІНАЦІЯ. Список вантажиться по 20 заявок, далі «Показати ще».
+//  3. ОПТИМІСТИЧНІ СТАТУСИ. Статус міняється в інтерфейсі МИТТЄВО, запит
+//     летить фоном; якщо сервер відмовив — відкочуємо і кажемо про це.
+//  4. ДЕТАЛІ ЗА ЗАПИТОМ. Кошторис і склад робіт вантажаться, лише коли
+//     картку розгорнули (у списку їх немає — інакше кожне відкриття тягнуло б
+//     повний JSON усіх анкет).
+//  5. СКЕЛЕТОНИ замість «Завантаження…» — інтерфейс не смикається.
+import { useEffect, useState, useRef } from 'react';
 import { authFetch, clearSession } from '../utils/auth';
 import {
-    Search, RefreshCw, LogOut, Users, BarChart3, Inbox, Copy, Check,
-    Hand, Trash2, Calculator, ExternalLink,
+    Search, RefreshCw, LogOut, Users, BarChart3, Inbox, Copy, Check, X,
+    Hand, Trash2, Calculator, ExternalLink, ChevronDown, ChevronUp, Phone,
 } from 'lucide-react';
 
 const DEAL_LABELS = {
@@ -19,47 +26,142 @@ const DEAL_LABELS = {
     lost: '❌ Програна',
 };
 const DEAL_COLORS = { new: '#0a84ff', sent: '#ff9500', won: '#34c759', lost: '#8e8e93' };
+const PAGE = 20;
 
+const money = (n) => Number(n || 0).toLocaleString('uk-UA');
+
+/* ---------------- Деталі заявки (вантажаться за запитом) ---------------- */
+function OrderDetail({ row }) {
+    const [data, setData] = useState(null);
+    const [failed, setFailed] = useState(false);
+
+    useEffect(() => {
+        let alive = true;
+        (async () => {
+            try {
+                const res = await authFetch(`/api/order_detail?row=${row}`);
+                const d = await res.json();
+                if (alive) setData(d);
+            } catch {
+                if (alive) setFailed(true);
+            }
+        })();
+        return () => { alive = false; };
+    }, [row]);
+
+    if (failed) return <div style={{ fontSize: '13px', color: '#ff3b30', padding: '10px 0' }}>Не вдалося завантажити деталі.</div>;
+    if (!data) return <div style={{ ...skeleton, height: '70px', marginTop: '10px' }} />;
+
+    const b = data.budget;
+    return (
+        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed var(--border-color)' }}>
+            {b && (
+                <div style={{ display: 'flex', gap: '18px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                    <div>
+                        <div style={{ fontSize: '11.5px', color: 'var(--hint-color)' }}>Робота</div>
+                        <div style={{ fontWeight: 800, fontSize: '17px' }}>{money(b.work)} ₴</div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '11.5px', color: 'var(--hint-color)' }}>Матеріали (від)</div>
+                        <div style={{ fontWeight: 800, fontSize: '17px' }}>{money(b.mat_min)} ₴</div>
+                    </div>
+                    <div>
+                        <div style={{ fontSize: '11.5px', color: 'var(--hint-color)' }}>Разом</div>
+                        <div style={{ fontWeight: 800, fontSize: '17px', color: '#34c759' }}>{money(b.total)} ₴</div>
+                    </div>
+                </div>
+            )}
+
+            {data.rooms?.length > 0 && (
+                <div>
+                    {data.rooms.map((r, i) => (
+                        <div key={i} style={{ padding: '7px 0', borderBottom: i === data.rooms.length - 1 ? 'none' : '1px solid var(--border-color)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px' }}>
+                                <span><b>{r.name}</b> <span style={{ color: 'var(--hint-color)' }}>· {r.area} м²</span></span>
+                                <span style={{ fontWeight: 600 }}>{money(r.work)} ₴</span>
+                            </div>
+                            {r.lines?.length > 0 && (
+                                <div style={{ fontSize: '12px', color: 'var(--hint-color)', marginTop: '3px' }}>
+                                    {r.lines.map((l) => l.label).join(' · ')}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {!b && <div style={{ fontSize: '13px', color: 'var(--hint-color)' }}>Кошторис не вдалося порахувати (стара заявка).</div>}
+        </div>
+    );
+}
+
+/* ---------------- Вкладка «Заявки» ---------------- */
 function OrdersTab({ role }) {
     const [orders, setOrders] = useState([]);
+    const [counts, setCounts] = useState({});
+    const [total, setTotal] = useState(0);
+    const [hasMore, setHasMore] = useState(false);
     const [filter, setFilter] = useState(null);
-    const [q, setQ] = useState('');
+    const [input, setInput] = useState('');      // те, що людина набирає
+    const [q, setQ] = useState('');              // те, що реально шукаємо (дебаунс)
+    const [offset, setOffset] = useState(0);
     const [loading, setLoading] = useState(true);
-
     const [reloadKey, setReloadKey] = useState(0);
-    const load = () => setReloadKey((k) => k + 1);
+    const [openRow, setOpenRow] = useState(null);
+    const inputRef = useRef(null);
 
-    // Запит живе всередині ефекту (а не викликається з нього синхронно) —
-    // так лінтер не свариться на каскадні рендери, і ми коректно
-    // ігноруємо відповідь, якщо фільтр змінився, поки вона летіла.
+    // ДЕБАУНС: чекаємо 400 мс тиші, і лише тоді б'ємо в API
+    useEffect(() => {
+        const t = setTimeout(() => { setQ(input.trim()); setOffset(0); }, 400);
+        return () => clearTimeout(t);
+    }, [input]);
+
     useEffect(() => {
         let alive = true;
         (async () => {
             setLoading(true);
             try {
-                const p = new URLSearchParams();
+                const p = new URLSearchParams({ limit: String(PAGE), offset: String(offset) });
                 if (filter) p.set('deal', filter);
-                if (q.trim()) p.set('q', q.trim());
+                if (q) p.set('q', q);
                 const res = await authFetch(`/api/orders?${p}`);
-                const data = await res.json();
-                if (alive) setOrders(data.orders || []);
+                const d = await res.json();
+                if (!alive) return;
+                // offset > 0 — це «Показати ще», дописуємо в кінець
+                setOrders((prev) => (offset > 0 ? [...prev, ...(d.orders || [])] : (d.orders || [])));
+                setCounts(d.counts || {});
+                setTotal(d.total || 0);
+                setHasMore(!!d.has_more);
             } catch { /* authFetch сам розлогінить при 401 */ }
             if (alive) setLoading(false);
         })();
         return () => { alive = false; };
-    }, [filter, q, reloadKey]);
+    }, [filter, q, offset, reloadKey]);
 
+    const refresh = () => { setOffset(0); setReloadKey((k) => k + 1); };
+
+    // ОПТИМІСТИЧНО: малюємо новий статус одразу, запит летить фоном
     const setStatus = async (row, deal, claim = false) => {
-        await authFetch('/api/order_status', {
-            method: 'POST',
-            body: JSON.stringify({ row, deal, claim }),
+        const before = orders;
+        setOrders((prev) => prev.map((o) => (o.row === row
+            ? { ...o, deal, manager_id: claim ? 'me' : o.manager_id }
+            : o)));
+        setCounts((c) => {
+            const old = before.find((o) => o.row === row)?.deal;
+            if (!old || old === deal) return c;
+            return { ...c, [old]: Math.max(0, (c[old] || 1) - 1), [deal]: (c[deal] || 0) + 1 };
         });
-        load();
+        try {
+            const res = await authFetch('/api/order_status', {
+                method: 'POST',
+                body: JSON.stringify({ row, deal, claim }),
+            });
+            if (!res.ok) throw new Error('fail');
+        } catch {
+            setOrders(before);                       // відкат
+            alert('Не вдалося змінити статус. Спробуйте ще раз.');
+        }
     };
-
-    const counts = Object.keys(DEAL_LABELS).reduce((a, k) => {
-        a[k] = orders.filter((o) => o.deal === k).length; return a;
-    }, {});
 
     return (
         <div>
@@ -67,85 +169,115 @@ function OrdersTab({ role }) {
                 <div style={{ position: 'relative', flex: 1 }}>
                     <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--hint-color)' }} />
                     <input
-                        value={q}
-                        onChange={(e) => setQ(e.target.value)}
+                        ref={inputRef}
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
                         placeholder="Пошук за іменем, телефоном, адресою"
-                        style={{ width: '100%', boxSizing: 'border-box', paddingLeft: '36px' }}
+                        style={{ width: '100%', boxSizing: 'border-box', paddingLeft: '36px', paddingRight: input ? '36px' : '12px' }}
                     />
+                    {input && (
+                        <button
+                            onClick={() => { setInput(''); inputRef.current?.focus(); }}
+                            style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--hint-color)', cursor: 'pointer', padding: 4 }}
+                        ><X size={15} /></button>
+                    )}
                 </div>
-                <button onClick={load} title="Оновити" style={btnIcon}><RefreshCw size={16} /></button>
+                <button onClick={refresh} title="Оновити" style={btnIcon}>
+                    <RefreshCw size={16} style={loading ? { animation: 'spin 1s linear infinite' } : undefined} />
+                </button>
             </div>
 
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
-                <Chip active={!filter} onClick={() => setFilter(null)}>Усі {orders.length}</Chip>
+                <Chip active={!filter} onClick={() => { setFilter(null); setOffset(0); }}>
+                    Усі {Object.values(counts).reduce((a, b) => a + b, 0)}
+                </Chip>
                 {Object.entries(DEAL_LABELS).map(([k, label]) => (
-                    <Chip key={k} active={filter === k} onClick={() => setFilter(filter === k ? null : k)}>
-                        {label} {filter ? '' : counts[k] || 0}
+                    <Chip key={k} active={filter === k} onClick={() => { setFilter(filter === k ? null : k); setOffset(0); }}>
+                        {label} {counts[k] ?? 0}
                     </Chip>
                 ))}
             </div>
 
-            {loading && <div style={{ color: 'var(--hint-color)', padding: '20px 0' }}>Завантаження…</div>}
+            {loading && orders.length === 0 && [1, 2, 3].map((i) => (
+                <div key={i} style={{ ...skeleton, height: '92px', marginBottom: '10px' }} />
+            ))}
+
             {!loading && orders.length === 0 && (
                 <div style={{ textAlign: 'center', color: 'var(--hint-color)', padding: '40px 0' }}>
                     <Inbox size={32} style={{ marginBottom: '10px', opacity: 0.5 }} />
-                    <div>Заявок не знайдено</div>
+                    <div>{q ? 'За цим запитом нічого немає' : 'Заявок поки немає'}</div>
                 </div>
             )}
 
-            {orders.map((o) => (
-                <div key={o.row} style={card}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start' }}>
-                        <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 700, fontSize: '15px' }}>
-                                {o.name || 'Без імені'}
-                                {o.source === 'web' && !o.manager_id && (
-                                    <span style={{ marginLeft: '7px', fontSize: '11px', fontWeight: 700, color: '#ff9500' }}>🔥 вільний лід</span>
+            {orders.map((o) => {
+                const isOpen = openRow === o.row;
+                return (
+                    <div key={o.row} style={card}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start' }}>
+                            <div style={{ minWidth: 0, flex: 1, cursor: 'pointer' }} onClick={() => setOpenRow(isOpen ? null : o.row)}>
+                                <div style={{ fontWeight: 700, fontSize: '15px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {o.name || 'Без імені'}
+                                    {o.source === 'web' && !o.manager_id && (
+                                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#ff9500' }}>🔥 вільний</span>
+                                    )}
+                                    {isOpen ? <ChevronUp size={14} color="var(--hint-color)" /> : <ChevronDown size={14} color="var(--hint-color)" />}
+                                </div>
+                                <div style={{ fontSize: '13px', color: 'var(--hint-color)', marginTop: '2px' }}>{o.date}</div>
+                                <div style={{ fontSize: '12.5px', color: 'var(--hint-color)', marginTop: '2px' }}>{o.address}</div>
+                                {role === 'admin' && o.manager_name && (
+                                    <div style={{ fontSize: '12px', color: 'var(--hint-color)', marginTop: '3px' }}>👔 {o.manager_name}</div>
                                 )}
                             </div>
-                            <div style={{ fontSize: '13px', color: 'var(--hint-color)', marginTop: '2px' }}>
-                                {o.phone} · {o.date}
-                            </div>
-                            <div style={{ fontSize: '12.5px', color: 'var(--hint-color)', marginTop: '2px' }}>
-                                {o.address}
-                            </div>
-                            {role === 'admin' && o.manager_name && (
-                                <div style={{ fontSize: '12px', color: 'var(--hint-color)', marginTop: '3px' }}>
-                                    👔 {o.manager_name}
-                                </div>
-                            )}
+                            <span style={{ ...badge, background: DEAL_COLORS[o.deal] }}>{DEAL_LABELS[o.deal]}</span>
                         </div>
-                        <span style={{ ...badge, background: DEAL_COLORS[o.deal] }}>{DEAL_LABELS[o.deal]}</span>
-                    </div>
 
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
-                        {Object.entries(DEAL_LABELS)
-                            .filter(([k]) => k !== o.deal)
-                            .map(([k, label]) => (
-                                <button key={k} onClick={() => setStatus(o.row, k)} style={btnSmall}>{label}</button>
-                            ))}
-                        {o.source === 'web' && !o.manager_id && (
-                            <button onClick={() => setStatus(o.row, 'new', true)} style={{ ...btnSmall, background: '#ff9500', color: '#fff', border: 'none' }}>
-                                <Hand size={13} /> Взяти в роботу
-                            </button>
-                        )}
-                        <a href={`?edit_id=${o.row}`} style={{ ...btnSmall, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <ExternalLink size={13} /> Відкрити анкету
-                        </a>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px', alignItems: 'center' }}>
+                            {/* Телефон — головна дія менеджера: один тап і дзвінок */}
+                            {o.phone && (
+                                <a href={`tel:${o.phone.replace(/[^\d+]/g, '')}`} style={{ ...btnSmall, textDecoration: 'none', fontWeight: 700 }}>
+                                    <Phone size={13} /> {o.phone}
+                                </a>
+                            )}
+                            {Object.entries(DEAL_LABELS)
+                                .filter(([k]) => k !== o.deal)
+                                .map(([k, label]) => (
+                                    <button key={k} onClick={() => setStatus(o.row, k)} style={btnSmall}>{label}</button>
+                                ))}
+                            {o.source === 'web' && !o.manager_id && (
+                                <button onClick={() => setStatus(o.row, 'new', true)} style={{ ...btnSmall, background: '#ff9500', color: '#fff', border: 'none' }}>
+                                    <Hand size={13} /> Взяти в роботу
+                                </button>
+                            )}
+                            <a href={`?edit_id=${o.row}`} style={{ ...btnSmall, textDecoration: 'none' }}>
+                                <ExternalLink size={13} /> Анкета
+                            </a>
+                        </div>
+
+                        {isOpen && <OrderDetail row={o.row} />}
                     </div>
-                </div>
-            ))}
+                );
+            })}
+
+            {hasMore && (
+                <button
+                    onClick={() => setOffset((o) => o + PAGE)}
+                    disabled={loading}
+                    style={{ ...btnSmall, width: '100%', justifyContent: 'center', padding: '12px', marginTop: '6px' }}
+                >
+                    {loading ? 'Завантаження…' : `Показати ще (${total - orders.length})`}
+                </button>
+            )}
         </div>
     );
 }
 
+/* ---------------- Вкладка «Команда» (адмін) ---------------- */
 function AdminTab() {
     const [users, setUsers] = useState([]);
     const [code, setCode] = useState('');
     const [copied, setCopied] = useState(false);
-
     const [reloadKey, setReloadKey] = useState(0);
-    const load = () => setReloadKey((k) => k + 1);
+
     useEffect(() => {
         let alive = true;
         (async () => {
@@ -166,7 +298,7 @@ function AdminTab() {
     const revoke = async (user_id, name) => {
         if (!window.confirm(`Забрати доступ у «${name}»? Людина одразу втратить доступ до заявок.`)) return;
         await authFetch('/api/admin/revoke', { method: 'POST', body: JSON.stringify({ user_id }) });
-        load();
+        setReloadKey((k) => k + 1);
     };
 
     return (
@@ -174,8 +306,8 @@ function AdminTab() {
             <div style={card}>
                 <div style={{ fontWeight: 700, marginBottom: '4px' }}>Додати менеджера</div>
                 <div style={{ fontSize: '13px', color: 'var(--hint-color)', lineHeight: 1.45, marginBottom: '12px' }}>
-                    Створіть одноразовий код і передайте людині. Вона натисне «Увійти через Telegram»
-                    на цьому ж сайті й введе код. Пароль не потрібен — і його неможливо вкрасти.
+                    Створіть одноразовий код і передайте людині. Вона відкриє бота, надішле код,
+                    а далі зайде в кабінет через «Вхід для менеджерів». Паролів не існує — красти нічого.
                 </div>
 
                 {code ? (
@@ -215,13 +347,20 @@ function AdminTab() {
     );
 }
 
+/* ---------------- Вкладка «Статистика» (адмін) ---------------- */
 function StatsTab() {
     const [s, setS] = useState(null);
     useEffect(() => {
-        authFetch('/api/admin/stats').then((r) => r.json()).then(setS).catch(() => {});
+        let alive = true;
+        authFetch('/api/admin/stats')
+            .then((r) => r.json())
+            .then((d) => { if (alive) setS(d); })
+            .catch(() => {});
+        return () => { alive = false; };
     }, []);
-    if (!s) return <div style={{ color: 'var(--hint-color)' }}>Завантаження…</div>;
+    if (!s) return <div style={{ ...skeleton, height: '120px' }} />;
 
+    const maxCount = Math.max(1, ...Object.values(s.by_status || {}));
     return (
         <div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
@@ -234,8 +373,14 @@ function StatsTab() {
             <div style={card}>
                 <div style={{ fontWeight: 700, marginBottom: '10px' }}>Воронка</div>
                 {Object.entries(s.by_status || {}).map(([k, v]) => (
-                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '14px' }}>
-                        <span>{DEAL_LABELS[k]}</span><b>{v}</b>
+                    <div key={k} style={{ marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', marginBottom: '3px' }}>
+                            <span>{DEAL_LABELS[k]}</span><b>{v}</b>
+                        </div>
+                        {/* Проста смуга: видно перекоси воронки без жодних графіків */}
+                        <div style={{ height: '6px', borderRadius: '3px', background: 'var(--secondary-bg, rgba(127,127,127,0.12))' }}>
+                            <div style={{ width: `${(v / maxCount) * 100}%`, height: '100%', borderRadius: '3px', background: DEAL_COLORS[k] }} />
+                        </div>
                     </div>
                 ))}
             </div>
@@ -263,7 +408,7 @@ export default function Dashboard({ session, onNewOrder }) {
                 <div>
                     <div style={{ fontSize: '20px', fontWeight: 800 }}>Кабінет</div>
                     <div style={{ fontSize: '13px', color: 'var(--hint-color)' }}>
-                        {isAdmin ? '👑 Адміністратор' : '👔 Менеджер'} · {session.name}
+                        {isAdmin ? '👑 Адміністратор' : '👔 Менеджер'}{session.name ? ` · ${session.name}` : ''}
                     </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -283,16 +428,22 @@ export default function Dashboard({ session, onNewOrder }) {
             {tab === 'orders' && <OrdersTab role={session.role} />}
             {tab === 'team' && isAdmin && <AdminTab />}
             {tab === 'stats' && isAdmin && <StatsTab />}
+
+            <style>{`
+                @keyframes spin { 100% { transform: rotate(360deg); } }
+                @keyframes pulse { 0%,100% { opacity: 0.55; } 50% { opacity: 0.9; } }
+            `}</style>
         </div>
     );
 }
 
-// --- дрібні пресети стилів ---
+/* --- пресети стилів --- */
 const card = { background: 'var(--card-bg, rgba(127,127,127,0.06))', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '14px', marginBottom: '10px' };
 const badge = { color: '#fff', fontSize: '11px', fontWeight: 700, padding: '4px 9px', borderRadius: '20px', whiteSpace: 'nowrap', flexShrink: 0 };
 const btnSmall = { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12.5px', fontWeight: 600, padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-color)', cursor: 'pointer' };
 const btnIcon = { display: 'flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-color)', cursor: 'pointer', flexShrink: 0 };
 const btnPrimary = { display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 14px', borderRadius: '10px', border: 'none', background: 'var(--link-color, #0a84ff)', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer' };
+const skeleton = { borderRadius: '14px', background: 'var(--secondary-bg, rgba(127,127,127,0.12))', animation: 'pulse 1.2s ease-in-out infinite' };
 
 function Chip({ active, onClick, children }) {
     return (

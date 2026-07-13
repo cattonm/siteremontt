@@ -109,6 +109,7 @@ function OrdersTab({ role }) {
     const [loading, setLoading] = useState(true);
     const [reloadKey, setReloadKey] = useState(0);
     const [openRow, setOpenRow] = useState(null);
+    const [error, setError] = useState(null);   // текст помилки API, а не тиша
     const inputRef = useRef(null);
 
     // ДЕБАУНС: чекаємо 400 мс тиші, і лише тоді б'ємо в API
@@ -121,11 +122,22 @@ function OrdersTab({ role }) {
         let alive = true;
         (async () => {
             setLoading(true);
+            setError(null);
             try {
                 const p = new URLSearchParams({ limit: String(PAGE), offset: String(offset) });
                 if (filter) p.set('deal', filter);
                 if (q) p.set('q', q);
                 const res = await authFetch(`/api/orders?${p}`);
+                // РАНІШЕ помилку API просто ковтали, і кабінет малював «Заявок
+                // немає» — тобто збій сервера виглядав як порожня база. Тепер
+                // кажемо прямо, що саме сталося.
+                if (!res.ok) {
+                    if (alive) setError(res.status === 404
+                        ? 'Сервер не знає цього запиту (404). Схоже, бекенд не оновлено — задеплойте main.py.'
+                        : `Сервер відповів помилкою ${res.status}.`);
+                    if (alive) setLoading(false);
+                    return;
+                }
                 const d = await res.json();
                 if (!alive) return;
                 // offset > 0 — це «Показати ще», дописуємо в кінець
@@ -133,7 +145,12 @@ function OrdersTab({ role }) {
                 setCounts(d.counts || {});
                 setTotal(d.total || 0);
                 setHasMore(!!d.has_more);
-            } catch { /* authFetch сам розлогінить при 401 */ }
+            } catch (e) {
+                // authFetch сам розлогінить при 401; решта — мережа/CORS
+                if (alive && e?.message !== 'unauthorized') {
+                    setError('Не вдалося звʼязатися з сервером. Перевірте зʼєднання.');
+                }
+            }
             if (alive) setLoading(false);
         })();
         return () => { alive = false; };
@@ -214,11 +231,21 @@ function OrdersTab({ role }) {
                 ))}
             </div>
 
+            {error && (
+                <div style={{ ...card, background: 'rgba(255,59,48,0.08)', borderColor: 'rgba(255,59,48,0.35)', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <AlertTriangle size={18} color="#ff3b30" style={{ flexShrink: 0, marginTop: '1px' }} />
+                    <div style={{ fontSize: '13.5px', lineHeight: 1.45 }}>
+                        <b>Не вдалося завантажити заявки.</b><br />
+                        <span style={{ color: 'var(--hint-color)' }}>{error}</span>
+                    </div>
+                </div>
+            )}
+
             {loading && orders.length === 0 && [1, 2, 3].map((i) => (
                 <div key={i} style={{ ...skeleton, height: '92px', marginBottom: '10px' }} />
             ))}
 
-            {!loading && orders.length === 0 && (
+            {!loading && !error && orders.length === 0 && (
                 <div style={{ textAlign: 'center', color: 'var(--hint-color)', padding: '40px 0' }}>
                     <Inbox size={32} style={{ marginBottom: '10px', opacity: 0.5 }} />
                     <div>{q ? 'За цим запитом нічого немає' : 'Заявок поки немає'}</div>

@@ -33,7 +33,7 @@ function formatRoomValue(q, val) {
     return String(optLabel(val));
 }
 
-export default function Summary({ client, answers, finalQuestions, shouldSkip, editStep, totals }) {
+export default function Summary({ client, setClient, answers, finalQuestions, shouldSkip, editStep, totals, isGuest = false }) {
     const [openZones, setOpenZones] = useState({ "👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ": true, "🏠 ПРИМІЩЕННЯ": true });
     const [openRooms, setOpenRooms] = useState({});   // які кімнати розгорнуті построчно
     const rooms = useStore((s) => s.rooms);
@@ -242,6 +242,41 @@ export default function Summary({ client, answers, finalQuestions, shouldSkip, e
                     </div>
                 </div>
             </div>
+
+            {/* ФОРМА КОНТАКТУ ДЛЯ ГОСТЯ — у самому кінці, коли людина вже
+                побачила свій кошторис. Це момент максимальної мотивації:
+                просимо телефон в обмін на безкоштовний замір, а не «щоб
+                продовжити». Класична помилка — питати контакти на вході. */}
+            {isGuest && (
+                <div className="summary-box" style={{ padding: '20px', border: '2px solid var(--link-color, #0a84ff)' }}>
+                    <h3 style={{ margin: '0 0 6px', fontSize: '17px' }}>Куди надіслати кошторис?</h3>
+                    <p style={{ color: 'var(--hint-color)', fontSize: '13.5px', lineHeight: 1.45, margin: '0 0 14px' }}>
+                        Менеджер зателефонує, уточнить деталі й погодить безкоштовний замір.
+                        Точну ціну підтверджують лише на об'єкті.
+                    </p>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '5px' }}>Ваше ім'я</label>
+                    <input
+                        type="text" value={client.name || ''}
+                        onChange={(e) => setClient((p) => ({ ...p, name: e.target.value }))}
+                        placeholder="Як до вас звертатись"
+                        style={{ width: '100%', boxSizing: 'border-box', marginBottom: '12px' }}
+                    />
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '5px' }}>Телефон</label>
+                    <input
+                        type="tel" inputMode="tel" value={client.phone || ''}
+                        onChange={(e) => setClient((p) => ({ ...p, phone: e.target.value }))}
+                        placeholder="+380 (XX) XXX-XX-XX"
+                        style={{ width: '100%', boxSizing: 'border-box' }}
+                    />
+                    {/* honeypot: приховане поле, яке заповнюють лише боти */}
+                    <input
+                        type="text" name="website" tabIndex={-1} autoComplete="off"
+                        onChange={(e) => setClient((p) => ({ ...p, website: e.target.value }))}
+                        style={{ position: 'absolute', left: '-9999px', opacity: 0, height: 0 }}
+                        aria-hidden="true"
+                    />
+                </div>
+            )}
         </div>
     );
 }

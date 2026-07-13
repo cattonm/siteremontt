@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import useStore from './store/useStore'; 
 import ClientForm from './components/ClientForm';
+import Onboarding from './components/Onboarding';
+import TierSwitch from './components/TierSwitch';
 import Survey from './components/Survey';
 import CustomWorks from './components/CustomWorks';
 import Summary from './components/Summary';
@@ -51,6 +53,20 @@ export default function App() {
     // Чернетка, знайдена на сервері (інший пристрій) — показуємо банер
     // «Продовжити?», а не мовчки підміняємо стан.
     const [serverDraft, setServerDraft] = useState(null);
+    // РОЛЬ: 'guest' (публічний калькулятор) | 'manager' | 'admin'.
+    // Визначається бекендом за initData — фронтенд їй лише вірить у частині
+    // UI; усі перевірки доступу однаково робляться на сервері.
+    const [role, setRole] = useState(null);
+    const isGuest = role === 'guest';
+    const [isSendingLead, setIsSendingLead] = useState(false);
+    const [leadSent, setLeadSent] = useState(false);
+    // Онбординг показуємо один раз на пристрій — і тільки на самому початку.
+    const [showOnboarding, setShowOnboarding] = useState(() => {
+        const isEdit = new URLSearchParams(window.location.search).get('edit_id');
+        return !isEdit
+            && useStore.getState().currentStep <= -1
+            && !localStorage.getItem('remont_onboarded');
+    });
 
     // Тема: один ефект синхронізує клас на body і localStorage
     useEffect(() => {
@@ -66,6 +82,15 @@ export default function App() {
         // чекати холодний старт ~30-50 с. Будимо сервер, поки людина
         // заповнює ім'я/площу — до кроку кімнат ціни вже рахуються миттєво.
         fetch(`${BACKEND_URL}/ping`, { mode: 'no-cors' }).catch(() => {});
+
+        // Хто я? Гість (сайт у браузері) бачить вільний калькулятор і форму
+        // контакту в кінці; менеджер — повний потік із відправкою в бота.
+        fetch(`${BACKEND_URL}/api/me`, {
+            headers: { 'X-Telegram-Init-Data': tg?.initData || '' },
+        })
+            .then((r) => (r.ok ? r.json() : { role: 'guest' }))
+            .then((d) => setRole(d.role || 'guest'))
+            .catch(() => setRole('guest'));
 
         const editId = new URLSearchParams(window.location.search).get('edit_id');
         
@@ -232,13 +257,44 @@ export default function App() {
     const goNext = () => {
         vibe('medium');
         if (currentStep === -1) {
-            if (!client.name.trim() || !client.area || parseFloat(client.area) <= 0) { vibeError(); tg?.showAlert("Заповніть Ім'я та Площу!"); return; }
+            // Гість на вході дає лише площу — контакти запитаємо в кінці.
+            if (!client.area || parseFloat(client.area) <= 0) { vibeError(); tg?.showAlert("Вкажіть площу об'єкта!"); return; }
+            if (!isGuest && !client.name.trim()) { vibeError(); tg?.showAlert("Заповніть Ім'я та Площу!"); return; }
             if (isEditingFromSummary) { setIsEditingFromSummary(false); setCurrentStep(finalQuestions.length); return; }
             setCurrentStep(0); return;
         }
 
         // ВІДПРАВКА АНКЕТИ НА СЕРВЕР
         if (currentStep >= finalQuestions.length) {
+            // ГІСТЬ: замість відправки в бота — публічний лід із контактами.
+            if (isGuest) {
+                const digits = (client.phone || '').replace(/\D/g, '');
+                if (!client.name?.trim() || digits.length < 9) {
+                    vibeError();
+                    (tg?.showAlert || window.alert)("Вкажіть ім'я та телефон — менеджер зателефонує й уточнить деталі.");
+                    return;
+                }
+                vibe('heavy');
+                setIsSendingLead(true);
+                fetch(`${BACKEND_URL}/api/submit_lead`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        client,
+                        answers: { ...answers, rooms },
+                        website: '',   // honeypot: справжня людина лишає порожнім
+                    }),
+                })
+                    .then((r) => {
+                        if (!r.ok) throw new Error('fail');
+                        setLeadSent(true);
+                        handleResetDraftSilent();
+                    })
+                    .catch(() => (tg?.showAlert || window.alert)('Не вдалося надіслати. Спробуйте ще раз.'))
+                    .finally(() => setIsSendingLead(false));
+                return;
+            }
+
             vibe('heavy'); 
             const editId = new URLSearchParams(window.location.search).get('edit_id'); 
             
@@ -322,8 +378,39 @@ export default function App() {
     }
 
     const renderCurrentStep = () => {
-        if (currentStep === -1) return <ClientForm client={client} setClient={setClient} toggleTheme={toggleTheme} isDark={isDark} />;
-        if (currentStep >= finalQuestions.length) return <Summary client={client} answers={answers} finalQuestions={finalQuestions} shouldSkip={shouldSkip} editStep={editStep} totals={totals} />;
+        // Гість надіслав контакти — далі йому нічого робити, дякуємо і
+        // чесно кажемо, що буде далі.
+        if (leadSent) {
+            return (
+                <div style={{ padding: '60px 24px', textAlign: 'center', animation: 'fadeIn 0.35s ease' }}>
+                    <div style={{ fontSize: '54px', lineHeight: 1, marginBottom: '18px' }}>✅</div>
+                    <h2 style={{ margin: '0 0 10px', fontSize: '22px', fontWeight: 800 }}>Заявку надіслано</h2>
+                    <p style={{ color: 'var(--hint-color)', fontSize: '15px', lineHeight: 1.5, margin: 0 }}>
+                        Ваш кошторис — <b style={{ color: 'var(--text-color)' }}>від {totalCost.toLocaleString()} ₴</b>.<br />
+                        Менеджер зателефонує найближчим часом і уточнить деталі.
+                        Точну ціну підтверджує безкоштовний замір.
+                    </p>
+                </div>
+            );
+        }
+        // Онбординг — найперший екран: пояснює, що буде далі й скільки триватиме.
+        if (showOnboarding) {
+            return (
+                <Onboarding
+                    isGuest={isGuest}
+                    onStart={() => {
+                        localStorage.setItem('remont_onboarded', '1');
+                        setShowOnboarding(false);
+                        // ГІСТЬ одразу йде рахувати: питати контакти на вході —
+                        // найшвидший спосіб втратити людину. Телефон попросимо
+                        // в кінці, коли вона вже побачила свій кошторис.
+                        if (isGuest) setCurrentStep(0);
+                    }}
+                />
+            );
+        }
+        if (currentStep === -1) return <ClientForm client={client} setClient={setClient} isGuest={isGuest} />;
+        if (currentStep >= finalQuestions.length) return <Summary client={client} setClient={setClient} answers={answers} finalQuestions={finalQuestions} shouldSkip={shouldSkip} editStep={editStep} totals={totals} isGuest={isGuest} />;
         
         const q = finalQuestions[currentStep];
         if (!q) return null;
@@ -373,7 +460,7 @@ export default function App() {
     let btnNextText = "Далі";
     const editId = new URLSearchParams(window.location.search).get('edit_id');
     if (currentStep === -1 && isEditingFromSummary) btnNextText = "Зберегти зміни";
-    else if (currentStep >= finalQuestions.length) btnNextText = editId ? "💾 Зберегти оновлення" : "Відправити";
+    else if (currentStep >= finalQuestions.length) btnNextText = isGuest ? (isSendingLead ? "Надсилаємо…" : "Отримати кошторис") : (editId ? "💾 Зберегти оновлення" : "Відправити");
     else if (currentStep >= 0) {
         let isLast = true; for(let i = currentStep + 1; i < finalQuestions.length; i++) { if (!shouldSkip(finalQuestions[i], answers)) { isLast = false; break; } }
         if (isLast) btnNextText = "Перевірити дані";
@@ -460,7 +547,11 @@ export default function App() {
                 <div className="drag-handle"></div>
                 <h3 style={{marginBottom: '5px'}}>Структура вартості</h3>
                 <p style={{color: 'var(--hint-color)', fontSize: '13px', marginTop:0}}>Попередній прорахунок на основі відповідей.</p>
-                
+
+                {/* Тумблер рівня стоїть САМЕ ТУТ — там, де людина дивиться
+                    на цифри: перемкнув і одразу бачить, як змінилась сума. */}
+                <TierSwitch />
+
                 <div className="chart-container">
                     <div className="donut-wrapper" style={{ background: `conic-gradient(var(--link-color) 0% ${workPct}%, #34c759 ${workPct}% 100%)` }}>
                         <div className="donut-hole"></div>

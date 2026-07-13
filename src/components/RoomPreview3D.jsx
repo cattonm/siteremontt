@@ -96,7 +96,14 @@ function surfaceFill(fieldId, value, widthM, heightM, fallback = '#efeeeb', fall
 // key на компоненті (у батька) перезбирає камеру, коли міняється площа.
 function CameraRig({ W, D }) {
     const tx = W / 2, ty = 0.85, tz = D / 2;
-    const R = Math.max(W, D) * 1.5 + 2.4;
+    // ВІДСТАНЬ КАМЕРИ — СУБЛІНІЙНА. Раніше було R = max*1.5 + 2.4, тобто
+    // камера відсувалась СТРОГО пропорційно розміру — і 6 м², і 30 м²
+    // займали однаковий кадр, масштаб не читався взагалі.
+    // Тепер відстань росте повільніше за кімнату (степінь 0.62), тож
+    // велика кімната справді виглядає більшою (~1.4× спред між крайніми
+    // площами), але все одно повністю вміщається в кадр.
+    const size = Math.max(W, D);
+    const R = 3.2 + Math.pow(size, 0.62) * 2.6;
     const polar = rad(64), az = rad(42);
     const pos = [
         tx + R * Math.sin(polar) * Math.sin(az),
@@ -680,7 +687,10 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick }) {
                     );
                 })}
             </Canvas>
-            <div className="r3d-badge">Схематичне прев'ю · покрутити пальцем</div>
+            <div className="r3d-badge">
+                {(parseFloat(room.measurements?.floor) > 0 ? `${parseFloat(room.measurements.floor)} м² · ` : '')}
+                {W.toFixed(1)}×{D.toFixed(1)} м · покрутити пальцем
+            </div>
         </div>
     );
 }

@@ -1,6 +1,9 @@
 import React from 'react';
 
-export default function ClientForm({ client, setClient }) {
+// isGuest — публічний калькулятор: НЕ питаємо ім'я і телефон на вході.
+// Просити контакти до того, як людина побачила цінність — найшвидший
+// спосіб її втратити. Телефон запитаємо в кінці, біля готового кошторису.
+export default function ClientForm({ client, setClient, isGuest = false }) {
     
     // Функція, яка оновлює дані при вводі (і додає маску для телефону)
     const handleChange = (e) => {
@@ -30,11 +33,13 @@ export default function ClientForm({ client, setClient }) {
                 {/* Перемикач теми зробимо пізніше глобально */}
             </div>
 
+            {!isGuest && (<>
             <label>Ім'я клієнта</label>
             <input type="text" name="name" value={client.name || ''} onChange={handleChange} placeholder="Введіть ім'я" />
 
             <label>Телефон</label>
             <input type="tel" name="phone" inputMode="tel" value={client.phone || ''} onChange={handleChange} placeholder="+380 (XX) XXX-XX-XX" />
+            </>)}
 
             <label>Тип об'єкту</label>
             <select name="object_type" value={client.object_type || 'Квартира (Новобудова)'} onChange={handleChange}>

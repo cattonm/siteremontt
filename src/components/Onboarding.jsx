@@ -87,7 +87,7 @@ export default function Onboarding({ isGuest, onStart }) {
 
             {isGuest && (
                 <p style={{ textAlign: 'center', color: 'var(--hint-color)', fontSize: '12.5px', marginTop: '14px', lineHeight: 1.4 }}>
-                    Кошторис орієнтовний. Точну ціну підтверджує замір — контакти залишите в кінці, якщо захочете.
+                    Кошторис орієнтовний. Контакти залишите в кінці, якщо захочете.
                 </p>
             )}
         </div>

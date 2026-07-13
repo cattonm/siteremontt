@@ -84,9 +84,13 @@ export default function Summary({ client, setClient, answers, finalQuestions, sh
         <div className="animated-step">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
                 <CheckCircle2 color="#34c759" size={28} />
-                <h3 style={{ margin: 0 }}>Перевірка даних</h3>
+                <h3 style={{ margin: 0 }}>{isGuest ? 'Ваш кошторис' : 'Перевірка даних'}</h3>
             </div>
-            <p style={{ color: 'var(--hint-color)', fontSize: '14px', marginTop: 0, marginBottom: '20px' }}>Натисніть на розділ, щоб розгорнути деталі.</p>
+            <p style={{ color: 'var(--hint-color)', fontSize: '14px', marginTop: 0, marginBottom: '20px' }}>
+                {isGuest
+                    ? 'Розгорніть приміщення, щоб побачити детальний розрахунок.'
+                    : 'Натисніть на розділ, щоб розгорнути деталі.'}
+            </p>
 
             <div className="summary-box" style={{ padding: '0 20px' }}>
                 <div className="accordion-header" onClick={() => toggleZone("👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ")}>
@@ -95,8 +99,16 @@ export default function Summary({ client, setClient, answers, finalQuestions, sh
                 </div>
                 <div className={`accordion-content ${openZones["👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ"] ? 'open' : ''}`}>
                     <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'10px' }}><div className="edit-btn" onClick={() => editStep(-1)}><Edit3 size={14}/> Змінити</div></div>
-                    <div className="summary-item"><span>Ім'я:</span> <b>{client.name || '-'}</b></div>
-                    <div className="summary-item"><span>Телефон:</span> <b>{client.phone || '-'}</b></div>
+                    {/* Гість не вводив ім'я і телефон на першому кроці — їх у нього
+                        питають унизу цієї ж сторінки. Показувати тут порожні
+                        прочерки, які «Змінити» все одно не дозволить заповнити,
+                        було б безглуздо. */}
+                    {!isGuest && (
+                        <>
+                            <div className="summary-item"><span>Ім'я:</span> <b>{client.name || '-'}</b></div>
+                            <div className="summary-item"><span>Телефон:</span> <b>{client.phone || '-'}</b></div>
+                        </>
+                    )}
                     <div className="summary-item"><span>Площа:</span> <b>{client.area || '0'} м²</b></div>
                     <div className="summary-item" style={{ borderBottom:'none', paddingBottom:'15px' }}><span>Тип:</span> <b>{client.object_type}</b></div>
                 </div>
@@ -245,13 +257,13 @@ export default function Summary({ client, setClient, answers, finalQuestions, sh
 
             {/* ФОРМА КОНТАКТУ ДЛЯ ГОСТЯ — у самому кінці, коли людина вже
                 побачила свій кошторис. Це момент максимальної мотивації:
-                просимо телефон в обмін на безкоштовний замір, а не «щоб
+                просимо телефон тоді, коли людина вже бачить цінність, а не «щоб
                 продовжити». Класична помилка — питати контакти на вході. */}
             {isGuest && (
                 <div className="summary-box" style={{ padding: '20px', border: '2px solid var(--link-color, #0a84ff)' }}>
                     <h3 style={{ margin: '0 0 6px', fontSize: '17px' }}>Куди надіслати кошторис?</h3>
                     <p style={{ color: 'var(--hint-color)', fontSize: '13.5px', lineHeight: 1.45, margin: '0 0 14px' }}>
-                        Менеджер зателефонує, уточнить деталі й погодить безкоштовний замір.
+                        Менеджер зателефонує та уточнить деталі.
                         Точну ціну підтверджують лише на об'єкті.
                     </p>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '5px' }}>Ваше ім'я</label>

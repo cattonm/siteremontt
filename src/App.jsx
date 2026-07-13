@@ -89,10 +89,10 @@ export default function App() {
     const isGuest = role === 'guest' && !session;
     const [isSendingLead, setIsSendingLead] = useState(false);
     const [leadSent, setLeadSent] = useState(false);
+    // Суму фіксуємо ДО скидання чернетки: після resetDraft анкета порожня,
+    // live-calc перераховує її в нуль — і людина бачила «Ваш кошторис — від 0 ₴».
+    const [sentTotal, setSentTotal] = useState(0);
     // Онбординг показуємо один раз на пристрій — і тільки на самому початку.
-    // ОНБОРДИНГ показуємо ЗАВЖДИ на початку нової анкети — це і пояснення
-    // процесу, і головна точка входу в кабінет. Виняток лише два:
-    // режим редагування (edit_id) і продовження незавершеної чернетки.
     // ОНБОРДИНГ — ЗАВЖДИ перший екран сесії.
     // Раніше він ховався, якщо в localStorage лежала незавершена чернетка
     // (currentStep >= 0) — тобто після першого ж проходження людина більше
@@ -330,6 +330,7 @@ export default function App() {
                 })
                     .then((r) => {
                         if (!r.ok) throw new Error('fail');
+                        setSentTotal(totals.work + totals.mat_min);   // ПЕРЕД скиданням!
                         setLeadSent(true);
                         handleResetDraftSilent();
                     })
@@ -456,8 +457,30 @@ export default function App() {
     }
 
     // ОНБОРДИНГ — окремий повноекранний крок. Раніше він рендерився
-    // ВСЕРЕДИНІ анкети, і під ним лишалася чужа кнопка «Далі» (два
-    // конкурентні заклики до дії на одному екрані).
+    // ЕКРАН ПОДЯКИ — окремий повноекранний крок.
+    // Раніше він малювався ВСЕРЕДИНІ анкети, тому знизу лишалася її кнопка
+    // «Далі»: натиснувши, людина отримувала «Вкажіть площу об'єкта!» на вже
+    // надісланій заявці. Тепер жодних чужих кнопок тут немає.
+    if (leadSent) {
+        return (
+            <div style={{ minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+                <div style={{ textAlign: 'center', maxWidth: '380px', animation: 'fadeIn 0.35s ease' }}>
+                    <div style={{ fontSize: '54px', lineHeight: 1, marginBottom: '18px' }}>✅</div>
+                    <h2 style={{ margin: '0 0 10px', fontSize: '22px', fontWeight: 800 }}>Заявку надіслано</h2>
+                    <p style={{ color: 'var(--hint-color)', fontSize: '15px', lineHeight: 1.5, margin: 0 }}>
+                        {sentTotal > 0 && (
+                            <>Ваш кошторис — <b style={{ color: 'var(--text-color)' }}>від {sentTotal.toLocaleString()} ₴</b>.<br /></>
+                        )}
+                        Менеджер зателефонує найближчим часом і уточнить деталі.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    // ОНБОРДИНГ показуємо ЗАВЖДИ на початку нової анкети — це і пояснення
+    // процесу, і головна точка входу в кабінет. Виняток лише два:
+    // режим редагування (edit_id) і продовження незавершеної чернетки.
     if (showOnboarding) {
         return (
             <div style={{ minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-color)' }}>
@@ -485,21 +508,6 @@ export default function App() {
     }
 
     const renderCurrentStep = () => {
-        // Гість надіслав контакти — далі йому нічого робити, дякуємо і
-        // чесно кажемо, що буде далі.
-        if (leadSent) {
-            return (
-                <div style={{ padding: '60px 24px', textAlign: 'center', animation: 'fadeIn 0.35s ease' }}>
-                    <div style={{ fontSize: '54px', lineHeight: 1, marginBottom: '18px' }}>✅</div>
-                    <h2 style={{ margin: '0 0 10px', fontSize: '22px', fontWeight: 800 }}>Заявку надіслано</h2>
-                    <p style={{ color: 'var(--hint-color)', fontSize: '15px', lineHeight: 1.5, margin: 0 }}>
-                        Ваш кошторис — <b style={{ color: 'var(--text-color)' }}>від {totalCost.toLocaleString()} ₴</b>.<br />
-                        Менеджер зателефонує найближчим часом і уточнить деталі.
-                        Точну ціну підтверджує безкоштовний замір.
-                    </p>
-                </div>
-            );
-        }
         if (currentStep === -1) return <ClientForm client={client} setClient={setClient} isGuest={isGuest} />;
         if (currentStep >= finalQuestions.length) return <Summary client={client} setClient={setClient} answers={answers} finalQuestions={finalQuestions} shouldSkip={shouldSkip} editStep={editStep} totals={totals} isGuest={isGuest} />;
         

@@ -21,11 +21,10 @@ import { FLOOR_THICKNESS } from './three/sceneConstants';
 import { SLOT_SIZE } from '../utils/layoutEngine';
 import { FURNITURE_LAYOUTS } from '../data/furnitureLayouts';
 import {
-    ZONES, WALLS, BOUNDS_MAIN, BOUNDS_FULL,
     TEMPLATE_WALL_HEIGHT as WALL_H, SILL_HEIGHT,
     EXT_THICKNESS, INT_THICKNESS,
-    assignRoomsToZones,
 } from '../data/apartmentTemplate';
+import { buildFloorPlan } from '../utils/floorPlanLayout';
 
 // ====== НАЛАШТУВАННЯ ВИГЛЯДУ ======
 const ELEVATION_DEG = 42;   // кут погляду зверху
@@ -217,20 +216,43 @@ function ZoomControls({ zoom, onZoom, onReset }) {
 
 export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
     const [zoom, setZoom] = useState(1);
-    const { roomByZoneId } = useMemo(() => assignRoomsToZones(rooms), [rooms]);
 
-    // Підвал/мансарду малюємо, лише коли їх додав користувач; від цього
-    // залежать і межі сцени (щоб порожній макет не мав дірки праворуч).
-    const showDetached = ZONES.some((z) => z.detached && roomByZoneId[z.id]);
-    const bounds = showDetached ? BOUNDS_FULL : BOUNDS_MAIN;
-    const visibleZones = ZONES.filter((z) => !z.detached || roomByZoneId[z.id]);
-    const visibleWalls = WALLS.filter((w) => !w.zoneId || roomByZoneId[w.zoneId]);
+    // ПЛАН ГЕНЕРУЄТЬСЯ З РЕАЛЬНИХ ПЛОЩ (а не береться з фіксованого шаблону).
+    // Кожна зона = конкретна кімната користувача: zone.id === room.id.
+    // Тому 26 м² вітальня справді більша за 5 м² санвузол, а третя кімната
+    // чи другий санвузол не «випадають» із плану, як було раніше.
+    const { zones, walls, bounds } = useMemo(() => buildFloorPlan(rooms), [rooms]);
+    const roomById = useMemo(
+        () => Object.fromEntries((rooms || []).map((r) => [r.id, r])),
+        [rooms],
+    );
+
+    const visibleZones = zones;
+    const visibleWalls = walls;
 
     const changeZoom = (delta) =>
         setZoom((z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, +(z + delta).toFixed(2))));
 
     return (
         <div style={{ position: 'relative', width: '100%', height: '380px', background: '#ffffff', borderRadius: '12px' }}>
+            {/* Порожній стан: раніше тут показувався макет-шаблон із порожніми
+                зонами, і клік по ньому створював кімнату. Тепер план — це
+                дзеркало реальних кімнат, тож поки їх нема, показуємо підказку,
+                а не порожню білу пляму. */}
+            {zones.length === 0 && (
+                <div style={{
+                    position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center', gap: '8px',
+                    color: 'var(--hint-color)', textAlign: 'center', padding: '20px', zIndex: 2,
+                }}>
+                    <div style={{ fontSize: '34px' }}>🏗</div>
+                    <div style={{ fontWeight: 700, color: 'var(--text-color)' }}>Тут з'явиться ваш план</div>
+                    <div style={{ fontSize: '13.5px', maxWidth: '260px', lineHeight: 1.45 }}>
+                        Додайте приміщення кнопками вгорі — план збереться сам,
+                        а розміри кімнат будуть пропорційні введеним площам.
+                    </div>
+                </div>
+            )}
             {/* frameloop="demand": сцена статична, тож рендеримо кадр лише при
                 змінах (зум, вибір зони, матеріали) — див. invalidate() в IsoCamera. */}
             <Canvas orthographic dpr={[1, 2]} frameloop="demand" shadows="soft" style={{ width: '100%', height: '100%' }}>
@@ -261,13 +283,15 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
                     <shadowMaterial transparent opacity={0.13} />
                 </mesh>
 
-                <group position={[-bounds.width / 2, 0, -bounds.depth / 2]}>
+                {/* offsetZ < 0, якщо є балкон (смуга виступає над фасадом) —
+                    інакше сцена була б зміщена і план «тікав» із кадру. */}
+                <group position={[-bounds.width / 2, 0, -(bounds.depth / 2 + (bounds.offsetZ || 0))]}>
                     {visibleZones.map((zone) => (
                         <ZoneFloor
                             key={zone.id}
                             zone={zone}
-                            room={roomByZoneId[zone.id]}
-                            isActive={roomByZoneId[zone.id]?.id === activeId}
+                            room={roomById[zone.id]}
+                            isActive={zone.id === activeId}
                             onPress={onZonePress}
                         />
                     ))}
@@ -281,8 +305,8 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
                     ))}
 
                     {visibleZones.map((zone) => {
-                        const room = roomByZoneId[zone.id];
-                        if (!room) return null; // порожні зони — без підпису
+                        const room = roomById[zone.id];
+                        if (!room) return null;
                         return (
                             <ZoneLabel
                                 key={`label_${zone.id}`}

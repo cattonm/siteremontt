@@ -24,7 +24,6 @@ import { ROOM_QUESTIONS_CONFIG, REQUIRED_GROUPS } from '../data/questions';
 import { groupQuestions } from '../utils/groupQuestions';
 import Survey from './Survey';
 import ApartmentScene3D from './ApartmentScene3D';
-import { ZONES, assignRoomsToZones } from '../data/apartmentTemplate';
 
 const ROOM_TYPES = [
     { id: 'room', name: 'Кімната' }, { id: 'kitchen', name: 'Кухня' }, { id: 'bath', name: 'Санвузол' },
@@ -95,17 +94,11 @@ export default function RoomVisualizer() {
         setOpenGroup(null); // нова кімната — акордеон згорнутий
     };
 
-    // Клік по зоні на плані (по підлозі або по плашці):
-    //  - у зоні вже є кімната — просто вибираємо її;
-    //  - зона порожня — СТВОРЮЄМО кімнату цього типу (як у Kapitel можна
-    //    почати з будь-якого приміщення прямо з макета).
-    const { roomByZoneId } = assignRoomsToZones(rooms);
-    const handleZonePress = (zoneId) => {
-        const assigned = roomByZoneId[zoneId];
-        if (assigned) { selectRoom(assigned.id); return; }
-        const zone = ZONES.find((z) => z.id === zoneId);
-        if (zone) handleAddRoom(zone.type);
-    };
+    // Клік по зоні на плані. План тепер ГЕНЕРУЄТЬСЯ з кімнат користувача,
+    // тому кожна зона — це конкретна кімната (zone.id === room.id).
+    // Порожніх зон «шаблону» більше не існує: щоб додати приміщення,
+    // є кнопки «+ Кімната / + Кухня…» над планом.
+    const handleZonePress = (roomId) => selectRoom(roomId);
 
     // Хотспот на фото: відкриваємо секцію та плавно скролимо до неї.
     // setTimeout(60) дає акордеону кадр на відкриття, інакше scrollIntoView

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import useStore from './store/useStore'; 
 import ClientForm from './components/ClientForm';
 import Onboarding from './components/Onboarding';
@@ -56,6 +56,10 @@ export default function App() {
     // без синхронного setState всередині ефекту (каскадний ре-рендер).
     const [isLoadingEdit, setIsLoadingEdit] = useState(() => !!new URLSearchParams(window.location.search).get('edit_id'));
     const [isEditingFromSummary, setIsEditingFromSummary] = useState(false);
+    // Ключ ідемпотентності заявки: генерується раз на заявку. Якщо двічі
+    // натиснути «Зберегти», обидва запити несуть той самий id — і сервер
+    // (у режимі Postgres) фізично відхиляє дубль. Скидаємо після успіху.
+    const submissionIdRef = useRef(null);
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [modalImg, setModalImg] = useState(null);
@@ -344,7 +348,15 @@ export default function App() {
             
             // АДАПТЕР: Додаємо rooms до фінального JSON
             const payloadAnswers = { ...answers, rooms: rooms };
-            const data = { edit_id: editId, client, answers: payloadAnswers };
+            // Для НОВОЇ заявки додаємо стабільний submission_id (захист від дублю).
+            // Редагування (editId) його не несе — воно оновлює наявний рядок.
+            if (!editId && !submissionIdRef.current) {
+                submissionIdRef.current = (crypto?.randomUUID
+                    ? crypto.randomUUID()
+                    : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+            }
+            const data = { edit_id: editId, client, answers: payloadAnswers,
+                           ...(editId ? {} : { submission_id: submissionIdRef.current }) };
             
             if (!editId) {
                 handleResetDraftSilent();
@@ -365,6 +377,7 @@ export default function App() {
             } else if (tg?.sendData) {
                 // Міні-апка: заявку ловить бот через web_app_data.
                 tg.sendData(JSON.stringify(data));
+                submissionIdRef.current = null;   // заявку здано — наступна отримає новий id
             } else {
                 // ВЕБ-КАБІНЕТ: tg.sendData у браузері не існує — раніше заявка
                 // менеджера тут просто зникала б у нікуди. Зберігаємо через API
@@ -374,7 +387,7 @@ export default function App() {
                     headers: authHeaders(),
                     body: JSON.stringify(data),
                 })
-                    .then((r) => { if (!r.ok) throw new Error('fail'); setView('dashboard'); })
+                    .then((r) => { if (!r.ok) throw new Error('fail'); submissionIdRef.current = null; setView('dashboard'); })
                     .catch(() => showAlert('Не вдалося зберегти заявку. Спробуйте ще раз.'));
             }
             return;

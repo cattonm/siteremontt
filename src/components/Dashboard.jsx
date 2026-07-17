@@ -16,17 +16,10 @@ import { useEffect, useState, useRef } from 'react';
 import { authFetch, clearSession } from '../utils/auth';
 import {
     Search, RefreshCw, LogOut, Users, BarChart3, Inbox, Copy, Check, X,
-    Hand, Trash2, Calculator, ExternalLink, ChevronDown, ChevronUp, Phone,
+    Trash2, Calculator, ExternalLink, ChevronDown, ChevronUp, Phone,
     Undo2, Flame, AlertTriangle,
 } from 'lucide-react';
 
-const DEAL_LABELS = {
-    new: '🆕 Нова',
-    sent: '📤 КП відправлено',
-    won: '✅ Виграна',
-    lost: '❌ Програна',
-};
-const DEAL_COLORS = { new: '#0a84ff', sent: '#ff9500', won: '#34c759', lost: '#8e8e93' };
 const PAGE = 20;
 
 const money = (n) => Number(n || 0).toLocaleString('uk-UA');
@@ -130,10 +123,8 @@ function OrderDetail({ row }) {
 /* ---------------- Вкладка «Заявки» ---------------- */
 function OrdersTab({ role }) {
     const [orders, setOrders] = useState([]);
-    const [counts, setCounts] = useState({});
     const [total, setTotal] = useState(0);
     const [hasMore, setHasMore] = useState(false);
-    const [filter, setFilter] = useState(null);
     const [input, setInput] = useState('');      // те, що людина набирає
     const [q, setQ] = useState('');              // те, що реально шукаємо (дебаунс)
     const [offset, setOffset] = useState(0);
@@ -156,7 +147,6 @@ function OrdersTab({ role }) {
             setError(null);
             try {
                 const p = new URLSearchParams({ limit: String(PAGE), offset: String(offset) });
-                if (filter) p.set('deal', filter);
                 if (q) p.set('q', q);
                 const res = await authFetch(`/api/orders?${p}`);
                 // РАНІШЕ помилку API просто ковтали, і кабінет малював «Заявок
@@ -173,7 +163,6 @@ function OrdersTab({ role }) {
                 if (!alive) return;
                 // offset > 0 — це «Показати ще», дописуємо в кінець
                 setOrders((prev) => (offset > 0 ? [...prev, ...(d.orders || [])] : (d.orders || [])));
-                setCounts(d.counts || {});
                 setTotal(d.total || 0);
                 setHasMore(!!d.has_more);
             } catch (e) {
@@ -185,32 +174,9 @@ function OrdersTab({ role }) {
             if (alive) setLoading(false);
         })();
         return () => { alive = false; };
-    }, [filter, q, offset, reloadKey]);
+    }, [q, offset, reloadKey]);
 
     const refresh = () => { setOffset(0); setReloadKey((k) => k + 1); };
-
-    // ОПТИМІСТИЧНО: малюємо новий статус одразу, запит летить фоном
-    const setStatus = async (row, deal, claim = false) => {
-        const before = orders;
-        setOrders((prev) => prev.map((o) => (o.row === row
-            ? { ...o, deal, manager_id: claim ? 'me' : o.manager_id }
-            : o)));
-        setCounts((c) => {
-            const old = before.find((o) => o.row === row)?.deal;
-            if (!old || old === deal) return c;
-            return { ...c, [old]: Math.max(0, (c[old] || 1) - 1), [deal]: (c[deal] || 0) + 1 };
-        });
-        try {
-            const res = await authFetch('/api/order_status', {
-                method: 'POST',
-                body: JSON.stringify({ row, deal, claim }),
-            });
-            if (!res.ok) throw new Error('fail');
-        } catch {
-            setOrders(before);                       // відкат
-            alert('Не вдалося змінити статус. Спробуйте ще раз.');
-        }
-    };
 
     // У КОШИК: заявка зникає зі списку миттєво, запит летить фоном.
     // Це soft delete — дані лишаються в таблиці й відновлюються з «Кошика».
@@ -251,15 +217,8 @@ function OrdersTab({ role }) {
                 </button>
             </div>
 
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
-                <Chip active={!filter} onClick={() => { setFilter(null); setOffset(0); }}>
-                    Усі {Object.values(counts).reduce((a, b) => a + b, 0)}
-                </Chip>
-                {Object.entries(DEAL_LABELS).map(([k, label]) => (
-                    <Chip key={k} active={filter === k} onClick={() => { setFilter(filter === k ? null : k); setOffset(0); }}>
-                        {label} {counts[k] ?? 0}
-                    </Chip>
-                ))}
+            <div style={{ fontSize: '13px', color: 'var(--hint-color)', marginBottom: '14px' }}>
+                Заявок: <b style={{ color: 'var(--text-color)' }}>{total}</b>
             </div>
 
             {error && (
@@ -290,19 +249,19 @@ function OrdersTab({ role }) {
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start' }}>
                             <div style={{ minWidth: 0, flex: 1, cursor: 'pointer' }} onClick={() => setOpenRow(isOpen ? null : o.row)}>
                                 <div style={{ fontWeight: 700, fontSize: '15px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {/* Префікс розрізняє походження заявки: 👔 створив менеджер, 🌐 прийшла з сайту */}
+                                    <span title={o.source === 'web' ? 'Заявка з сайту' : 'Створена менеджером'}>
+                                        {o.source === 'web' ? '🌐' : '👔'}
+                                    </span>
                                     {o.name || 'Без імені'}
-                                    {o.source === 'web' && !o.manager_id && (
-                                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#ff9500' }}>🔥 вільний</span>
-                                    )}
                                     {isOpen ? <ChevronUp size={14} color="var(--hint-color)" /> : <ChevronDown size={14} color="var(--hint-color)" />}
                                 </div>
                                 <div style={{ fontSize: '13px', color: 'var(--hint-color)', marginTop: '2px' }}>{o.date}</div>
                                 <div style={{ fontSize: '12.5px', color: 'var(--hint-color)', marginTop: '2px' }}>{o.address}</div>
-                                {role === 'admin' && o.manager_name && (
+                                {o.manager_name && (
                                     <div style={{ fontSize: '12px', color: 'var(--hint-color)', marginTop: '3px' }}>👔 {o.manager_name}</div>
                                 )}
                             </div>
-                            <span style={{ ...badge, background: DEAL_COLORS[o.deal] }}>{DEAL_LABELS[o.deal]}</span>
                         </div>
 
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px', alignItems: 'center' }}>
@@ -311,16 +270,6 @@ function OrdersTab({ role }) {
                                 <a href={`tel:${o.phone.replace(/[^\d+]/g, '')}`} style={{ ...btnSmall, textDecoration: 'none', fontWeight: 700 }}>
                                     <Phone size={13} /> {o.phone}
                                 </a>
-                            )}
-                            {Object.entries(DEAL_LABELS)
-                                .filter(([k]) => k !== o.deal)
-                                .map(([k, label]) => (
-                                    <button key={k} onClick={() => setStatus(o.row, k)} style={btnSmall}>{label}</button>
-                                ))}
-                            {o.source === 'web' && !o.manager_id && (
-                                <button onClick={() => setStatus(o.row, 'new', true)} style={{ ...btnSmall, background: '#ff9500', color: '#fff', border: 'none' }}>
-                                    <Hand size={13} /> Взяти в роботу
-                                </button>
                             )}
                             <a href={`?edit_id=${o.row}`} style={{ ...btnSmall, textDecoration: 'none' }}>
                                 <ExternalLink size={13} /> Анкета
@@ -439,32 +388,14 @@ function StatsTab() {
     }, []);
     if (!s) return <div style={{ ...skeleton, height: '120px' }} />;
 
-    const maxCount = Math.max(1, ...Object.values(s.by_status || {}));
     return (
         <div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
                 <Stat label="Усього заявок" value={s.total} />
                 <Stat label="З сайту" value={s.web_leads} />
-                <Stat label="Конверсія" value={s.conversion === null ? '—' : `${s.conversion}%`} hint="виграні / закриті" />
-                <Stat label="Виграно" value={s.by_status?.won ?? 0} color="#34c759" />
             </div>
 
             <div style={card}>
-                <div style={{ fontWeight: 700, marginBottom: '10px' }}>Воронка</div>
-                {Object.entries(s.by_status || {}).map(([k, v]) => (
-                    <div key={k} style={{ marginBottom: '8px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', marginBottom: '3px' }}>
-                            <span>{DEAL_LABELS[k]}</span><b>{v}</b>
-                        </div>
-                        {/* Проста смуга: видно перекоси воронки без жодних графіків */}
-                        <div style={{ height: '6px', borderRadius: '3px', background: 'var(--secondary-bg, rgba(127,127,127,0.12))' }}>
-                            <div style={{ width: `${(v / maxCount) * 100}%`, height: '100%', borderRadius: '3px', background: DEAL_COLORS[k] }} />
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            <div style={{ ...card, marginTop: '12px' }}>
                 <div style={{ fontWeight: 700, marginBottom: '10px' }}>По менеджерах</div>
                 {Object.keys(s.by_manager || {}).length === 0 && <div style={{ color: 'var(--hint-color)', fontSize: '14px' }}>Поки порожньо</div>}
                 {Object.entries(s.by_manager || {}).sort((a, b) => b[1] - a[1]).map(([n, c]) => (
@@ -656,22 +587,10 @@ export default function Dashboard({ session, onNewOrder }) {
 
 /* --- пресети стилів --- */
 const card = { background: 'var(--card-bg, rgba(127,127,127,0.06))', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '14px', marginBottom: '10px' };
-const badge = { color: '#fff', fontSize: '11px', fontWeight: 700, padding: '4px 9px', borderRadius: '20px', whiteSpace: 'nowrap', flexShrink: 0 };
 const btnSmall = { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12.5px', fontWeight: 600, padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-color)', cursor: 'pointer' };
 const btnIcon = { display: 'flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-color)', cursor: 'pointer', flexShrink: 0 };
 const btnPrimary = { display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 14px', borderRadius: '10px', border: 'none', background: 'var(--link-color, #0a84ff)', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer' };
 const skeleton = { borderRadius: '14px', background: 'var(--secondary-bg, rgba(127,127,127,0.12))', animation: 'pulse 1.2s ease-in-out infinite' };
-
-function Chip({ active, onClick, children }) {
-    return (
-        <button onClick={onClick} style={{
-            ...btnSmall,
-            background: active ? 'var(--link-color, #0a84ff)' : 'transparent',
-            color: active ? '#fff' : 'var(--text-color)',
-            borderColor: active ? 'transparent' : 'var(--border-color)',
-        }}>{children}</button>
-    );
-}
 
 function Tab({ active, onClick, children }) {
     return (

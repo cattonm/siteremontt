@@ -35,6 +35,9 @@ const money = (n) => Number(n || 0).toLocaleString('uk-UA');
 function OrderDetail({ row }) {
     const [data, setData] = useState(null);
     const [failed, setFailed] = useState(false);
+    const [report, setReport] = useState('');
+    const [gen, setGen] = useState(false);
+    const [genErr, setGenErr] = useState('');
 
     useEffect(() => {
         let alive = true;
@@ -42,13 +45,26 @@ function OrderDetail({ row }) {
             try {
                 const res = await authFetch(`/api/order_detail?row=${row}`);
                 const d = await res.json();
-                if (alive) setData(d);
+                if (alive) { setData(d); setReport(d.order?.report || ''); }
             } catch {
                 if (alive) setFailed(true);
             }
         })();
         return () => { alive = false; };
     }, [row]);
+
+    const generate = async () => {
+        setGen(true); setGenErr('');
+        try {
+            const res = await authFetch('/api/generate_report', {
+                method: 'POST', body: JSON.stringify({ row }),
+            });
+            const d = await res.json();
+            if (res.ok && d.report != null) setReport(d.report);
+            else setGenErr('Не вдалося згенерувати ТЗ. Спробуйте ще раз.');
+        } catch { setGenErr('Помилка мережі.'); }
+        setGen(false);
+    };
 
     if (failed) return <div style={{ fontSize: '13px', color: '#ff3b30', padding: '10px 0' }}>Не вдалося завантажити деталі.</div>;
     if (!data) return <div style={{ ...skeleton, height: '70px', marginTop: '10px' }} />;
@@ -92,6 +108,21 @@ function OrderDetail({ row }) {
             )}
 
             {!b && <div style={{ fontSize: '13px', color: 'var(--hint-color)' }}>Кошторис не вдалося порахувати (стара заявка).</div>}
+
+            <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed var(--border-color)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700 }}>📋 Технічне завдання</span>
+                    <button onClick={generate} disabled={gen}
+                        style={{ fontSize: '12px', padding: '5px 11px', borderRadius: '8px', border: 'none',
+                                 background: 'var(--button-color, #0a84ff)', color: '#fff', cursor: gen ? 'default' : 'pointer', opacity: gen ? 0.6 : 1 }}>
+                        {gen ? 'Генеруємо…' : (report ? '🔄 Перегенерувати' : '✨ Згенерувати ТЗ')}
+                    </button>
+                </div>
+                {genErr && <div style={{ fontSize: '12px', color: '#ff3b30', marginBottom: '6px' }}>{genErr}</div>}
+                {report
+                    ? <div style={{ fontSize: '13px', lineHeight: 1.55 }} dangerouslySetInnerHTML={{ __html: report }} />
+                    : <div style={{ fontSize: '12.5px', color: 'var(--hint-color)' }}>ТЗ ще не згенеровано.</div>}
+            </div>
         </div>
     );
 }

@@ -138,7 +138,10 @@ export default function App() {
         if (editId) {
             // РЕЖИМ РЕДАГУВАННЯ (isLoadingEdit уже true з лінивого ініту)
             fetch(`${BACKEND_URL}/api/get_order?edit_id=${editId}`, {
-                headers: { 'X-Telegram-Init-Data': tg?.initData || '' } 
+                headers: {
+                    'X-Telegram-Init-Data': tg?.initData || '',
+                    ...(getSession()?.token ? { 'X-Session-Token': getSession().token } : {}),
+                },
             })
                 .then(res => {
                     if(!res.ok) throw new Error("Помилка завантаження");

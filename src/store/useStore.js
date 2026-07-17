@@ -9,6 +9,13 @@ const useStore = create(
       client: { name: '', phone: '', object_type: 'Квартира (Новобудова)', address: '', area: '', floor: '1', elevator: 'Немає' },
       answers: {}, // Для старих плоских відповідей (стяжка, загальні питання)
       rooms: [],   // НОВИЙ МАСИВ для візуалізатора
+      // ID заявки, яку зараз редагує менеджер (не гостьовий чернетка!).
+      // Персистимо його поряд з даними: якщо застосунок закриють і відкриють
+      // ЗАНОВО без ?edit_id в URL (наприклад, через кнопку бота), ми маємо
+      // спосіб дізнатись, що в сторі — чужа заявка на редагуванні, а не власна
+      // нова чернетка. Інакше відправка створювала б ДУБЛЬ замість оновлення.
+      editingOrderId: null,
+      setEditingOrderId: (id) => set({ editingOrderId: id }),
 
       // Жива розбивка цін від live_calc: { rooms: {roomId: {work, mat_min}}, general: {work, mat_min} }
       // НЕ персиститься (partialize нижче) — це кеш відповіді сервера.
@@ -86,6 +93,7 @@ const useStore = create(
         rooms: [],
         lastRemoved: null,
         liveBreakdown: { rooms: {}, general: null },
+        editingOrderId: null,
       })
     }),
     {
@@ -97,6 +105,7 @@ const useStore = create(
         client: s.client,
         answers: s.answers,
         rooms: s.rooms,
+        editingOrderId: s.editingOrderId,
       }),
     }
   )

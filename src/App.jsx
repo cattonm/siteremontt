@@ -83,9 +83,14 @@ export default function App() {
     const [session, setSessionState] = useState(() => getSession());
     // Режим сайту: 'calc' — калькулятор, 'login' — вхід, 'dashboard' — кабінет.
     const [view, setView] = useState(() => {
+        const params = new URLSearchParams(window.location.search);
+        // Редагування заявки МАЄ відкрити форму одразу — раніше тут
+        // ігнорувався edit_id, якщо була активна сесія: людина бачила
+        // кабінет, а не анкету (дані вже тихо вантажились у фоні).
+        if (params.get('edit_id')) return 'calc';
         // ?panel=1 — пряме посилання на кабінет: зручно тримати в закладках
         // і давати менеджерам замість «шукай кнопку в меню».
-        const wantsPanel = new URLSearchParams(window.location.search).has('panel');
+        const wantsPanel = params.has('panel');
         if (getSession()) return 'dashboard';
         return wantsPanel ? 'login' : 'calc';
     });
@@ -156,6 +161,11 @@ export default function App() {
                             useStore.setState({ rooms: data.answers.rooms });
                         }
                     }
+                    // Позначаємо в СТОРІ (не лише в URL), що це — редагування
+                    // заявки editId. Так навіть якщо застосунок пізніше
+                    // відкриють без ?edit_id, дані не сплутають із власною
+                    // новою чернеткою і не підуть у /api/create_order.
+                    useStore.setState({ editingOrderId: editId });
                     // Кидаємо одразу на фінальний екран (підсумок)
                     setCurrentStep(9999); 
                 })
@@ -347,7 +357,13 @@ export default function App() {
             }
 
             vibe('heavy'); 
-            const editId = new URLSearchParams(window.location.search).get('edit_id'); 
+            // Основне джерело — URL (?edit_id=), запасне — те, що ми записали
+            // в стор одразу після завантаження анкети на редагування. Це і є
+            // фікс дублювання: якщо застосунок відкрили заново БЕЗ edit_id у
+            // URL, але в сторі лишився editingOrderId — це все одно оновлення
+            // наявної заявки, а не нова.
+            const editId = new URLSearchParams(window.location.search).get('edit_id')
+                || useStore.getState().editingOrderId;
             
             // АДАПТЕР: Додаємо rooms до фінального JSON
             const payloadAnswers = { ...answers, rooms: rooms };
@@ -376,7 +392,10 @@ export default function App() {
                     method: 'POST', 
                     headers: authHeaders(), 
                     body: JSON.stringify(data) 
-                }).then(() => (tg?.close ? tg.close() : setView('dashboard'))); 
+                }).then((r) => {
+                    if (r.ok) useStore.setState({ editingOrderId: null });   // оновлено — більше не «в редагуванні»
+                    if (tg?.close) tg.close(); else setView('dashboard');
+                }); 
             } else if (tg?.sendData) {
                 // Міні-апка: заявку ловить бот через web_app_data.
                 tg.sendData(JSON.stringify(data));

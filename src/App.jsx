@@ -248,6 +248,21 @@ export default function App() {
         return zones;
     }, [finalQuestions, answers]);
 
+    // === 4.5 ФОНОВЕ ПЕРЕДЗАВАНТАЖЕННЯ 3D ===
+    // three.js (~240 КБ gzip) лінивий і тягнеться лише на кроці планувальника.
+    // Раніше це давало паузу САМЕ там. Тепер підвантажуємо чанк у фоні під час
+    // простою — поки людина заповнює перші кроки. Старт не блокуємо (idle-час),
+    // а до 3D-кроку код уже в кеші — без очікування.
+    useEffect(() => {
+        const warm = () => { import('./components/RoomVisualizer').catch(() => {}); };
+        if ('requestIdleCallback' in window) {
+            const id = window.requestIdleCallback(warm, { timeout: 4000 });
+            return () => window.cancelIdleCallback?.(id);
+        }
+        const t = setTimeout(warm, 2500);
+        return () => clearTimeout(t);
+    }, []);
+
     // === 5. LIVE CALC: ЖИВИЙ РОЗРАХУНОК ===
     useEffect(() => {
         if (currentStep < 0 && currentStep !== 9999) return; 

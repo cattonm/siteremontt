@@ -48,7 +48,8 @@ export default function App() {
         currentStep, setCurrentStep, 
         client, setClient, 
         answers, setAnswers, 
-        rooms, resetDraftSilent: storeResetDraft 
+        rooms, resetDraftSilent: storeResetDraft,
+        editingOrderId
     } = useStore();
 
     // === 2. ЛОКАЛЬНІ СТАНИ UI (Не йдуть на сервер) ===
@@ -308,7 +309,13 @@ export default function App() {
     // Дебаунс 3 с (довший за live-calc: тут ходимо в Google Sheets, не варто
     // смикати на кожен клік). Режим редагування не чіпаємо — там уже є заявка.
     useEffect(() => {
-        const editId = new URLSearchParams(window.location.search).get('edit_id');
+        // Джерело правди про «ми в режимі редагування» — URL АБО збережений
+        // editingOrderId. Раніше дивились лише в URL: якщо менеджер відкривав
+        // застосунок заново (вже без ?edit_id), вміст ЧУЖОЇ збереженої заявки
+        // їхав на сервер як його «незавершена чернетка» — і бот ще й нагадував
+        // про неї через добу.
+        const editId = new URLSearchParams(window.location.search).get('edit_id')
+            || useStore.getState().editingOrderId;
         if (editId || currentStep < 0) return;
         if (!tg?.initData && !session) return;   // гість чернетки на сервері не має
         if (!client.name && !client.area && rooms.length === 0) return; // порожню не шлемо
@@ -408,7 +415,12 @@ export default function App() {
                     headers: authHeaders(), 
                     body: JSON.stringify(data) 
                 }).then((r) => {
-                    if (r.ok) useStore.setState({ editingOrderId: null });   // оновлено — більше не «в редагуванні»
+                    // ВАЖЛИВО: чистимо не лише прапорець редагування, а й САМІ
+                    // дані анкети. Раніше вони лишались у чернетці, і при
+                    // наступному відкритті застосунок пропонував «продовжити
+                    // збережену» — тобто ту саму, вже збережену заявку. Її
+                    // повторна відправка створювала ДУБЛЬ.
+                    if (r.ok) handleResetDraftSilent();
                     if (tg?.close) tg.close(); else setView('dashboard');
                 }); 
             } else if (tg?.sendData) {
@@ -666,9 +678,15 @@ export default function App() {
                     <div className="sheet-overlay open" style={{ zIndex: 9998 }}></div>
                     <div className="image-modal open" style={{ zIndex: 9999, padding: '25px', textAlign: 'center', background: 'var(--modal-bg)' }}>
                         <h3 style={{ marginTop: 0, fontSize: '20px' }}>Відновлення</h3>
-                        <p style={{ color: 'var(--hint-color)', fontSize: '15px', lineHeight: '1.4', marginBottom: 0 }}>Знайдено незбережену анкету. Бажаєте продовжити заповнення з місця зупинки?</p>
+                        <p style={{ color: 'var(--hint-color)', fontSize: '15px', lineHeight: '1.4', marginBottom: 0 }}>
+                            {editingOrderId
+                                ? `Ви редагували заявку №${editingOrderId}, але не зберегли зміни. Продовжити редагування? Збереження оновить ту саму заявку, а не створить нову.`
+                                : 'Знайдено незбережену анкету. Бажаєте продовжити заповнення з місця зупинки?'}
+                        </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
-                            <button onClick={() => { vibe('medium'); setShowDraftPrompt(false); }} style={{ background: 'var(--link-color)', color: 'white', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>Продовжити збережену</button>
+                            <button onClick={() => { vibe('medium'); setShowDraftPrompt(false); }} style={{ background: 'var(--link-color)', color: 'white', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>
+                                {editingOrderId ? 'Продовжити редагування' : 'Продовжити збережену'}
+                            </button>
                             <button onClick={() => { vibe('light'); handleResetDraftSilent(); setShowDraftPrompt(false); }} style={{ background: 'rgba(255, 59, 48, 0.1)', color: '#ff3b30', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>Почати заново</button>
                         </div>
                     </div>

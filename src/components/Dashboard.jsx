@@ -121,7 +121,7 @@ function OrderDetail({ row }) {
 }
 
 /* ---------------- Вкладка «Заявки» ---------------- */
-function OrdersTab({ role }) {
+function OrdersTab() {
     const [orders, setOrders] = useState([]);
     const [total, setTotal] = useState(0);
     const [hasMore, setHasMore] = useState(false);
@@ -776,7 +776,7 @@ function NumField({ label, value, onChange }) {
                 <Tab active={tab === 'trash'} onClick={() => setTab('trash')}><Trash2 size={15} /> Кошик</Tab>
             </div>
 
-            {tab === 'orders' && <OrdersTab role={session.role} />}
+            {tab === 'orders' && <OrdersTab />}
             {tab === 'team' && isAdmin && <AdminTab />}
             {tab === 'prices' && isAdmin && <PricesTab />}
             {tab === 'stats' && isAdmin && <StatsTab />}

@@ -547,18 +547,19 @@ function TrashTab({ role }) {
 export default function Dashboard({ session, onNewOrder }) {
     const isAdmin = session.role === 'admin';
 /* ---------------- Вкладка «Прайс» (адмін) ---------------- */
-// Раніше ціни правились у Google-таблиці: будь-хто з доступом міг зсунути
-// колонку або вписати текст замість числа, і кошторис тихо ламався. Тепер
-// прайс живе в БД, а тут — єдине місце, де його можна змінити: з перевіркою
-// чисел, з підписом хто і коли правив.
+// Три рівні ремонту беруться з трьох цін на позицію:
+//     Стандарт — дешевший матеріал, Преміум — дорожчий, Комфорт — між ними.
+// Комфорт можна лишити порожнім: тоді рахується середнє. Заповнений — має
+// пріоритет. Раніше ці 18 «правильних» цін комфорту жили в коді, і змінити
+// їх можна було тільки деплоєм.
 function PricesTab() {
     const [rows, setRows] = useState([]);
-    const [edits, setEdits] = useState({});   // key -> { work, mat_min, mat_max } як рядки
+    const [edits, setEdits] = useState({});
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [readOnly, setReadOnly] = useState('');
-    const [savedAt, setSavedAt] = useState('');
+    const [savedNote, setSavedNote] = useState('');
     const [q, setQ] = useState('');
 
     useEffect(() => {
@@ -580,37 +581,53 @@ function PricesTab() {
         return () => { alive = false; };
     }, []);
 
+    const asText = (v) => (v === null || v === undefined ? '' : String(v));
+    const draft = (r) => edits[r.key] || {
+        work: asText(r.work), mat_min: asText(r.mat_min),
+        mat_mid: asText(r.mat_mid), mat_max: asText(r.mat_max),
+    };
+
     const setField = (key, field, value) => {
-        setSavedAt('');
+        setSavedNote('');
         setEdits((e) => {
             const row = rows.find((r) => r.key === key);
-            const cur = e[key] || { work: String(row.work), mat_min: String(row.mat_min), mat_max: String(row.mat_max) };
-            return { ...e, [key]: { ...cur, [field]: value } };
+            return { ...e, [key]: { ...draft(row), ...e[key], [field]: value } };
         });
     };
 
-    // Змінені — це ті, де значення реально відрізняється від збереженого,
-    // а не просто ті, у чиє поле хтось клацнув.
-    const changed = rows.filter((r) => {
+    const isChanged = (r) => {
         const e = edits[r.key];
         if (!e) return false;
-        return Number(e.work) !== r.work || Number(e.mat_min) !== r.mat_min || Number(e.mat_max) !== r.mat_max;
-    });
+        return e.work !== asText(r.work) || e.mat_min !== asText(r.mat_min)
+            || e.mat_max !== asText(r.mat_max) || e.mat_mid !== asText(r.mat_mid);
+    };
 
-    const badRows = changed.filter((r) => {
-        const e = edits[r.key];
-        const nums = [e.work, e.mat_min, e.mat_max].map(Number);
-        return nums.some((n) => !Number.isFinite(n) || n < 0);
-    });
+    // Комфорт може бути порожнім — це «рахувати як середнє», а не помилка.
+    const problems = (r) => {
+        const d = draft(r);
+        const nums = [d.work, d.mat_min, d.mat_max].map(Number);
+        if (nums.some((n) => !Number.isFinite(n) || n < 0)) return 'Введіть число не менше нуля';
+        if (d.mat_mid !== '') {
+            const mid = Number(d.mat_mid);
+            if (!Number.isFinite(mid) || mid < 0) return 'Комфорт: введіть число або лишіть порожнім';
+            const lo = Math.min(nums[1], nums[2]), hi = Math.max(nums[1], nums[2]);
+            if (mid < lo || mid > hi) return `Комфорт має бути між ${lo} і ${hi}`;
+        }
+        return '';
+    };
+
+    const changed = rows.filter(isChanged);
+    const broken = changed.filter((r) => problems(r));
 
     const save = async () => {
-        if (!changed.length || badRows.length) return;
+        if (!changed.length || broken.length) return;
         setSaving(true); setError('');
         const items = changed.map((r) => {
-            const e = edits[r.key];
+            const d = draft(r);
             return {
                 key: r.key, label: r.label, unit: r.unit,
-                work: Number(e.work), mat_min: Number(e.mat_min), mat_max: Number(e.mat_max),
+                work: Number(d.work), mat_min: Number(d.mat_min), mat_max: Number(d.mat_max),
+                mat_mid: d.mat_mid === '' ? null : Number(d.mat_mid),
             };
         });
         try {
@@ -622,13 +639,12 @@ function PricesTab() {
                 setError(d.message || 'Зберегти не вдалося. Перевірте числа і спробуйте ще раз.');
                 return;
             }
-            // Оновлюємо локально, щоб не смикати сервер удруге.
             const byKey = Object.fromEntries(items.map((i) => [i.key, i]));
             setRows((rs) => rs.map((r) => (byKey[r.key]
                 ? { ...r, ...byKey[r.key], saved: true, updated_at: 'щойно', updated_by: 'ви' }
                 : r)));
             setEdits({});
-            setSavedAt(`Збережено ${d.saved} ${d.saved === 1 ? 'позицію' : 'позиції'}`);
+            setSavedNote(`Збережено: ${d.saved}`);
         } catch {
             setError('Немає звʼязку з сервером. Зміни не збережені.');
         } finally {
@@ -645,7 +661,7 @@ function PricesTab() {
         );
     }
     if (loading) {
-        return <div>{[0, 1, 2, 3].map((i) => <div key={i} style={{ ...skeleton, height: '76px', marginBottom: '10px' }} />)}</div>;
+        return <div>{[0, 1, 2, 3].map((i) => <div key={i} style={{ ...skeleton, height: '92px', marginBottom: '10px' }} />)}</div>;
     }
 
     const needle = q.trim().toLowerCase();
@@ -654,7 +670,16 @@ function PricesTab() {
         : rows;
 
     return (
-        <div style={{ paddingBottom: changed.length ? '72px' : 0 }}>
+        <div style={{ paddingBottom: changed.length ? '76px' : 0 }}>
+            <style>{`
+                /* Телефон — два поля в ряд, планшет і ширше — усі чотири.
+                   auto-fit із minmax сам вирішує, скільки влізе. */
+                .price-fields { display: grid; gap: 8px;
+                                grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); }
+                .price-head { display: flex; justify-content: space-between;
+                              align-items: baseline; gap: 8px; flex-wrap: wrap; }
+            `}</style>
+
             <div style={{ position: 'relative', marginBottom: '12px' }}>
                 <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--hint-color)' }} />
                 <input
@@ -665,14 +690,19 @@ function PricesTab() {
                 />
             </div>
 
+            <div style={{ ...card, padding: '10px 12px', fontSize: '12.5px', color: 'var(--hint-color)', lineHeight: 1.5 }}>
+                Ціна матеріалу залежить від рівня ремонту. <b>Комфорт</b> можна лишити
+                порожнім — тоді береться середнє між стандартом і преміумом.
+            </div>
+
             {error && (
                 <div style={{ ...card, borderColor: '#e5484d', color: '#e5484d', fontSize: '13px' }}>
                     <AlertTriangle size={14} style={{ verticalAlign: '-2px', marginRight: '6px' }} />{error}
                 </div>
             )}
-            {savedAt && !changed.length && (
+            {savedNote && !changed.length && (
                 <div style={{ ...card, fontSize: '13px', color: '#2f9e44' }}>
-                    <Check size={14} style={{ verticalAlign: '-2px', marginRight: '6px' }} />{savedAt}
+                    <Check size={14} style={{ verticalAlign: '-2px', marginRight: '6px' }} />{savedNote}
                 </div>
             )}
 
@@ -683,33 +713,31 @@ function PricesTab() {
             )}
 
             {visible.map((r) => {
-                const e = edits[r.key];
-                const val = (f) => (e ? e[f] : String(r[f]));
-                const isChanged = changed.some((c) => c.key === r.key);
-                const nums = [val('work'), val('mat_min'), val('mat_max')].map(Number);
-                const bad = nums.some((n) => !Number.isFinite(n) || n < 0);
-                const swapped = !bad && nums[2] < nums[1];
-
+                const d = draft(r);
+                const problem = problems(r);
+                const midAuto = d.mat_mid === ''
+                    ? Math.round((Number(d.mat_min) + Number(d.mat_max)) / 2) : null;
                 return (
-                    <div key={r.key} style={{ ...card, borderColor: isChanged ? 'var(--link-color, #0a84ff)' : 'var(--border-color)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
+                    <div key={r.key} style={{ ...card, borderColor: isChanged(r) ? 'var(--link-color, #0a84ff)' : 'var(--border-color)' }}>
+                        <div className="price-head" style={{ marginBottom: '10px' }}>
                             <div style={{ fontWeight: 600, fontSize: '14px' }}>
                                 {r.label || r.key}
                                 {r.unit && <span style={{ color: 'var(--hint-color)', fontWeight: 400 }}> · {r.unit}</span>}
                             </div>
-                            <div style={{ fontSize: '11px', color: 'var(--hint-color)', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--hint-color)' }}>
                                 {r.updated_at ? `${r.updated_at}${r.updated_by ? ` · ${r.updated_by}` : ''}` : 'з коду'}
                             </div>
                         </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                            <NumField label="Робота" value={val('work')} onChange={(v) => setField(r.key, 'work', v)} />
-                            <NumField label="Матеріал від" value={val('mat_min')} onChange={(v) => setField(r.key, 'mat_min', v)} />
-                            <NumField label="до" value={val('mat_max')} onChange={(v) => setField(r.key, 'mat_max', v)} />
+                        <div className="price-fields">
+                            <NumField label="Робота" value={d.work} onChange={(v) => setField(r.key, 'work', v)} />
+                            <NumField label="Стандарт" value={d.mat_min} onChange={(v) => setField(r.key, 'mat_min', v)} />
+                            <NumField label="Комфорт" value={d.mat_mid} placeholder={midAuto ? String(midAuto) : 'авто'}
+                                      hint={midAuto !== null} onChange={(v) => setField(r.key, 'mat_mid', v)} />
+                            <NumField label="Преміум" value={d.mat_max} onChange={(v) => setField(r.key, 'mat_max', v)} />
                         </div>
 
-                        {bad && <div style={{ fontSize: '12px', color: '#e5484d', marginTop: '6px' }}>Введіть число не менше нуля</div>}
-                        {swapped && <div style={{ fontSize: '12px', color: 'var(--hint-color)', marginTop: '6px' }}>Верхня межа менша за нижню — при збереженні поміняються місцями</div>}
+                        {problem && <div style={{ fontSize: '12px', color: '#e5484d', marginTop: '6px' }}>{problem}</div>}
                     </div>
                 );
             })}
@@ -718,13 +746,13 @@ function PricesTab() {
                 <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, padding: '12px 16px',
                               background: 'var(--bg-color, #fff)', borderTop: '1px solid var(--border-color)',
                               display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                    <div style={{ fontSize: '13px', color: 'var(--hint-color)' }}>
-                        Змінено позицій: {changed.length}
+                    <div style={{ fontSize: '13px', color: broken.length ? '#e5484d' : 'var(--hint-color)' }}>
+                        {broken.length ? `Виправте ${broken.length}` : `Змінено: ${changed.length}`}
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
                         <button onClick={() => { setEdits({}); setError(''); }} style={btnSmall}>Скасувати</button>
-                        <button onClick={save} disabled={saving || badRows.length > 0}
-                                style={{ ...btnPrimary, opacity: saving || badRows.length ? 0.5 : 1 }}>
+                        <button onClick={save} disabled={saving || broken.length > 0}
+                                style={{ ...btnPrimary, opacity: saving || broken.length ? 0.5 : 1 }}>
                             <Save size={15} /> {saving ? 'Зберігаю…' : 'Зберегти'}
                         </button>
                     </div>
@@ -734,16 +762,18 @@ function PricesTab() {
     );
 }
 
-function NumField({ label, value, onChange }) {
+function NumField({ label, value, onChange, placeholder, hint }) {
     return (
-        <label style={{ display: 'block' }}>
+        <label style={{ display: 'block', minWidth: 0 }}>
             <div style={{ fontSize: '11px', color: 'var(--hint-color)', marginBottom: '3px' }}>{label}</div>
             <input
                 type="number" inputMode="decimal" step="any" min="0"
-                value={value} onChange={(e) => onChange(e.target.value)}
+                value={value} placeholder={placeholder}
+                onChange={(e) => onChange(e.target.value)}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '9px 10px', borderRadius: '8px',
                          border: '1px solid var(--border-color)', background: 'transparent',
-                         color: 'var(--text-color)', fontSize: '14px', fontVariantNumeric: 'tabular-nums' }}
+                         color: hint && !value ? 'var(--hint-color)' : 'var(--text-color)',
+                         fontSize: '14px', fontVariantNumeric: 'tabular-nums' }}
             />
         </label>
     );
@@ -752,7 +782,7 @@ function NumField({ label, value, onChange }) {
     const [tab, setTab] = useState('orders');
 
     return (
-        <div style={{ maxWidth: '760px', margin: '0 auto', padding: '20px 16px 60px' }}>
+        <div style={{ maxWidth: '980px', margin: '0 auto', padding: '20px 16px 60px', overflowX: 'hidden' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
                 <div>
                     <div style={{ fontSize: '20px', fontWeight: 800 }}>Кабінет</div>
@@ -768,7 +798,7 @@ function NumField({ label, value, onChange }) {
                 </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '6px', marginBottom: '18px', borderBottom: '1px solid var(--border-color)' }}>
+            <div className="tabbar" style={{ display: 'flex', gap: '6px', marginBottom: '18px', borderBottom: '1px solid var(--border-color)' }}>
                 <Tab active={tab === 'orders'} onClick={() => setTab('orders')}><Inbox size={15} /> Заявки</Tab>
                 {isAdmin && <Tab active={tab === 'team'} onClick={() => setTab('team')}><Users size={15} /> Команда</Tab>}
                 {isAdmin && <Tab active={tab === 'prices'} onClick={() => setTab('prices')}><Tags size={15} /> Прайс</Tab>}
@@ -785,6 +815,10 @@ function NumField({ label, value, onChange }) {
             <style>{`
                 @keyframes spin { 100% { transform: rotate(360deg); } }
                 @keyframes pulse { 0%,100% { opacity: 0.55; } 50% { opacity: 0.9; } }
+                /* Вкладок стало пʼять і смуга перестала влазити у вузький
+                   екран — тягнула вбік усю сторінку. Тепер прокручується сама. */
+                .tabbar { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+                .tabbar::-webkit-scrollbar { display: none; }
             `}</style>
         </div>
     );
@@ -800,7 +834,8 @@ const skeleton = { borderRadius: '14px', background: 'var(--secondary-bg, rgba(1
 function Tab({ active, onClick, children }) {
     return (
         <button onClick={onClick} style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 14px',
+            display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 12px',
+            flexShrink: 0, whiteSpace: 'nowrap',
             background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px',
             fontWeight: active ? 700 : 500,
             color: active ? 'var(--link-color, #0a84ff)' : 'var(--hint-color)',

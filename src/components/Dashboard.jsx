@@ -17,7 +17,7 @@ import { authFetch, clearSession } from '../utils/auth';
 import {
     Search, RefreshCw, LogOut, Users, BarChart3, Inbox, Copy, Check, X,
     Trash2, Calculator, ExternalLink, ChevronDown, ChevronUp, Phone,
-    Undo2, Flame, AlertTriangle,
+    Undo2, Flame, AlertTriangle, Tags, Save,
 } from 'lucide-react';
 
 const PAGE = 20;
@@ -546,6 +546,209 @@ function TrashTab({ role }) {
 
 export default function Dashboard({ session, onNewOrder }) {
     const isAdmin = session.role === 'admin';
+/* ---------------- Вкладка «Прайс» (адмін) ---------------- */
+// Раніше ціни правились у Google-таблиці: будь-хто з доступом міг зсунути
+// колонку або вписати текст замість числа, і кошторис тихо ламався. Тепер
+// прайс живе в БД, а тут — єдине місце, де його можна змінити: з перевіркою
+// чисел, з підписом хто і коли правив.
+function PricesTab() {
+    const [rows, setRows] = useState([]);
+    const [edits, setEdits] = useState({});   // key -> { work, mat_min, mat_max } як рядки
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState('');
+    const [readOnly, setReadOnly] = useState('');
+    const [savedAt, setSavedAt] = useState('');
+    const [q, setQ] = useState('');
+
+    useEffect(() => {
+        let alive = true;
+        (async () => {
+            try {
+                const res = await authFetch('/api/admin/prices');
+                const d = await res.json();
+                if (!alive) return;
+                if (res.status === 409) { setReadOnly(d.message || 'Редагування недоступне'); return; }
+                if (!res.ok) { setError('Не вдалося завантажити прайс. Спробуйте оновити сторінку.'); return; }
+                setRows(d.prices || []);
+            } catch {
+                if (alive) setError('Немає звʼязку з сервером.');
+            } finally {
+                if (alive) setLoading(false);
+            }
+        })();
+        return () => { alive = false; };
+    }, []);
+
+    const setField = (key, field, value) => {
+        setSavedAt('');
+        setEdits((e) => {
+            const row = rows.find((r) => r.key === key);
+            const cur = e[key] || { work: String(row.work), mat_min: String(row.mat_min), mat_max: String(row.mat_max) };
+            return { ...e, [key]: { ...cur, [field]: value } };
+        });
+    };
+
+    // Змінені — це ті, де значення реально відрізняється від збереженого,
+    // а не просто ті, у чиє поле хтось клацнув.
+    const changed = rows.filter((r) => {
+        const e = edits[r.key];
+        if (!e) return false;
+        return Number(e.work) !== r.work || Number(e.mat_min) !== r.mat_min || Number(e.mat_max) !== r.mat_max;
+    });
+
+    const badRows = changed.filter((r) => {
+        const e = edits[r.key];
+        const nums = [e.work, e.mat_min, e.mat_max].map(Number);
+        return nums.some((n) => !Number.isFinite(n) || n < 0);
+    });
+
+    const save = async () => {
+        if (!changed.length || badRows.length) return;
+        setSaving(true); setError('');
+        const items = changed.map((r) => {
+            const e = edits[r.key];
+            return {
+                key: r.key, label: r.label, unit: r.unit,
+                work: Number(e.work), mat_min: Number(e.mat_min), mat_max: Number(e.mat_max),
+            };
+        });
+        try {
+            const res = await authFetch('/api/admin/prices/save', {
+                method: 'POST', body: JSON.stringify({ items }),
+            });
+            const d = await res.json();
+            if (!res.ok) {
+                setError(d.message || 'Зберегти не вдалося. Перевірте числа і спробуйте ще раз.');
+                return;
+            }
+            // Оновлюємо локально, щоб не смикати сервер удруге.
+            const byKey = Object.fromEntries(items.map((i) => [i.key, i]));
+            setRows((rs) => rs.map((r) => (byKey[r.key]
+                ? { ...r, ...byKey[r.key], saved: true, updated_at: 'щойно', updated_by: 'ви' }
+                : r)));
+            setEdits({});
+            setSavedAt(`Збережено ${d.saved} ${d.saved === 1 ? 'позицію' : 'позиції'}`);
+        } catch {
+            setError('Немає звʼязку з сервером. Зміни не збережені.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (readOnly) {
+        return (
+            <div style={card}>
+                <div style={{ fontWeight: 700, marginBottom: '6px' }}>Прайс лише для перегляду</div>
+                <div style={{ fontSize: '13px', color: 'var(--hint-color)', lineHeight: 1.5 }}>{readOnly}</div>
+            </div>
+        );
+    }
+    if (loading) {
+        return <div>{[0, 1, 2, 3].map((i) => <div key={i} style={{ ...skeleton, height: '76px', marginBottom: '10px' }} />)}</div>;
+    }
+
+    const needle = q.trim().toLowerCase();
+    const visible = needle
+        ? rows.filter((r) => (r.label || '').toLowerCase().includes(needle) || r.key.toLowerCase().includes(needle))
+        : rows;
+
+    return (
+        <div style={{ paddingBottom: changed.length ? '72px' : 0 }}>
+            <div style={{ position: 'relative', marginBottom: '12px' }}>
+                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--hint-color)' }} />
+                <input
+                    value={q} onChange={(e) => setQ(e.target.value)}
+                    placeholder="Знайти позицію"
+                    style={{ width: '100%', padding: '11px 12px 11px 36px', borderRadius: '10px', boxSizing: 'border-box',
+                             border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-color)', fontSize: '14px' }}
+                />
+            </div>
+
+            {error && (
+                <div style={{ ...card, borderColor: '#e5484d', color: '#e5484d', fontSize: '13px' }}>
+                    <AlertTriangle size={14} style={{ verticalAlign: '-2px', marginRight: '6px' }} />{error}
+                </div>
+            )}
+            {savedAt && !changed.length && (
+                <div style={{ ...card, fontSize: '13px', color: '#2f9e44' }}>
+                    <Check size={14} style={{ verticalAlign: '-2px', marginRight: '6px' }} />{savedAt}
+                </div>
+            )}
+
+            {!visible.length && (
+                <div style={{ ...card, textAlign: 'center', color: 'var(--hint-color)', fontSize: '13.5px' }}>
+                    За запитом «{q}» нічого немає. Спробуйте коротший запит.
+                </div>
+            )}
+
+            {visible.map((r) => {
+                const e = edits[r.key];
+                const val = (f) => (e ? e[f] : String(r[f]));
+                const isChanged = changed.some((c) => c.key === r.key);
+                const nums = [val('work'), val('mat_min'), val('mat_max')].map(Number);
+                const bad = nums.some((n) => !Number.isFinite(n) || n < 0);
+                const swapped = !bad && nums[2] < nums[1];
+
+                return (
+                    <div key={r.key} style={{ ...card, borderColor: isChanged ? 'var(--link-color, #0a84ff)' : 'var(--border-color)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
+                            <div style={{ fontWeight: 600, fontSize: '14px' }}>
+                                {r.label || r.key}
+                                {r.unit && <span style={{ color: 'var(--hint-color)', fontWeight: 400 }}> · {r.unit}</span>}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--hint-color)', whiteSpace: 'nowrap' }}>
+                                {r.updated_at ? `${r.updated_at}${r.updated_by ? ` · ${r.updated_by}` : ''}` : 'з коду'}
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                            <NumField label="Робота" value={val('work')} onChange={(v) => setField(r.key, 'work', v)} />
+                            <NumField label="Матеріал від" value={val('mat_min')} onChange={(v) => setField(r.key, 'mat_min', v)} />
+                            <NumField label="до" value={val('mat_max')} onChange={(v) => setField(r.key, 'mat_max', v)} />
+                        </div>
+
+                        {bad && <div style={{ fontSize: '12px', color: '#e5484d', marginTop: '6px' }}>Введіть число не менше нуля</div>}
+                        {swapped && <div style={{ fontSize: '12px', color: 'var(--hint-color)', marginTop: '6px' }}>Верхня межа менша за нижню — при збереженні поміняються місцями</div>}
+                    </div>
+                );
+            })}
+
+            {changed.length > 0 && (
+                <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, padding: '12px 16px',
+                              background: 'var(--bg-color, #fff)', borderTop: '1px solid var(--border-color)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--hint-color)' }}>
+                        Змінено позицій: {changed.length}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button onClick={() => { setEdits({}); setError(''); }} style={btnSmall}>Скасувати</button>
+                        <button onClick={save} disabled={saving || badRows.length > 0}
+                                style={{ ...btnPrimary, opacity: saving || badRows.length ? 0.5 : 1 }}>
+                            <Save size={15} /> {saving ? 'Зберігаю…' : 'Зберегти'}
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function NumField({ label, value, onChange }) {
+    return (
+        <label style={{ display: 'block' }}>
+            <div style={{ fontSize: '11px', color: 'var(--hint-color)', marginBottom: '3px' }}>{label}</div>
+            <input
+                type="number" inputMode="decimal" step="any" min="0"
+                value={value} onChange={(e) => onChange(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '9px 10px', borderRadius: '8px',
+                         border: '1px solid var(--border-color)', background: 'transparent',
+                         color: 'var(--text-color)', fontSize: '14px', fontVariantNumeric: 'tabular-nums' }}
+            />
+        </label>
+    );
+}
+
     const [tab, setTab] = useState('orders');
 
     return (
@@ -568,12 +771,14 @@ export default function Dashboard({ session, onNewOrder }) {
             <div style={{ display: 'flex', gap: '6px', marginBottom: '18px', borderBottom: '1px solid var(--border-color)' }}>
                 <Tab active={tab === 'orders'} onClick={() => setTab('orders')}><Inbox size={15} /> Заявки</Tab>
                 {isAdmin && <Tab active={tab === 'team'} onClick={() => setTab('team')}><Users size={15} /> Команда</Tab>}
+                {isAdmin && <Tab active={tab === 'prices'} onClick={() => setTab('prices')}><Tags size={15} /> Прайс</Tab>}
                 {isAdmin && <Tab active={tab === 'stats'} onClick={() => setTab('stats')}><BarChart3 size={15} /> Статистика</Tab>}
                 <Tab active={tab === 'trash'} onClick={() => setTab('trash')}><Trash2 size={15} /> Кошик</Tab>
             </div>
 
             {tab === 'orders' && <OrdersTab role={session.role} />}
             {tab === 'team' && isAdmin && <AdminTab />}
+            {tab === 'prices' && isAdmin && <PricesTab />}
             {tab === 'stats' && isAdmin && <StatsTab />}
             {tab === 'trash' && <TrashTab role={session.role} />}
 

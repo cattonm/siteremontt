@@ -17,7 +17,7 @@ import { authFetch, clearSession } from '../utils/auth';
 import {
     Search, RefreshCw, LogOut, Users, BarChart3, Inbox, Copy, Check, X,
     Trash2, Calculator, ExternalLink, ChevronDown, ChevronUp, Phone,
-    Undo2, Flame, AlertTriangle, Tags, Save,
+    Undo2, Flame, AlertTriangle, Tags, Save, FileText,
 } from 'lucide-react';
 
 const PAGE = 20;
@@ -102,6 +102,8 @@ function OrderDetail({ row }) {
 
             {!b && <div style={{ fontSize: '13px', color: 'var(--hint-color)' }}>Кошторис не вдалося порахувати (стара заявка).</div>}
 
+            {b && <PdfButton row={row} clientName={data?.order?.name} />}
+
             <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed var(--border-color)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <span style={{ fontSize: '13px', fontWeight: 700 }}>📋 Технічне завдання</span>
@@ -116,6 +118,55 @@ function OrderDetail({ row }) {
                     ? <div style={{ fontSize: '13px', lineHeight: 1.55 }} dangerouslySetInnerHTML={{ __html: report }} />
                     : <div style={{ fontSize: '12.5px', color: 'var(--hint-color)' }}>ТЗ ще не згенеровано.</div>}
             </div>
+        </div>
+    );
+}
+
+/* Кнопка вивантаження кошторису.
+   Через <a href> не вийде: ендпоінт вимагає токен у заголовку, а посилання
+   його не несе. Тому тягнемо файл запитом і віддаємо браузеру як blob. */
+function PdfButton({ row, clientName }) {
+    const [busy, setBusy] = useState(false);
+    const [err, setErr] = useState('');
+
+    const download = async () => {
+        setBusy(true); setErr('');
+        try {
+            const res = await authFetch(`/api/order_pdf?row=${row}`);
+            if (!res.ok) {
+                const d = await res.json().catch(() => ({}));
+                setErr(d.message || 'Не вдалося сформувати кошторис.');
+                return;
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const name = (clientName || 'obiekt').replace(/[^\p{L}\d -]/gu, '').trim() || 'obiekt';
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Кошторис — ${name}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            // Відкликаємо не одразу: Safari на iOS не встигає почати завантаження.
+            setTimeout(() => URL.revokeObjectURL(url), 30000);
+        } catch {
+            setErr('Немає звʼязку з сервером.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div style={{ marginTop: '12px' }}>
+            <button onClick={download} disabled={busy}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '7px',
+                         fontSize: '13px', padding: '9px 14px', borderRadius: '9px',
+                         border: '1px solid var(--border-color)', background: 'transparent',
+                         color: 'var(--text-color)', cursor: busy ? 'default' : 'pointer',
+                         opacity: busy ? 0.6 : 1 }}>
+                <FileText size={15} /> {busy ? 'Готуємо…' : 'Кошторис PDF'}
+            </button>
+            {err && <div style={{ fontSize: '12px', color: '#ff3b30', marginTop: '6px' }}>{err}</div>}
         </div>
     );
 }

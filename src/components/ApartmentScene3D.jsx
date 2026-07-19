@@ -110,7 +110,7 @@ function WallSegment({ wall }) {
 // кімнати (proceduralTextures) — на плані видно міні-ялинку паркету, сітку
 // плитки і т.д. Раніше тут був середній колір фото з каталогу (materialFill),
 // але лайфстайл-кадри давали брудно-коричневу заливку.
-function ZoneFloor({ zone, room, isActive, onPress }) {
+function ZoneFloor({ zone, room, isActive, dimmed, onPress }) {
     const kind = getSurfaceKind('floor', room?.floor ?? null);
     const texture = kind
         ? getSurfaceTexture(kind, repeatsFor(kind, zone.w), repeatsFor(kind, zone.d))
@@ -132,6 +132,7 @@ function ZoneFloor({ zone, room, isActive, onPress }) {
                 position={[cx, FLOOR_THICKNESS / 2 + (isActive ? 0.008 : 0), cz]}
                 color={color}
                 texture={texture}
+                dim={dimmed}
                 onClick={(e) => { e.stopPropagation(); onPress(zone.id); }}
             />
         </>
@@ -165,7 +166,7 @@ function ZoneFurniture({ zone }) {
 }
 
 // ====== ЛЕЙБЛ (клікабельний; компактний, поки не активний) ======
-function ZoneLabel({ zone, room, index, isActive, onPress }) {
+function ZoneLabel({ zone, room, index, isActive, dimmed, onPress }) {
     const [lx, lz] = zone.label;
     const [shiftX = 0, shiftY = 0] = zone.labelShift || [];
     const area = parseFloat(room.measurements?.floor) || 0;
@@ -180,6 +181,10 @@ function ZoneLabel({ zone, room, index, isActive, onPress }) {
                     background: 'var(--card-bg)', color: 'var(--text-color)',
                     padding: isActive ? '4px 10px' : '2px 8px',
                     borderRadius: '8px', cursor: 'pointer',
+                    // Активна плашка — повна; невибрані приглушені, а коли
+                    // якусь зону обрано, решта тьмяніє ще сильніше (акцент на вибір).
+                    opacity: isActive ? 1 : (dimmed ? 0.35 : 0.75),
+                    transition: 'opacity 0.2s ease',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
                     border: `1.5px solid ${isActive ? 'var(--accent)' : 'var(--border-color)'}`,
                     fontSize: isActive ? '12px' : '10px', fontWeight: 700,
@@ -214,8 +219,32 @@ function ZoomControls({ zoom, onZoom, onReset }) {
     );
 }
 
+// ====== ПОДІУМ «архітектурного макета» ======
+// Бетонна плита під планом + тонка темна окантовка знизу — модель «стоїть»
+// на столі, а не висить у порожнечі. Центрована в origin (як тіне-площина).
+function Podium({ bounds }) {
+    const w = bounds.width + 1.6;
+    const d = bounds.depth + 1.6;
+    const concrete = getSurfaceTexture('screed', repeatsFor('screed', w), repeatsFor('screed', d));
+    return (
+        <group>
+            <mesh position={[0, -0.27, 0]} receiveShadow>
+                <boxGeometry args={[w, 0.5, d]} />
+                <meshStandardMaterial color="#ffffff" map={concrete} roughness={0.95} />
+            </mesh>
+            <mesh position={[0, -0.5, 0]}>
+                <boxGeometry args={[w + 0.14, 0.07, d + 0.14]} />
+                <meshBasicMaterial color="#17181C" />
+            </mesh>
+        </group>
+    );
+}
+
 export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
     const [zoom, setZoom] = useState(1);
+    // Темна тема читається з body.classList — вся вкладка перемальовується
+    // при перемиканні теми, тож окремої реактивності не треба.
+    const dark = typeof document !== 'undefined' && document.body.classList.contains('dark-theme');
 
     // ПЛАН ГЕНЕРУЄТЬСЯ З РЕАЛЬНИХ ПЛОЩ (а не береться з фіксованого шаблону).
     // Кожна зона = конкретна кімната користувача: zone.id === room.id.
@@ -255,17 +284,25 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
             )}
             {/* frameloop="demand": сцена статична, тож рендеримо кадр лише при
                 змінах (зум, вибір зони, матеріали) — див. invalidate() в IsoCamera. */}
-            <Canvas orthographic dpr={[1, 2]} frameloop="demand" shadows="soft" style={{ width: '100%', height: '100%' }}>
+            <Canvas
+                orthographic
+                dpr={[1, 2]}
+                frameloop="demand"
+                shadows="soft"
+                style={{ width: '100%', height: '100%' }}
+                gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.12 }}
+            >
                 <IsoCamera bounds={bounds} userZoom={zoom} />
-                <ambientLight intensity={0.6} />
-                <hemisphereLight intensity={0.4} color="#ffffff" groundColor="#d6d2ca" />
+                {/* ACES темніший за лінійний — ambient прибрано, hemisphere/сонце
+                    підняті; у темній темі «земля» hemisphere теж темна. */}
+                <hemisphereLight intensity={0.75} color="#ffffff" groundColor={dark ? '#3a3b42' : '#d6d2ca'} />
                 {/* Сонце з тінями: сцена відцентрована в origin (група нижче
                     зміщена на -bounds/2), тому дефолтний target (0,0,0) — те,
                     що треба. Коробка тіней накриває план із запасом. */}
                 <directionalLight
                     castShadow
                     position={[10, 16, 8]}
-                    intensity={0.95}
+                    intensity={2.0}
                     shadow-mapSize-width={2048}
                     shadow-mapSize-height={2048}
                     shadow-camera-left={-(Math.max(bounds.width, bounds.depth) * 0.72 + 1.5)}
@@ -277,10 +314,14 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
                     shadow-bias={-0.0004}
                     shadow-normalBias={0.03}
                 />
-                {/* Площина-тінеловка: план кидає м'яку тінь на "стіл" під собою */}
-                <mesh rotation-x={-Math.PI / 2} position={[0, -0.02, 0]} receiveShadow>
+                {/* Бетонний подіум під планом («архітектурний макет») */}
+                <Podium bounds={bounds} />
+
+                {/* Площина-тінеловка: тінь падає на "стіл" під подіумом,
+                    тож макет справді «стоїть» на поверхні */}
+                <mesh rotation-x={-Math.PI / 2} position={[0, -0.54, 0]} receiveShadow>
                     <planeGeometry args={[bounds.width * 2.4, bounds.depth * 2.4]} />
-                    <shadowMaterial transparent opacity={0.13} />
+                    <shadowMaterial transparent opacity={0.22} />
                 </mesh>
 
                 {/* offsetZ < 0, якщо є балкон (смуга виступає над фасадом) —
@@ -292,6 +333,7 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
                             zone={zone}
                             room={roomById[zone.id]}
                             isActive={zone.id === activeId}
+                            dimmed={activeId != null && zone.id !== activeId}
                             onPress={onZonePress}
                         />
                     ))}
@@ -314,6 +356,7 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
                                 room={room}
                                 index={rooms.indexOf(room) + 1}
                                 isActive={room.id === activeId}
+                                dimmed={activeId != null && room.id !== activeId}
                                 onPress={onZonePress}
                             />
                         );

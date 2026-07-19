@@ -10,6 +10,15 @@ import * as THREE from 'three';
 const OUTLINE = 0.018; // товщина контуру, метри
 const OUTLINE_COLOR = '#161616';
 
+// Помножити hex-колір покомпонентно на hex-множник (0..1 на канал).
+// Для приглушення невибраних зон плану: множимо і заливку, і map-текстуру.
+function mulHex(hex, tint) {
+    const a = parseInt(hex.slice(1), 16);
+    const b = parseInt(tint.slice(1), 16);
+    const ch = (sh) => Math.round((((a >> sh) & 255) * ((b >> sh) & 255)) / 255);
+    return `#${((ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).padStart(6, '0')}`;
+}
+
 export function OutlinedBox({ args, position = [0, 0, 0], rotation, color, roughness = 0.9, onClick, opacity = 1, castShadow = true, receiveShadow = true }) {
     const [w, h, d] = args;
     return (
@@ -48,15 +57,22 @@ export function OutlinedCylinder({ args, position = [0, 0, 0], rotation, color, 
 // castShadow/receiveShadow (дефолт true) стосуються ТІЛЬКИ основного меша:
 // чорний контур-дубль тіней не кидає й не приймає, інакше кожен об'єкт
 // давав би подвійну "жирну" тінь.
-export function OutlinedSurface({ args, position = [0, 0, 0], color, texture, roughnessMap = null, onClick, castShadow = true, receiveShadow = true }) {
+const DIM_TINT = '#9a978f'; // множник для приглушення невибраних зон плану
+
+export function OutlinedSurface({ args, position = [0, 0, 0], color, texture, roughnessMap = null, dim = false, onClick, castShadow = true, receiveShadow = true }) {
     const [w, h, d] = args;
+    // З текстурою колір матеріалу множиться на map: '#ffffff' = без змін,
+    // DIM_TINT = приглушено. Без текстури множимо саму заливку.
+    const matColor = dim
+        ? (texture ? DIM_TINT : mulHex(color, DIM_TINT))
+        : (texture ? '#ffffff' : color);
     return (
         <group position={position}>
             <mesh onClick={onClick} castShadow={castShadow} receiveShadow={receiveShadow}>
                 <boxGeometry args={args} />
                 <meshStandardMaterial
-                    key={`${texture ? texture.uuid : color}|${roughnessMap ? roughnessMap.uuid : ''}`}
-                    color={texture ? '#ffffff' : color}
+                    key={`${texture ? texture.uuid : color}|${roughnessMap ? roughnessMap.uuid : ''}|${dim ? 'd' : ''}`}
+                    color={matColor}
                     map={texture || null}
                     roughnessMap={roughnessMap}
                     roughness={roughnessMap ? 1 : 0.85}

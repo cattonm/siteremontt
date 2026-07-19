@@ -1,27 +1,37 @@
 :root {
-    --bg-color: #f8f9fa;
-    --text-color: #1c1c1e;
-    --hint-color: #8e8e93;
-    --link-color: #007aff;
-    --secondary-bg: #ffffff;
-    --card-bg: #ffffff;
-    --border-color: #e5e5ea;
-    --zone-badge-bg: #e5e5ea;
-    --modal-bg: #ffffff;
-    --shadow-color: rgba(0,0,0,0.05);
+    --bg-color: #F6F5F2;
+    --text-color: #16181D;
+    --hint-color: #5F6368;
+    --link-color: #C2251D;      /* бренд: був iOS-синій #007aff */
+    --accent: #C2251D;
+    --accent-soft: rgba(194, 37, 29, 0.08);
+    --money: #1F7A4D;
+    --secondary-bg: #FFFFFF;
+    --card-bg: #FFFFFF;
+    --border-color: #E4E2DD;
+    --zone-badge-bg: #ECEAE5;
+    --modal-bg: #FFFFFF;
+    --shadow-color: rgba(20, 18, 14, 0.06);
+    --stage-bg: #E9E7E2;        /* фон 3D-обгорток */
+    --stage-badge-bg: rgba(255, 255, 255, 0.92);
 }
 
 body.dark-theme {
-    --bg-color: #000000;
-    --text-color: #ffffff;
-    --hint-color: #ebebf5;
-    --link-color: #0a84ff;
-    --secondary-bg: #1c1c1e;
-    --card-bg: #1c1c1e;
-    --border-color: #38383a;
-    --zone-badge-bg: #38383a;
-    --modal-bg: #1c1c1e;
-    --shadow-color: rgba(0,0,0,0.3);
+    --bg-color: #121316;
+    --text-color: #F2F1EE;
+    --hint-color: #A3A7AD;
+    --link-color: #EF4D43;
+    --accent: #EF4D43;
+    --accent-soft: rgba(239, 77, 67, 0.12);
+    --money: #4CC38A;
+    --secondary-bg: #1D1F24;
+    --card-bg: #1D1F24;
+    --border-color: #33363C;
+    --zone-badge-bg: #2A2D33;
+    --modal-bg: #1D1F24;
+    --shadow-color: rgba(0, 0, 0, 0.35);
+    --stage-bg: #26272C;
+    --stage-badge-bg: rgba(29, 31, 36, 0.88);
 }
 
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; padding-bottom: 220px; margin: 0; background: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; overflow-x: hidden;}
@@ -58,16 +68,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helve
 .menu-item:active { background: var(--border-color); }
 
 .zone-badge { display: inline-flex; align-items: center; gap: 6px; background: var(--zone-badge-bg); color: var(--hint-color); padding: 6px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; margin-bottom: 12px; letter-spacing: 0.5px; }
-h3 { margin: 0 0 20px 0; font-size: 22px; font-weight: 700; line-height: 1.3; }
+h3 { margin: 0 0 20px 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.3; }
 label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 15px; color: var(--text-color); }
 
 input[type="text"], input[type="tel"], input[type="number"], select { width: 100%; padding: 15px; border-radius: 12px; border: 1.5px solid var(--border-color); font-size: 16px; margin-bottom: 20px; box-sizing: border-box; background: var(--secondary-bg); color: var(--text-color); transition: all 0.2s; outline: none;}
-input:focus, select:focus { border-color: var(--link-color); box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15); }
+input:focus, select:focus { border-color: var(--link-color); box-shadow: 0 0 0 3px var(--accent-soft); }
 
 .card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .card { border: 1.5px solid var(--border-color); border-radius: 16px; padding: 12px; text-align: center; cursor: pointer; transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1); position: relative; background: var(--card-bg); box-shadow: 0 4px 12px var(--shadow-color); display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
 .card:active { transform: scale(0.96); }
-.card.selected { border-color: var(--link-color); background: rgba(10, 132, 255, 0.08); box-shadow: 0 4px 16px rgba(10, 132, 255, 0.15); }
+.card.selected { border-color: var(--link-color); background: var(--accent-soft); box-shadow: 0 4px 16px var(--shadow-color); }
 .img-wrapper { position: relative; width: 100%; height: 110px; margin-bottom: 10px; border-radius: 10px; overflow: hidden;}
 .card img { width: 100%; height: 100%; object-fit: cover; background-color: var(--secondary-bg); }
 .zoom-icon { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.5); color: white; padding: 4px 8px; border-radius: 20px; font-size: 13px; cursor: pointer; z-index: 10; transition: background 0.2s; backdrop-filter: blur(4px);}
@@ -99,15 +109,15 @@ input:focus, select:focus { border-color: var(--link-color); box-shadow: 0 0 0 3
 .btn { flex: 1; padding: 16px; border: none; border-radius: 14px; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform 0.1s; display: flex; justify-content: center; align-items: center; gap: 8px;}
 .btn:active { transform: scale(0.95); }
 .btn-back { background: var(--secondary-bg); color: var(--text-color); flex: 0.3; border: 1.5px solid var(--border-color); }
-.btn-next { background: var(--link-color); color: #fff; box-shadow: 0 4px 14px rgba(0, 122, 255, 0.3);}
-.btn-submit { background: #34c759 !important; color: #fff !important; box-shadow: 0 4px 14px rgba(52, 199, 89, 0.3) !important; font-size: 18px !important; }
+.btn-next { background: var(--link-color); color: #fff; box-shadow: 0 4px 14px rgba(194, 37, 29, 0.28);}
+.btn-submit { background: var(--money) !important; color: #fff !important; box-shadow: 0 4px 14px rgba(31, 122, 77, 0.3) !important; font-size: 18px !important; }
 
 /* Кошик */
 #live-cart { position: fixed; bottom: calc(110px + env(safe-area-inset-bottom)); left: 15px; right: 15px; background: rgba(28, 28, 30, 0.95); color: #fff; padding: 14px 18px; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: 101; display: flex; justify-content: space-between; align-items: center; font-size: 14px; cursor: pointer; backdrop-filter: blur(10px); transition: opacity 0.3s, transform 0.2s; opacity: 0; pointer-events: none;}
 #live-cart.visible { opacity: 1; pointer-events: auto; }
 #live-cart:active { transform: scale(0.97); }
 #live-cart div { display: flex; flex-direction: column; }
-#live-cart span.cart-val { color: #34c759; font-weight: 700; font-size: 17px;}
+#live-cart span.cart-val { color: #4CC38A; font-weight: 700; font-size: 17px;}
 
 .cart-close-btn { background: var(--zone-badge-bg); color: var(--text-color); border: none; padding: 12px; border-radius: 12px; font-weight: 600; width: 100%; margin-top: 15px; cursor: pointer;}
 .cart-zone-title { font-weight: 700; color: var(--link-color); margin-top: 20px; border-bottom: 1.5px solid var(--border-color); padding-bottom: 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;}
@@ -115,12 +125,12 @@ input:focus, select:focus { border-color: var(--link-color); box-shadow: 0 0 0 3
 .summary-box { background: var(--secondary-bg); border-radius: 16px; padding: 15px 20px; border: 1.5px solid var(--border-color); margin-bottom: 15px; box-shadow: 0 4px 12px var(--shadow-color); animation: slideInRight 0.3s forwards;}
 .summary-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-color); align-items: center; font-size: 15px;}
 .summary-item:last-child { border-bottom: none; padding-bottom: 0; }
-.edit-btn { color: var(--link-color); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 6px 12px; background: rgba(10,132,255,0.1); border-radius: 8px; transition: transform 0.1s;}
+.edit-btn { color: var(--link-color); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 6px 12px; background: var(--accent-soft); border-radius: 8px; transition: transform 0.1s;}
 .edit-btn:active { transform: scale(0.92); }
 
 .tag-container { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .tag-pill { background: var(--zone-badge-bg); color: var(--text-color); padding: 6px 12px; border-radius: 16px; font-size: 13px; font-weight: 500; cursor: pointer; transition: 0.2s; border: 1px solid transparent; }
-.tag-pill:active { transform: scale(0.95); background: rgba(10, 132, 255, 0.1); border-color: var(--link-color); color: var(--link-color); }
+.tag-pill:active { transform: scale(0.95); background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 
 .accordion-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 10px 0; border-bottom: 1.5px solid var(--border-color); transition: 0.2s; }
 .accordion-header:active { opacity: 0.7; }
@@ -151,7 +161,7 @@ input:focus, select:focus { border-color: var(--link-color); box-shadow: 0 0 0 3
     transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 .rpp-hotspot:active { transform: translate(-50%, -50%) scale(0.9); }
-.rpp-hotspot.active { background: #e31e24; color: #fff; }
+.rpp-hotspot.active { background: var(--accent); color: #fff; }
 
 /* ==== RoomPreview3D: живе 3D-прев'ю кімнати ==== */
 /* aspect-ratio задає висоту Canvas (інакше вона нульова і сцену не видно). */
@@ -163,7 +173,7 @@ input:focus, select:focus { border-color: var(--link-color); box-shadow: 0 0 0 3
     max-height: 400px;
     border-radius: 12px;
     overflow: hidden;
-    background: linear-gradient(180deg, #ffffff 0%, #f3f3f0 100%);
+    background: var(--stage-bg);
     border: 1px solid var(--border-color);
 }
 .r3d-wrap canvas { display: block; }
@@ -183,8 +193,8 @@ input:focus, select:focus { border-color: var(--link-color); box-shadow: 0 0 0 3
    тому тут БЕЗ translate(-50%), на відміну від .rpp-hotspot. */
 .r3d-hotspot {
     width: 32px; height: 32px; border-radius: 50%;
-    background: rgba(255, 255, 255, 0.94);
-    color: #1c1c1e;
+    background: var(--stage-badge-bg);
+    color: var(--text-color);
     border: 1px solid rgba(0, 0, 0, 0.07);
     padding: 0;
     display: flex; align-items: center; justify-content: center;
@@ -192,13 +202,13 @@ input:focus, select:focus { border-color: var(--link-color); box-shadow: 0 0 0 3
     transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 .r3d-hotspot:active { transform: scale(0.9); }
-.r3d-hotspot.active { background: #e31e24; border-color: #e31e24; color: #fff; }
+.r3d-hotspot.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
 .r3d-badge {
     position: absolute; left: 10px; bottom: 10px; z-index: 25;
-    font-size: 11px; font-weight: 600; color: #6d6d72;
-    background: rgba(255, 255, 255, 0.92);
-    border: 1px solid #e5e5ea; border-radius: 14px;
+    font-size: 11px; font-weight: 600; color: var(--hint-color);
+    background: var(--stage-badge-bg);
+    border: 1px solid var(--border-color); border-radius: 14px;
     padding: 4px 10px; pointer-events: none;
 }
 

@@ -34,7 +34,7 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2.5;
 const ZOOM_STEP = 0.25;
 
-const ACCENT = '#e31e24';          // фірмовий червоний
+const ACCENT = '#C2251D';          // фірмовий червоний (three-матеріали; у HTML-стилях — 'var(--accent)')
 const WALL_COLOR = '#ffffff';
 const WALL_CAP_COLOR = '#141414';  // чорний зріз стін = лінії плану
 const CAP_HEIGHT = 0.07;
@@ -177,17 +177,17 @@ function ZoneLabel({ zone, room, index, isActive, onPress }) {
                 style={{
                     display: 'flex', alignItems: 'baseline', gap: '5px',
                     transform: `translate(${shiftX}px, ${shiftY}px)`,
-                    background: '#ffffff', color: '#141414',
+                    background: 'var(--card-bg)', color: 'var(--text-color)',
                     padding: isActive ? '4px 10px' : '2px 8px',
                     borderRadius: '8px', cursor: 'pointer',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
-                    border: `1.5px solid ${isActive ? ACCENT : 'rgba(0,0,0,0.08)'}`,
+                    border: `1.5px solid ${isActive ? 'var(--accent)' : 'var(--border-color)'}`,
                     fontSize: isActive ? '12px' : '10px', fontWeight: 700,
                     whiteSpace: 'nowrap', fontFamily: 'inherit',
                 }}
             >
                 <span>{index}. {room.name}</span>
-                {isActive && area > 0 && <span style={{ color: ACCENT }}>{area} м²</span>}
+                {isActive && area > 0 && <span style={{ color: 'var(--accent)' }}>{area} м²</span>}
             </button>
         </Html>
     );
@@ -195,8 +195,8 @@ function ZoneLabel({ zone, room, index, isActive, onPress }) {
 
 function ZoomControls({ zoom, onZoom, onReset }) {
     const btn = {
-        width: '32px', height: '32px', borderRadius: '50%', border: '1px solid #e5e5ea',
-        background: '#fff', color: '#1c1c1e', display: 'flex', alignItems: 'center',
+        width: '32px', height: '32px', borderRadius: '50%', border: '1px solid var(--border-color)',
+        background: 'var(--card-bg)', color: 'var(--text-color)', display: 'flex', alignItems: 'center',
         justifyContent: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
         padding: 0,
     };
@@ -205,7 +205,7 @@ function ZoomControls({ zoom, onZoom, onReset }) {
             <button type="button" style={btn} onClick={() => onZoom(-ZOOM_STEP)} aria-label="Зменшити"><Minus size={16} /></button>
             <span style={{
                 minWidth: '46px', textAlign: 'center', fontSize: '13px', fontWeight: 600,
-                color: '#1c1c1e', background: '#fff', border: '1px solid #e5e5ea',
+                color: 'var(--text-color)', background: 'var(--card-bg)', border: '1px solid var(--border-color)',
                 borderRadius: '16px', padding: '5px 8px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
             }}>{Math.round(zoom * 100)}%</span>
             <button type="button" style={btn} onClick={() => onZoom(ZOOM_STEP)} aria-label="Збільшити"><Plus size={16} /></button>
@@ -234,7 +234,7 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
         setZoom((z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, +(z + delta).toFixed(2))));
 
     return (
-        <div style={{ position: 'relative', width: '100%', height: '380px', background: '#ffffff', borderRadius: '12px' }}>
+        <div style={{ position: 'relative', width: '100%', height: '380px', background: 'var(--stage-bg)', borderRadius: '12px' }}>
             {/* Порожній стан: раніше тут показувався макет-шаблон із порожніми
                 зонами, і клік по ньому створював кімнату. Тепер план — це
                 дзеркало реальних кімнат, тож поки їх нема, показуємо підказку,

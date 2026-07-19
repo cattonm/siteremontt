@@ -48,17 +48,18 @@ export function OutlinedCylinder({ args, position = [0, 0, 0], rotation, color, 
 // castShadow/receiveShadow (дефолт true) стосуються ТІЛЬКИ основного меша:
 // чорний контур-дубль тіней не кидає й не приймає, інакше кожен об'єкт
 // давав би подвійну "жирну" тінь.
-export function OutlinedSurface({ args, position = [0, 0, 0], color, texture, onClick, castShadow = true, receiveShadow = true }) {
+export function OutlinedSurface({ args, position = [0, 0, 0], color, texture, roughnessMap = null, onClick, castShadow = true, receiveShadow = true }) {
     const [w, h, d] = args;
     return (
         <group position={position}>
             <mesh onClick={onClick} castShadow={castShadow} receiveShadow={receiveShadow}>
                 <boxGeometry args={args} />
                 <meshStandardMaterial
-                    key={texture ? texture.uuid : color}
+                    key={`${texture ? texture.uuid : color}|${roughnessMap ? roughnessMap.uuid : ''}`}
                     color={texture ? '#ffffff' : color}
                     map={texture || null}
-                    roughness={0.85}
+                    roughnessMap={roughnessMap}
+                    roughness={roughnessMap ? 1 : 0.85}
                 />
             </mesh>
             <mesh raycast={() => null}>

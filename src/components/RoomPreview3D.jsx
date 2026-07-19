@@ -28,12 +28,13 @@
 // Камера: перспективна, з OrbitControls у вузьких межах — користувач може
 // трохи покрутити й наблизити кімнату ("вільно переглядати", як у Kapitel),
 // але не може заглянути за стіни чи перевернути сцену.
-import React from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useThree } from '@react-three/fiber';
 import { Html, OrbitControls, PerspectiveCamera } from '@react-three/drei';
+import { DoorOpen, LogOut } from 'lucide-react';
 import { OutlinedBox, OutlinedCylinder, OutlinedSurface } from './three/Outlined';
-import { getSurfaceKind, getSurfaceColor, getSurfaceTexture, repeatsFor } from '../utils/proceduralTextures';
+import { getSurfaceKind, getSurfaceColor, getSurfaceTexture, getSurfaceRoughness, repeatsFor } from '../utils/proceduralTextures';
 import { GROUP_ICONS, DEFAULT_GROUP_ICON } from '../data/groupIcons';
 import { ROOM_QUESTIONS_CONFIG } from '../data/questions';
 import { FURNITURE_LAYOUTS } from '../data/furnitureLayouts';
@@ -65,6 +66,36 @@ function roomDims(room) {
     return { W, D };
 }
 
+// ====== КОНТАКТНА ТІНЬ ПІД МЕБЛЯМИ ======
+// М'який радіальний "blob" на площині замість дорогого AO — і працює з
+// frameloop="demand" (нічого не рахує щокадру). Текстура одна на всю сцену.
+let _blobTex = null;
+function getBlobTexture() {
+    if (_blobTex) return _blobTex;
+    if (typeof document === 'undefined') return null;
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const ctx = c.getContext('2d');
+    const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 32);
+    g.addColorStop(0, 'rgba(0,0,0,0.32)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 64, 64);
+    _blobTex = new THREE.CanvasTexture(c);
+    return _blobTex;
+}
+
+function ContactShadow({ position, size }) {
+    const tex = getBlobTexture();
+    if (!tex) return null;
+    return (
+        <mesh rotation-x={-Math.PI / 2} position={position} raycast={() => null}>
+            <planeGeometry args={size} />
+            <meshBasicMaterial map={tex} transparent depthWrite={false} />
+        </mesh>
+    );
+}
+
 // ====== МАТЕРІАЛИ ПОВЕРХОНЬ ======
 // Значення в сторі буває рядком (cards), масивом (cards_multiselect) або
 // об'єктом {type,tier}. Беремо ПЕРШЕ значення, для якого існує текстура.
@@ -85,16 +116,28 @@ function firstMapped(fieldId, raw) {
 function surfaceFill(fieldId, value, widthM, heightM, fallback = '#efeeeb', fallbackKind = null) {
     let kind = getSurfaceKind(fieldId, value);
     if (!kind && fallbackKind) kind = fallbackKind;
-    if (!kind) return { color: fallback, texture: null };
+    if (!kind) return { color: fallback, texture: null, roughnessMap: null };
+    const rx = repeatsFor(kind, widthM);
+    const ry = repeatsFor(kind, heightM);
     return {
         color: getSurfaceColor(kind),
-        texture: getSurfaceTexture(kind, repeatsFor(kind, widthM), repeatsFor(kind, heightM)),
+        texture: getSurfaceTexture(kind, rx, ry),
+        roughnessMap: getSurfaceRoughness(kind, rx, ry),
     };
 }
 
-// ====== КАМЕРА: фіксований старт + обмежений орбіт ======
+// ====== КАМЕРА: обмежений орбіт + режим «зайти в кімнату» ======
 // key на компоненті (у батька) перезбирає камеру, коли міняється площа.
-function CameraRig({ W, D }) {
+// view: 'orbit' — зовнішній огляд макета; 'fp' — погляд зсередини (look-around).
+const easeInOutQuad = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+
+function CameraRig({ W, D, view }) {
+    const { invalidate } = useThree();
+    const camRef = useRef();
+    const ctrlRef = useRef();
+    const rafRef = useRef(0);
+    const firstRef = useRef(true);
+
     const tx = W / 2, ty = 0.85, tz = D / 2;
     // ВІДСТАНЬ КАМЕРИ — СУБЛІНІЙНА. Раніше було R = max*1.5 + 2.4, тобто
     // камера відсувалась СТРОГО пропорційно розміру — і 6 м², і 30 м²
@@ -105,25 +148,83 @@ function CameraRig({ W, D }) {
     const size = Math.max(W, D);
     const R = 3.2 + Math.pow(size, 0.62) * 2.6;
     const polar = rad(64), az = rad(42);
-    const pos = [
-        tx + R * Math.sin(polar) * Math.sin(az),
-        ty + R * Math.cos(polar),
-        tz + R * Math.sin(polar) * Math.cos(az),
-    ];
+
+    const VIEWS = useMemo(() => ({
+        orbit: {
+            pos: [
+                tx + R * Math.sin(polar) * Math.sin(az),
+                ty + R * Math.cos(polar),
+                tz + R * Math.sin(polar) * Math.cos(az),
+            ],
+            target: [tx, ty, tz],
+        },
+        // Погляд від дверей углиб кімнати (людський зріст ~1.6 м)
+        fp: {
+            pos: [W * 0.78, 1.6, D * 0.86],
+            target: [W * 0.3, 1.35, D * 0.2],
+        },
+    }), [W, D, R, tx, ty, tz, polar, az]);
+
+    // Анімований перехід між видами. З frameloop="demand" кожен кадр
+    // лерпа треба явно замовляти через invalidate(); на час лету контроли
+    // вимкнено, щоб інерція не боролась із анімацією. Мутація камери/контролів
+    // тут імперативна — норма для r3f.
+    useEffect(() => {
+        const cam = camRef.current, ctrl = ctrlRef.current;
+        if (!cam || !ctrl) return undefined;
+        const dest = VIEWS[view];
+        const toPos = new THREE.Vector3(...dest.pos);
+        const toTgt = new THREE.Vector3(...dest.target);
+
+        // Перший рендер (і зміна площі) — ставимо камеру миттєво, без лету.
+        if (firstRef.current) {
+            firstRef.current = false;
+            cam.position.copy(toPos);
+            ctrl.target.copy(toTgt);
+            ctrl.update();
+            invalidate();
+            return undefined;
+        }
+
+        const fromPos = cam.position.clone();
+        const fromTgt = ctrl.target.clone();
+        const t0 = performance.now();
+        const DUR = 900;
+        ctrl.enabled = false;
+        cancelAnimationFrame(rafRef.current);
+        const step = () => {
+            const k = easeInOutQuad(Math.min((performance.now() - t0) / DUR, 1));
+            cam.position.lerpVectors(fromPos, toPos, k);
+            ctrl.target.lerpVectors(fromTgt, toTgt, k);
+            ctrl.update();
+            invalidate();
+            if (k < 1) rafRef.current = requestAnimationFrame(step);
+            else { ctrl.enabled = true; invalidate(); }
+        };
+        rafRef.current = requestAnimationFrame(step);
+        return () => cancelAnimationFrame(rafRef.current);
+    }, [view, VIEWS, invalidate]);
+
+    const fp = view === 'fp';
     return (
         <>
-            <PerspectiveCamera makeDefault fov={34} near={0.1} far={100} position={pos} />
+            <PerspectiveCamera ref={camRef} makeDefault fov={fp ? 62 : 34} near={0.05} far={100} position={VIEWS.orbit.pos} />
             <OrbitControls
-                target={[tx, ty, tz]}
+                ref={ctrlRef}
+                makeDefault
                 enablePan={false}
-                enableDamping={false}
-                minDistance={R * 0.6}
-                maxDistance={R * 1.45}
-                minPolarAngle={rad(46)}
-                maxPolarAngle={rad(82)}
-                minAzimuthAngle={rad(8)}
-                maxAzimuthAngle={rad(84)}
-                rotateSpeed={0.55}
+                enableDamping
+                dampingFactor={0.08}
+                // demand-режим: кожна зміна контролів (у т.ч. загасання інерції)
+                // замовляє наступний кадр — це самопідтримна петля до зупинки.
+                onChange={() => invalidate()}
+                minDistance={fp ? 0.01 : R * 0.6}
+                maxDistance={fp ? 0.05 : R * 1.45}
+                minPolarAngle={fp ? rad(55) : rad(46)}
+                maxPolarAngle={fp ? rad(110) : rad(82)}
+                minAzimuthAngle={fp ? -Infinity : rad(8)}
+                maxAzimuthAngle={fp ? Infinity : rad(84)}
+                rotateSpeed={fp ? -0.35 : 0.55}
             />
         </>
     );
@@ -146,9 +247,9 @@ function SunLight({ W, D }) {
                 target={target}
                 color="#fff6ea"
                 position={[W / 2 + R * 1.1 + 1.2, R * 1.5 + 4, D / 2 + R * 0.9 + 1]}
-                intensity={1.35}
-                shadow-mapSize-width={1024}
-                shadow-mapSize-height={1024}
+                intensity={2.4}
+                shadow-mapSize-width={2048}
+                shadow-mapSize-height={2048}
                 shadow-camera-left={-ext}
                 shadow-camera-right={ext}
                 shadow-camera-top={ext}
@@ -175,6 +276,7 @@ function Shell({ W, D, floorFill, backFill, leftFill }) {
                 position={[W / 2, -FLOOR_T / 2, D / 2]}
                 color={floorFill.color}
                 texture={floorFill.texture}
+                roughnessMap={floorFill.roughnessMap}
             />
 
             {/* Задня стіна: тіло + чорна кришка (стиль плану) */}
@@ -183,6 +285,7 @@ function Shell({ W, D, floorFill, backFill, leftFill }) {
                 position={[(W - WALL_T) / 2, WALL_H / 2, -WALL_T / 2]}
                 color={backFill.color}
                 texture={backFill.texture}
+                roughnessMap={backFill.roughnessMap}
             />
             <mesh position={[(W - WALL_T) / 2, WALL_H + CAP_H / 2, -WALL_T / 2]} raycast={() => null}>
                 <boxGeometry args={[W + WALL_T + CAP_OVER * 2, CAP_H, WALL_T + CAP_OVER * 2]} />
@@ -195,6 +298,7 @@ function Shell({ W, D, floorFill, backFill, leftFill }) {
                 position={[-WALL_T / 2, WALL_H / 2, (D - WALL_T) / 2]}
                 color={leftFill.color}
                 texture={leftFill.texture}
+                roughnessMap={leftFill.roughnessMap}
             />
             <mesh position={[-WALL_T / 2, WALL_H + CAP_H / 2, (D - WALL_T) / 2]} raycast={() => null}>
                 <boxGeometry args={[WALL_T + CAP_OVER * 2, CAP_H, D + WALL_T + CAP_OVER * 2]} />
@@ -288,7 +392,7 @@ function EmissiveStrip({ args, position, rotation }) {
     return (
         <mesh position={position} rotation={rotation}>
             <boxGeometry args={args} />
-            <meshStandardMaterial color="#fff6dd" emissive="#ffd98f" emissiveIntensity={1.25} />
+            <meshStandardMaterial color="#fff6dd" emissive="#ffd98f" emissiveIntensity={1.6} />
         </mesh>
     );
 }
@@ -310,7 +414,7 @@ function LightFixtures({ lightArr, W, D }) {
                     </mesh>
                     <mesh position={[0, -0.018, 0]}>
                         <cylinderGeometry args={[0.055, 0.055, 0.01, 20]} />
-                        <meshStandardMaterial color="#fff2cf" emissive="#ffdf9e" emissiveIntensity={1.4} />
+                        <meshStandardMaterial color="#fff2cf" emissive="#ffdf9e" emissiveIntensity={1.82} />
                     </mesh>
                 </group>
             ))}
@@ -327,9 +431,9 @@ function LightFixtures({ lightArr, W, D }) {
                     </mesh>
                     <mesh position={[0, WALL_H - 0.6, 0]}>
                         <cylinderGeometry args={[0.13, 0.27, 0.24, 22]} />
-                        <meshStandardMaterial color="#f3efe7" emissive="#ffd9a0" emissiveIntensity={0.45} />
+                        <meshStandardMaterial color="#f3efe7" emissive="#ffd9a0" emissiveIntensity={0.59} />
                     </mesh>
-                    <pointLight position={[0, WALL_H - 0.75, 0]} intensity={4} distance={7} decay={1.8} color="#ffd9a8" />
+                    <pointLight position={[0, WALL_H - 0.75, 0]} intensity={10} distance={7} decay={1.8} color="#ffd9a8" />
                 </group>
             )}
 
@@ -342,7 +446,7 @@ function LightFixtures({ lightArr, W, D }) {
                     {[-0.3, 0, 0.3].map((fz, i) => (
                         <mesh key={i} position={[0, -0.09, fz * Math.max(D * 0.55, 1)]} rotation={[rad(24), 0, 0]}>
                             <cylinderGeometry args={[0.035, 0.045, 0.14, 14]} />
-                            <meshStandardMaterial color="#1d1d21" emissive="#ffe8bf" emissiveIntensity={0.35} />
+                            <meshStandardMaterial color="#1d1d21" emissive="#ffe8bf" emissiveIntensity={0.46} />
                         </mesh>
                     ))}
                 </group>
@@ -356,7 +460,7 @@ function LightFixtures({ lightArr, W, D }) {
             )}
 
             {(spots || track) && (
-                <pointLight position={[W / 2, WALL_H - 0.35, D / 2]} intensity={2.4} distance={7} decay={2} color="#fff3da" />
+                <pointLight position={[W / 2, WALL_H - 0.35, D / 2]} intensity={6} distance={7} decay={2} color="#fff3da" />
             )}
         </group>
     );
@@ -379,6 +483,8 @@ function KitchenSet({ W, room }) {
 
     return (
         <group>
+            {/* Контактна тінь під гарнітуром */}
+            <ContactShadow position={[cx, 0.006, 0.34]} size={[setW * 1.15, 0.95]} />
             {/* Нижні шафи */}
             <OutlinedBox args={[setW, 0.8, 0.6]} position={[cx, 0.4, 0.31]} color={WOOD} />
             {/* Стільниця — темний камінь із прожилками */}
@@ -567,10 +673,19 @@ function GenericFurniture({ type, W, D }) {
         <group>
             {pieces.map((p, i) => {
                 const pos = [clamp(p.pos[0] * sx, W), p.pos[1], clamp(p.pos[2] * sz, D)];
-                return p.shape === 'cylinder' ? (
-                    <OutlinedCylinder key={i} args={p.args} position={pos} rotation={p.rotation} color={p.color} />
-                ) : (
-                    <OutlinedBox key={i} args={p.args} position={pos} rotation={p.rotation} color={p.color} />
+                // Контактна тінь під об'ємними предметами, що стоять на підлозі
+                const footprint = p.shape !== 'cylinder' && p.args[1] >= 0.35 && p.pos[1] <= p.args[1];
+                return (
+                    <React.Fragment key={i}>
+                        {footprint && (
+                            <ContactShadow position={[pos[0], 0.006, pos[2]]} size={[p.args[0] * 1.5, p.args[2] * 1.5]} />
+                        )}
+                        {p.shape === 'cylinder' ? (
+                            <OutlinedCylinder args={p.args} position={pos} rotation={p.rotation} color={p.color} />
+                        ) : (
+                            <OutlinedBox args={p.args} position={pos} rotation={p.rotation} color={p.color} />
+                        )}
+                    </React.Fragment>
                 );
             })}
         </group>
@@ -603,6 +718,11 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick }) {
     const { W, D } = roomDims(room);
     const type = room.type;
 
+    // Режим камери: 'orbit' — зовнішній огляд макета, 'fp' — погляд зсередини.
+    // Локальний стан (стор не чіпаємо — той самий принцип, що з матеріалами).
+    const [view, setView] = useState('orbit');
+    const fp = view === 'fp';
+
     // Поле стін у санвузлі зветься wall_tile, всюди інде — walls
     const wallField = type === 'bath' ? 'wall_tile' : 'walls';
     const wallVal = firstMapped(wallField, room[wallField]);
@@ -627,16 +747,22 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick }) {
             {/* frameloop="demand": GPU малює кадр лише коли щось змінилось
                 (вибір матеріалу, обертання камери). Разом із планом квартири
                 на екрані ДВА канваси — без цього обидва крутили б 60 fps
-                постійно і садили батарею в Telegram WebView. Damping вимкнено
-                вище, бо інерція вимагає безперервних кадрів. */}
-            <Canvas dpr={[1, 2]} frameloop="demand" shadows="soft">
-                <CameraRig key={`${W.toFixed(1)}x${D.toFixed(1)}`} W={W} D={D} />
-                {/* Світло трьома шарами: ambient (загальний рівень) + hemisphere
-                    (м'який градієнт небо/земля, "оживляє" білі поверхні) +
-                    directional з тінями (об'єм). Разом ≈ старій яскравості,
-                    але тепер форми читаються тінями, а не лише контуром. */}
-                <ambientLight intensity={0.5} />
-                <hemisphereLight intensity={0.55} color="#ffffff" groundColor="#d8d3ca" />
+                постійно і садили батарею в Telegram WebView. Інерція (damping)
+                самопідтримується через onChange→invalidate у CameraRig. */}
+            {/* ACES-тонмапінг: фотографічна крива яскравості замість лінійної
+                (пікові емісіви й відблиски не «вигорають», тіні глибші). Світло
+                перебалансовано під неї — див. SunLight/LightFixtures. */}
+            <Canvas
+                dpr={[1, 2]}
+                frameloop="demand"
+                shadows="soft"
+                gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.12 }}
+            >
+                <CameraRig key={`${W.toFixed(1)}x${D.toFixed(1)}`} W={W} D={D} view={view} />
+                {/* Світло двома шарами: hemisphere (м'який градієнт небо/земля,
+                    "оживляє" білі поверхні) + directional з тінями (об'єм).
+                    ambient прибрано — його рівень бере на себе hemisphere. */}
+                <hemisphereLight intensity={0.65} color="#ffffff" groundColor="#d8d3ca" />
                 <SunLight W={W} D={D} />
 
                 {/* Невидима площина під подіумом ловить м'яку тінь моделі —
@@ -671,7 +797,9 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick }) {
                 {type === 'bath' && <BathSet W={W} D={D} room={room} />}
                 {hasGeneric && <GenericFurniture type={type} W={W} D={D} />}
 
-                {hotspots.map((h) => {
+                {/* Хотспоти прив'язані до ЗОВНІШНЬОГО погляду — у режимі
+                    «зсередини» ховаємо, бо вони перекривали б увесь кадр. */}
+                {!fp && hotspots.map((h) => {
                     const Icon = GROUP_ICONS[h.group] || DEFAULT_GROUP_ICON;
                     return (
                         <Html key={h.group} position={h.pos} center zIndexRange={[40, 0]}>
@@ -687,9 +815,30 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick }) {
                     );
                 })}
             </Canvas>
+
+            {/* Кнопка-пігулка «зайти в кімнату» / «вийти» поверх канваса */}
+            <button
+                type="button"
+                onClick={() => { vibe('light'); setView(fp ? 'orbit' : 'fp'); }}
+                style={{
+                    position: 'absolute', top: '10px', right: '10px', zIndex: 30,
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    padding: '6px 12px', borderRadius: '16px', cursor: 'pointer',
+                    fontFamily: 'inherit', fontSize: '12px', fontWeight: 700,
+                    border: `1px solid ${fp ? 'var(--accent)' : 'var(--border-color)'}`,
+                    background: fp ? 'var(--accent)' : 'var(--stage-badge-bg)',
+                    color: fp ? '#fff' : 'var(--text-color)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+                }}
+            >
+                {fp ? <LogOut size={15} /> : <DoorOpen size={15} />}
+                {fp ? 'Вийти' : 'Зайти в кімнату'}
+            </button>
+
             <div className="r3d-badge">
-                {(parseFloat(room.measurements?.floor) > 0 ? `${parseFloat(room.measurements.floor)} м² · ` : '')}
-                {W.toFixed(1)}×{D.toFixed(1)} м · покрутити пальцем
+                {fp
+                    ? 'Вид зсередини · тягніть, щоб озирнутись'
+                    : `${parseFloat(room.measurements?.floor) > 0 ? `${parseFloat(room.measurements.floor)} м² · ` : ''}${W.toFixed(1)}×${D.toFixed(1)} м · покрутити пальцем`}
             </div>
         </div>
     );

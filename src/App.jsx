@@ -11,7 +11,7 @@ import CustomWorks from './components/CustomWorks';
 import Summary from './components/Summary';
 import AnimatedPrice from './components/AnimatedPrice';
 import { vibe, vibeError, tg } from './utils/telegram';
-import { Menu, Moon, Sun, ShoppingCart, ArrowLeft, Send, Trash2, Loader2, ShieldCheck } from 'lucide-react';
+import { Menu, Moon, Sun, ArrowLeft, Send, Trash2, Loader2, ShieldCheck } from 'lucide-react';
 
 // ЛІНИВИЙ імпорт: RoomVisualizer тягне за собою three.js + drei (~850 КБ
 // сирого JS). Без lazy усе це вантажилось КОЖНОМУ користувачу одразу на
@@ -479,6 +479,20 @@ export default function App() {
     const editStep = (index) => { vibe('light'); setIsEditingFromSummary(true); setCurrentStep(index); };
     const jumpToMenuStep = (stepIdx) => { vibe('light'); setIsEditingFromSummary(false); setCurrentStep(stepIdx); setIsMenuOpen(false); };
 
+    // Третя сума в липкій панелі — по кімнаті, відкритій у візуалізаторі
+    const activeRoomId = useStore((s) => s.activeRoomId);
+    const liveBreakdown = useStore((s) => s.liveBreakdown);
+    const activeRoomSum = useMemo(() => {
+        if (!activeRoomId) return null;
+        const bd = liveBreakdown?.rooms?.[activeRoomId];
+        if (!bd) return null;
+        const room = rooms.find((r) => r.id === activeRoomId);
+        return {
+            name: room?.name || 'Кімната',
+            total: (Number(bd.work) || 0) + (Number(bd.mat_min) || 0),
+        };
+    }, [activeRoomId, liveBreakdown, rooms]);
+
     const totalCost = totals.work + totals.mat_min;
     const workPct = totalCost > 0 ? Math.round((totals.work / totalCost) * 100) : 0;
     const matPct = totalCost > 0 ? 100 - workPct : 0;
@@ -580,27 +594,71 @@ export default function App() {
 
         return (
             <>
-                <div id="top-bar">
-                    <div id="menu-btn" onClick={() => { vibe('light'); setIsMenuOpen(true); }}><Menu size={20} /> Меню</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                        <div onClick={toggleTheme} style={{ cursor: 'pointer' }}>{isDark ? <Sun size={20}/> : <Moon size={20}/>}</div>
-                        <div id="step-count">Крок {currentStep + 1}/{finalQuestions.length}</div>
+                {/* ШАПКА-СТЕПЕР. Телефон: ← / зона + крок / ⋯ . Планшет: заголовок
+                    з даними об'єкта + TierSwitch, а зони — хлібними крихтами
+                    замість бургер-меню (обидва варіанти в DOM, перемикає CSS). */}
+                <div className="app-head">
+                    <div className="head-row head-mobile">
+                        <button type="button" className="head-icon-btn" onClick={goBack} aria-label="Назад">
+                            <ArrowLeft size={20} />
+                        </button>
+                        <div className="head-titles">
+                            <div className="head-zone">{menuZones[currentZoneIndex]?.name || 'Анкета'}</div>
+                            <div className="head-step">Крок {currentStep + 1} з {finalQuestions.length}</div>
+                        </div>
+                        <button type="button" className="head-icon-btn" onClick={toggleTheme} aria-label="Тема">
+                            {isDark ? <Sun size={19}/> : <Moon size={19}/>}
+                        </button>
+                        <button type="button" className="head-icon-btn" onClick={() => { vibe('light'); setIsMenuOpen(true); }} aria-label="Меню">
+                            <Menu size={20} />
+                        </button>
+                    </div>
+
+                    <div className="head-row head-desk">
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div className="head-desk-title">Кошторис ремонту</div>
+                            <div className="head-desk-sub">
+                                {[client.address, client.area ? `${client.area} м²` : null]
+                                    .filter(Boolean).join(' · ') || 'Об’єкт не заповнено'}
+                            </div>
+                        </div>
+                        <button type="button" className="head-icon-btn" onClick={toggleTheme} aria-label="Тема">
+                            {isDark ? <Sun size={19}/> : <Moon size={19}/>}
+                        </button>
+                        <div className="head-desk-tier"><TierSwitch compact /></div>
+                    </div>
+
+                    <div id="progress-container" style={{ marginTop: '10px', marginBottom: 0 }}>
+                        {menuZones.map((z, idx) => (
+                            <div key={idx} className={`progress-segment ${idx === currentZoneIndex ? 'active' : (idx < currentZoneIndex ? 'passed' : '')}`}></div>
+                        ))}
+                    </div>
+
+                    <div className="zone-crumbs">
+                        {menuZones.map((z, idx) => (
+                            <button
+                                key={idx}
+                                type="button"
+                                className={`zone-crumb ${idx === currentZoneIndex ? 'active' : (idx < currentZoneIndex ? 'passed' : '')}`}
+                                onClick={() => jumpToMenuStep(z.step)}
+                            >
+                                {idx < currentZoneIndex ? '✓ ' : ''}{z.name}
+                            </button>
+                        ))}
                     </div>
                 </div>
-                
+
+                {/* Глобальний рівень матеріалів — на телефоні окремим блоком
+                    під шапкою, на планшеті він уже в шапці праворуч. */}
+                <div className="head-mobile"><TierSwitch /></div>
+
                 {isEditingFromSummary && (
-                    <div onClick={() => { setIsEditingFromSummary(false); setCurrentStep(finalQuestions.length); vibe(); }} 
+                    <div onClick={() => { setIsEditingFromSummary(false); setCurrentStep(finalQuestions.length); vibe(); }}
                          style={{background: 'var(--link-color)', color: 'white', padding: '10px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', textAlign: 'center', marginBottom: '15px'}}>
                         🔙 Повернутися до підсумку
                     </div>
                 )}
-                
-                <div id="progress-container">
-                    {menuZones.map((z, idx) => (
-                        <div key={idx} className={`progress-segment ${idx === currentZoneIndex ? 'active' : (idx < currentZoneIndex ? 'passed' : '')}`}></div>
-                    ))}
-                </div>
-                
+
                 {q.type === 'trigger_meas' ? (
                     <Suspense fallback={
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '320px', color: 'var(--hint-color)' }}>
@@ -728,8 +786,9 @@ export default function App() {
                 <h3 style={{marginBottom: '5px'}}>Структура вартості</h3>
                 <p style={{color: 'var(--hint-color)', fontSize: '13px', marginTop:0}}>Попередній прорахунок на основі відповідей.</p>
 
-                {/* Тумблер рівня стоїть САМЕ ТУТ — там, де людина дивиться
-                    на цифри: перемкнув і одразу бачить, як змінилась сума. */}
+                {/* Тумблер рівня продубльовано тут — там, де людина дивиться
+                    на цифри: перемкнув і одразу бачить, як змінилась сума.
+                    Основний (глобальний) живе в шапці — стан у сторі спільний. */}
                 <TierSwitch />
 
                 <div className="chart-container">
@@ -747,25 +806,37 @@ export default function App() {
                 <button className="cart-close-btn" onClick={() => setIsCartOpen(false)} style={{marginTop: '25px'}}>Закрити кошик</button>
             </div>
 
-            {renderCurrentStep()}
+            {/* app-shell обмежує контент до 1000px на планшеті (патч 6.6) */}
+            <div className="app-shell">{renderCurrentStep()}</div>
 
-            {currentStep >= 0 && currentStep < finalQuestions.length && (
-                <div id="live-cart" className="visible" onClick={() => setIsCartOpen(true)}>
-                    <div><span style={{fontSize:'12px', color:'#aaa', fontWeight:500}}>Робота</span><span className="cart-val"><AnimatedPrice value={totals.work} /> ₴</span></div>
-                    <div><span style={{fontSize:'12px', color:'#aaa', fontWeight:500}}>Матеріали (від)</span><span className="cart-val"><AnimatedPrice value={totals.mat_min} /> ₴</span></div>
-                    <ShoppingCart color="white" size={24} />
+            {/* ЛИПКА ПАНЕЛЬ КОШТОРИСУ + навігація одним блоком (патч 6.2).
+                Замінила плаваючу чорну пігулку #live-cart: суми тепер завжди
+                на видноті, а не перекривають контент. */}
+            <div className="estimate-bar">
+                <div className="estimate-inner">
+                    {currentStep >= 0 && currentStep < finalQuestions.length && (
+                        <div className="estimate-sums">
+                            <span>Роботи <b><AnimatedPrice value={totals.work} /> ₴</b></span>
+                            <span>Матеріали <b className="money">від <AnimatedPrice value={totals.mat_min} /> ₴</b></span>
+                            {activeRoomSum && (
+                                <span>{activeRoomSum.name} <b><AnimatedPrice value={activeRoomSum.total} /> ₴</b></span>
+                            )}
+                            <button type="button" className="estimate-details" onClick={() => { vibe('light'); setIsCartOpen(true); }}>
+                                Деталі ▸
+                            </button>
+                        </div>
+                    )}
+                    <div className="estimate-actions">
+                        {currentStep >= 0 && (
+                            <button type="button" className="btn btn-back" onClick={goBack}>
+                                <ArrowLeft size={20} />
+                            </button>
+                        )}
+                        <button type="button" className={`btn btn-next ${currentStep >= finalQuestions.length ? 'btn-submit' : ''}`} onClick={goNext}>
+                            {btnNextText} {currentStep >= finalQuestions.length && <Send size={18} />}
+                        </button>
+                    </div>
                 </div>
-            )}
-
-            <div className="nav-bar">
-                {currentStep >= 0 && (
-                    <button type="button" className="btn btn-back" onClick={goBack}>
-                        <ArrowLeft size={20} />
-                    </button>
-                )}
-                <button type="button" className={`btn btn-next ${currentStep >= finalQuestions.length ? 'btn-submit' : ''}`} onClick={goNext}>
-                    {btnNextText} {currentStep >= finalQuestions.length && <Send size={18} />}
-                </button>
             </div>
         </>
     );

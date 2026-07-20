@@ -21,6 +21,11 @@ const useStore = create(
       // НЕ персиститься (partialize нижче) — це кеш відповіді сервера.
       liveBreakdown: { rooms: {}, general: null },
       setLiveBreakdown: (bd) => set({ liveBreakdown: bd }),
+      // Яка кімната зараз відкрита у візуалізаторі — щоб липка панель
+      // кошторису могла показати третю суму саме по ній. Службове,
+      // в localStorage не їде.
+      activeRoomId: null,
+      setActiveRoomId: (id) => set({ activeRoomId: id }),
 
       // Канал «сфокусуй візуалізатор»: валідація в App і кнопки Summary
       // просять RoomVisualizer вибрати кімнату/відкрити групу.
@@ -93,6 +98,7 @@ const useStore = create(
         rooms: [],
         lastRemoved: null,
         liveBreakdown: { rooms: {}, general: null },
+        activeRoomId: null,
         editingOrderId: null,
       })
     }),

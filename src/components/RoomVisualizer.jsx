@@ -12,7 +12,7 @@
 //  4. Обгортка 3D-плану тепер біла (без сірого фону) — під стиль Kapitel.
 //  5. Клас .visualizer-split: на екранах від 900px прев'ю ліворуч (липке),
 //     налаштування праворуч; на мобільному (TMA) — все в стовпчик, як було.
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import useStore from '../store/useStore';
 import { Trash2, Copy, Undo2 } from 'lucide-react';
 import { vibe } from '../utils/telegram';
@@ -47,6 +47,13 @@ export default function RoomVisualizer() {
     // його тут і прокидаємо в прев'ю пропом (компонент лишається props-only).
     const ceilingShadow = useStore((s) => s.answers?.ceiling_shadow === 'Так');
     const [activeId, setActiveId] = useState(null);
+    // Публікуємо активну кімнату в стор — липка панель кошторису в App
+    // показує по ній третю суму. Розмонтування скидає.
+    const setActiveRoomId = useStore((s) => s.setActiveRoomId);
+    useEffect(() => {
+        setActiveRoomId(activeId);
+        return () => setActiveRoomId(null);
+    }, [activeId, setActiveRoomId]);
     const [openGroup, setOpenGroup] = useState(null); // яка секція акордеону відкрита
     const groupRefs = useRef({}); // DOM-вузли секцій — щоб скролити до них з хотспота
 

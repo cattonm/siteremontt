@@ -17,24 +17,28 @@ const TIERS = [
     { val: 'Преміум', hint: 'Топові матеріали' },
 ];
 
-export default function TierSwitch() {
+// compact — варіант для шапки планшета: без рядка-заголовка, щоб влізти
+// поруч із назвою об'єкта.
+export default function TierSwitch({ compact = false }) {
     const answers = useStore((s) => s.answers);
     const setAnswers = useStore((s) => s.setAnswers);
     const current = answers.global_tier || 'Стандарт';
 
     return (
-        <div style={{ marginBottom: '14px' }}>
-            <div style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-                marginBottom: '7px',
-            }}>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-color)' }}>
-                    Рівень матеріалів
-                </span>
-                <span style={{ fontSize: '11.5px', color: 'var(--hint-color)' }}>
-                    {TIERS.find((t) => t.val === current)?.hint}
-                </span>
-            </div>
+        <div style={{ marginBottom: compact ? 0 : '14px' }}>
+            {!compact && (
+                <div style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                    marginBottom: '7px',
+                }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-color)' }}>
+                        Рівень матеріалів
+                    </span>
+                    <span style={{ fontSize: '11.5px', color: 'var(--hint-color)' }}>
+                        {TIERS.find((t) => t.val === current)?.hint}
+                    </span>
+                </div>
+            )}
 
             <div style={{
                 display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px',

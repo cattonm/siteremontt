@@ -272,7 +272,8 @@ export default function Survey({ question, answers, setAnswers, client, openImag
             <div className="animated-step">
                 {question.zone && <div className="zone-badge">{question.zone}</div>}
                 <h3>{question.text}</h3>
-                <div>
+                {/* mq-complex: на планшеті (≥768px) список іде у 2 колонки */}
+                <div className="mq-complex">
                     {question.options.map(opt => {
                         const isChecked = !!currentObj[opt.label];
                         return (

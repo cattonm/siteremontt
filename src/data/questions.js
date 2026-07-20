@@ -19,7 +19,13 @@ export const blockDemolition = [
 ];
 
 export const blockGeneral = [
-    { id: "rough_plaster_done", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Чи потрібна машинна штукатурка стін (чорнова)?", type: "cards", options: [{label:"Так",val:"Так"},{label:"Ні",val:"Ні"}] },
+    // СЕМАНТИКА: бекенд (calculator.py) додає штукатурку при відповіді "Ні",
+    // тобто питання для нього — «чи вже зроблена». Текст питання повернуто до
+    // цієї ж семантики, інакше клієнт, який відповідав «Так, потрібна»,
+    // НЕ отримував штукатурку в кошторисі (і навпаки).
+    { id: "rough_plaster_done", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Чи оштукатурені стіни (чорнова штукатурка вже є)?", type: "cards", options: [
+        {label:"Так, вже є",val:"Так"}, {label:"Ні, потрібна штукатурка",val:"Ні"}
+    ] },
     { id: "entrance_door", zone: "ЧОРНОВІ / ЗАГАЛЬНЕ", text: "Тип нових вхідних дверей.", type: "cards_with_tier", options: [
         { label: "МДФ", val: "МДФ", variants: ['Standard', 'Comfort', 'Premium'] },
         { label: "Броньовані", val: "Броньовані", variants: ['Standard', 'Comfort', 'Premium'] },

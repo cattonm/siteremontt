@@ -43,6 +43,9 @@ export default function RoomVisualizer() {
     const lastRemoved = useStore((s) => s.lastRemoved);
     const liveBreakdown = useStore((s) => s.liveBreakdown);
     const focus = useStore((s) => s.visualizerFocus);
+    // Тіньовий шов стелі — ЗАГАЛЬНЕ питання (не по кімнатах), тож дістаємо
+    // його тут і прокидаємо в прев'ю пропом (компонент лишається props-only).
+    const ceilingShadow = useStore((s) => s.answers?.ceiling_shadow === 'Так');
     const [activeId, setActiveId] = useState(null);
     const [openGroup, setOpenGroup] = useState(null); // яка секція акордеону відкрита
     const groupRefs = useRef({}); // DOM-вузли секцій — щоб скролити до них з хотспота
@@ -226,6 +229,7 @@ export default function RoomVisualizer() {
                                     room={activeRoom}
                                     activeGroup={openGroup}
                                     onHotspotClick={openGroupFromHotspot}
+                                    ceilingShadow={ceilingShadow}
                                 />
                             )}
 

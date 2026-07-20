@@ -30,9 +30,9 @@
 // але не може заглянути за стіни чи перевернути сцену.
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { Html, OrbitControls, PerspectiveCamera } from '@react-three/drei';
-import { DoorOpen, LogOut } from 'lucide-react';
+import { Box, Footprints } from 'lucide-react';
 import { OutlinedBox, OutlinedCylinder, OutlinedSurface } from './three/Outlined';
 import { getSurfaceKind, getSurfaceColor, getSurfaceTexture, getSurfaceRoughness, repeatsFor } from '../utils/proceduralTextures';
 import { GROUP_ICONS, DEFAULT_GROUP_ICON } from '../data/groupIcons';
@@ -50,6 +50,16 @@ const CAP_OVER = 0.015;
 const CAP_COLOR = '#161616';
 const WOOD = '#cdb293';
 const rad = (deg) => (deg * Math.PI) / 180;
+
+// ====== РЕЖИМ ПРОГУЛЯНКИ ======
+const EYE = 1.62;            // висота очей, м
+const WALK_SPEED = 1.7;      // м/с
+const WALL_MARGIN = 0.34;    // не підходити впритул до стін
+const FURN_PAD = 0.28;       // «товщина» пішохода навколо меблів
+const FOV_ORBIT = 34;
+const FOV_FP = 62;
+const CAM_TWEEN = 850;       // мс на переліт між видами
+const PITCH_MIN = -1.25, PITCH_MAX = 1.35;
 
 // Пропорції "ширина/глибина" за типом кімнати: коридор довгий, балкон ще
 // довший, санвузол майже квадратний. Площа береться з measurements.floor.
@@ -131,7 +141,7 @@ function surfaceFill(fieldId, value, widthM, heightM, fallback = '#efeeeb', fall
 // view: 'orbit' — зовнішній огляд макета; 'fp' — погляд зсередини (look-around).
 const easeInOutQuad = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
-function CameraRig({ W, D, view }) {
+function CameraRig({ W, D, view, yawRef, pitchRef, setWalking }) {
     const { invalidate } = useThree();
     const camRef = useRef();
     const ctrlRef = useRef();
@@ -158,76 +168,172 @@ function CameraRig({ W, D, view }) {
             ],
             target: [tx, ty, tz],
         },
-        // Погляд від дверей углиб кімнати (людський зріст ~1.6 м)
+        // Точка «входу» в кімнату — біля дверей, на висоті очей
         fp: {
-            pos: [W * 0.78, 1.6, D * 0.86],
+            pos: [W * 0.78, EYE, D * 0.86],
             target: [W * 0.3, 1.35, D * 0.2],
         },
     }), [W, D, R, tx, ty, tz, polar, az]);
 
-    // Анімований перехід між видами. З frameloop="demand" кожен кадр
-    // лерпа треба явно замовляти через invalidate(); на час лету контроли
-    // вимкнено, щоб інерція не боролась із анімацією. Мутація камери/контролів
-    // тут імперативна — норма для r3f.
+    // Переліт між видами (позиція + fov). У fp-режимі керування камерою далі
+    // забирає WalkController, тож OrbitControls лишаються вимкненими, а yaw/pitch
+    // знімаються з кватерніона в момент прибуття. Мутація камери — норма r3f.
     useEffect(() => {
         const cam = camRef.current, ctrl = ctrlRef.current;
         if (!cam || !ctrl) return undefined;
+        const fp = view === 'fp';
         const dest = VIEWS[view];
         const toPos = new THREE.Vector3(...dest.pos);
         const toTgt = new THREE.Vector3(...dest.target);
+        const toFov = fp ? FOV_FP : FOV_ORBIT;
 
         // Перший рендер (і зміна площі) — ставимо камеру миттєво, без лету.
         if (firstRef.current) {
             firstRef.current = false;
             cam.position.copy(toPos);
             ctrl.target.copy(toTgt);
-            ctrl.update();
+            cam.fov = toFov;
+            cam.updateProjectionMatrix();
+            if (fp) {
+                // Площу змінили, не виходячи з кімнати — одразу віддаємо
+                // керування ході, інакше рух би «завис».
+                cam.rotation.order = 'YXZ';
+                cam.lookAt(toTgt);
+                const e0 = new THREE.Euler().setFromQuaternion(cam.quaternion, 'YXZ');
+                yawRef.current = e0.y;
+                pitchRef.current = e0.x;
+                setWalking(true);
+            } else {
+                ctrl.update();
+            }
             invalidate();
             return undefined;
         }
 
         const fromPos = cam.position.clone();
         const fromTgt = ctrl.target.clone();
+        const fromFov = cam.fov;
         const t0 = performance.now();
-        const DUR = 900;
+        const tmp = new THREE.Vector3();
         ctrl.enabled = false;
+        setWalking(false);
         cancelAnimationFrame(rafRef.current);
         const step = () => {
-            const k = easeInOutQuad(Math.min((performance.now() - t0) / DUR, 1));
+            const k = easeInOutQuad(Math.min((performance.now() - t0) / CAM_TWEEN, 1));
             cam.position.lerpVectors(fromPos, toPos, k);
-            ctrl.target.lerpVectors(fromTgt, toTgt, k);
-            ctrl.update();
+            tmp.lerpVectors(fromTgt, toTgt, k);
+            cam.fov = fromFov + (toFov - fromFov) * k;
+            cam.updateProjectionMatrix();
+            if (fp) {
+                cam.lookAt(tmp);
+            } else {
+                ctrl.target.copy(tmp);
+                ctrl.update();
+            }
             invalidate();
-            if (k < 1) rafRef.current = requestAnimationFrame(step);
-            else { ctrl.enabled = true; invalidate(); }
+            if (k < 1) { rafRef.current = requestAnimationFrame(step); return; }
+            if (fp) {
+                // Далі камерою керує хода — знімаємо стартові yaw/pitch
+                cam.rotation.order = 'YXZ';
+                const e = new THREE.Euler().setFromQuaternion(cam.quaternion, 'YXZ');
+                yawRef.current = e.y;
+                pitchRef.current = e.x;
+                setWalking(true);
+            } else {
+                ctrl.target.copy(toTgt);
+                ctrl.enabled = true;
+                ctrl.update();
+            }
+            invalidate();
         };
         rafRef.current = requestAnimationFrame(step);
         return () => cancelAnimationFrame(rafRef.current);
-    }, [view, VIEWS, invalidate]);
+    }, [view, VIEWS, invalidate, yawRef, pitchRef, setWalking]);
 
     const fp = view === 'fp';
     return (
         <>
-            <PerspectiveCamera ref={camRef} makeDefault fov={fp ? 62 : 34} near={0.05} far={100} position={VIEWS.orbit.pos} />
+            <PerspectiveCamera ref={camRef} makeDefault fov={FOV_ORBIT} near={0.05} far={100} position={VIEWS.orbit.pos} />
             <OrbitControls
                 ref={ctrlRef}
                 makeDefault
+                // У прогулянці камеру веде WalkController — орбіта повністю вимкнена.
+                enabled={!fp}
                 enablePan={false}
                 enableDamping
                 dampingFactor={0.08}
                 // demand-режим: кожна зміна контролів (у т.ч. загасання інерції)
                 // замовляє наступний кадр — це самопідтримна петля до зупинки.
                 onChange={() => invalidate()}
-                minDistance={fp ? 0.01 : R * 0.6}
-                maxDistance={fp ? 0.05 : R * 1.45}
-                minPolarAngle={fp ? rad(55) : rad(46)}
-                maxPolarAngle={fp ? rad(110) : rad(82)}
-                minAzimuthAngle={fp ? -Infinity : rad(8)}
-                maxAzimuthAngle={fp ? Infinity : rad(84)}
-                rotateSpeed={fp ? -0.35 : 0.55}
+                minDistance={R * 0.6}
+                maxDistance={R * 1.45}
+                minPolarAngle={rad(46)}
+                maxPolarAngle={rad(82)}
+                minAzimuthAngle={rad(8)}
+                maxAzimuthAngle={rad(84)}
+                rotateSpeed={0.55}
             />
         </>
     );
+}
+
+// ====== ХОДА: рух у площині XZ + колізії ======
+// keys/joy/yaw/pitch живуть у ref'ах — DOM-обробники пишуть, useFrame читає,
+// жодного setState на кадр.
+function resolveCollisions(x, z, W, D, colliders) {
+    for (const c of colliders) {
+        const hw = c.hw + FURN_PAD, hd = c.hd + FURN_PAD;
+        const dx = x - c.x, dz = z - c.z;
+        const px = hw - Math.abs(dx), pz = hd - Math.abs(dz);
+        // Всередині боксу — виштовхуємо по осі меншого проникнення
+        if (px > 0 && pz > 0) {
+            if (px < pz) x = c.x + (dx < 0 ? -hw : hw);
+            else z = c.z + (dz < 0 ? -hd : hd);
+        }
+    }
+    return [
+        Math.min(Math.max(x, WALL_MARGIN), W - WALL_MARGIN),
+        Math.min(Math.max(z, WALL_MARGIN), D - WALL_MARGIN),
+    ];
+}
+
+function WalkController({ active, W, D, colliders, yawRef, pitchRef, keysRef, joyRef }) {
+    const { camera } = useThree();
+    const bobRef = useRef(0);
+
+    /* eslint-disable react-hooks/immutability -- імперативний рух камери — норма r3f */
+    useFrame((_, delta) => {
+        if (!active) return;
+        const dt = Math.min(delta, 0.05); // захист від стрибка після фонової вкладки
+        const k = keysRef.current;
+        const joy = joyRef.current;
+        let sx = (k.right ? 1 : 0) - (k.left ? 1 : 0) + joy.x;
+        let sf = (k.fwd ? 1 : 0) - (k.back ? 1 : 0) - joy.y;
+
+        const len = Math.hypot(sx, sf);
+        if (len > 1) { sx /= len; sf /= len; }
+        const moving = len > 0.001;
+
+        if (moving) {
+            const yaw = yawRef.current;
+            const sin = Math.sin(yaw), cos = Math.cos(yaw);
+            // forward = (-sin, 0, -cos), right = (cos, 0, -sin)
+            const vx = (-sin * sf + cos * sx) * WALK_SPEED * dt;
+            const vz = (-cos * sf - sin * sx) * WALK_SPEED * dt;
+            const [nx, nz] = resolveCollisions(
+                camera.position.x + vx, camera.position.z + vz, W, D, colliders,
+            );
+            camera.position.x = nx;
+            camera.position.z = nz;
+            bobRef.current += dt * 8;
+        }
+        // Ледь помітне похитування кроку
+        camera.position.y = EYE + (moving ? Math.sin(bobRef.current) * 0.008 : 0);
+        camera.rotation.set(pitchRef.current, yawRef.current, 0);
+    });
+    /* eslint-enable react-hooks/immutability */
+
+    return null;
 }
 
 // ====== СОНЦЕ З ТІНЯМИ ======
@@ -316,6 +422,150 @@ function Shell({ W, D, floorFill, backFill, leftFill }) {
             </mesh>
         </group>
     );
+}
+
+// ====== ЗАМИКАННЯ КІМНАТИ (тільки в режимі прогулянки) ======
+// Дві решти стіни + стеля + плінтуси. В орбітальному режимі група прихована,
+// тож макет лишається «розрізом». Рендериться ЗАВЖДИ (керуємо visible) —
+// інакше при вході в кімнату був би стрибок на компіляції шейдерів.
+function ceilingProps(value) {
+    if (value === 'Гіпсокартон') return { color: '#f4f2ee', roughness: 0.98 };
+    if (value === 'Побілка') return { color: '#f8f7f3', roughness: 0.95 };
+    // «сатин» в анкеті поки нема, але матеріал підготовлений
+    if (/сатин/i.test(value || '')) return { color: '#f2f1ee', roughness: 0.35, metalness: 0.08 };
+    return { color: '#f5f4f0', roughness: 0.95 }; // «Натяжна» матова
+}
+
+const SEAM = 0.035; // тіньовий шов, 3.5 см
+
+function ClosedShell({ W, D, visible, frontFill, rightFill, ceilingValue, shadowSeam }) {
+    const cp = ceilingProps(ceilingValue);
+    const seam = shadowSeam && ceilingValue === 'Натяжна';
+    return (
+        <group visible={visible}>
+            {/* Передня стіна (дзеркало задньої) */}
+            <OutlinedSurface
+                args={[W + WALL_T, WALL_H, WALL_T]}
+                position={[(W - WALL_T) / 2, WALL_H / 2, D + WALL_T / 2]}
+                color={frontFill.color}
+                texture={frontFill.texture}
+                roughnessMap={frontFill.roughnessMap}
+            />
+            {/* Права стіна (дзеркало лівої) */}
+            <OutlinedSurface
+                args={[WALL_T, WALL_H, D + WALL_T]}
+                position={[W + WALL_T / 2, WALL_H / 2, (D - WALL_T) / 2]}
+                color={rightFill.color}
+                texture={rightFill.texture}
+                roughnessMap={rightFill.roughnessMap}
+            />
+
+            {/* Стеля */}
+            <mesh position={[W / 2, WALL_H + 0.04, D / 2]} receiveShadow>
+                <boxGeometry args={[W + WALL_T * 2, 0.08, D + WALL_T * 2]} />
+                <meshStandardMaterial {...cp} />
+            </mesh>
+
+            {/* Тіньовий шов по периметру стелі */}
+            {seam && (
+                <group>
+                    <mesh position={[W / 2, WALL_H - SEAM / 2, SEAM / 2]}>
+                        <boxGeometry args={[W, SEAM, SEAM]} />
+                        <meshBasicMaterial color="#111214" />
+                    </mesh>
+                    <mesh position={[W / 2, WALL_H - SEAM / 2, D - SEAM / 2]}>
+                        <boxGeometry args={[W, SEAM, SEAM]} />
+                        <meshBasicMaterial color="#111214" />
+                    </mesh>
+                    <mesh position={[SEAM / 2, WALL_H - SEAM / 2, D / 2]}>
+                        <boxGeometry args={[SEAM, SEAM, D]} />
+                        <meshBasicMaterial color="#111214" />
+                    </mesh>
+                    <mesh position={[W - SEAM / 2, WALL_H - SEAM / 2, D / 2]}>
+                        <boxGeometry args={[SEAM, SEAM, D]} />
+                        <meshBasicMaterial color="#111214" />
+                    </mesh>
+                </group>
+            )}
+
+            {/* Плінтуси на нових стінах */}
+            <mesh position={[W / 2, 0.045, D - 0.012]}>
+                <boxGeometry args={[W, 0.09, 0.024]} />
+                <meshStandardMaterial color="#fafafa" roughness={0.9} />
+            </mesh>
+            <mesh position={[W - 0.012, 0.045, D / 2]}>
+                <boxGeometry args={[0.024, 0.09, D]} />
+                <meshStandardMaterial color="#fafafa" roughness={0.9} />
+            </mesh>
+        </group>
+    );
+}
+
+// ====== КОЛАЙДЕРИ МЕБЛІВ ======
+// Повторюють ту саму розкладку, що й рендер — щоб крізь ліжко/гарнітур
+// не можна було пройти. {x, z} — центр, hw/hd — півширина/півглибина.
+function buildColliders(type, W, D, room) {
+    const list = [];
+    const push = (x, z, w, d) => list.push({ x, z, hw: w / 2, hd: d / 2 });
+
+    if (type === 'kitchen') {
+        const withFridge = W >= 2.55;
+        const fridgeW = 0.66;
+        const setW = Math.min(W - 0.3 - (withFridge ? fridgeW + 0.1 : 0), 3.4);
+        const x0 = 0.15;
+        push(x0 + setW / 2, 0.31, setW, 0.6);
+        if (withFridge) push(x0 + setW + 0.1 + fridgeW / 2, 0.33, fridgeW, 0.64);
+        return list;
+    }
+
+    if (type === 'bath') {
+        const showerArr = (Array.isArray(room.shower) ? room.shower : []).filter((v) => v !== 'Не обладнувати');
+        const showerAny = showerArr.length > 0;
+        const S = Math.min(0.95, W - 0.5, D - 0.5);
+        if (showerAny) push(0.12 + S / 2, 0.12 + S / 2, S, S);
+
+        const tubType = room.tub?.type && room.tub.type !== 'Не обладнувати' ? room.tub.type : null;
+        if (tubType) {
+            const tubLen = 1.65, tubDep = 0.75;
+            const free = room.tub?.type === 'Окремостояча';
+            const tubStartX = showerAny ? 0.12 + S + 0.2 : 0.15;
+            const tubFits = W - tubStartX >= tubLen + 0.1;
+            const tubAlt = !tubFits && D >= tubLen + 0.6;
+            if (tubFits) push(tubStartX + tubLen / 2, free ? 0.62 : 0.42, tubLen, tubDep);
+            else if (tubAlt) push(W - tubDep / 2 - 0.12, D - tubLen / 2 - 0.25, tubDep, tubLen);
+        }
+        return list;
+    }
+
+    const pieces = FURNITURE_LAYOUTS[type];
+    if (!pieces) return list;
+    const slot = SLOT_SIZE[type] || { width: 2.0, depth: 1.8 };
+    const sx = W / slot.width;
+    const sz = D / slot.depth;
+    const clamp = (v, max) => Math.min(Math.max(v, 0.35), max - 0.35);
+    for (const p of pieces) {
+        if (p.shape === 'cylinder') continue;
+        if (p.args[1] < 0.3) continue;           // килими/низькі підставки не заважають
+        if (p.pos[1] > p.args[1]) continue;      // висить на стіні — під ним можна пройти
+        const turned = p.rotation && Math.abs(Math.abs(p.rotation[1] || 0) - Math.PI / 2) < 0.2;
+        const w = turned ? p.args[2] : p.args[0];
+        const d = turned ? p.args[0] : p.args[2];
+        push(clamp(p.pos[0] * sx, W), clamp(p.pos[2] * sz, D), w, d);
+    }
+    return list;
+}
+
+// ====== СВІТЛО/ЕКСПОЗИЦІЯ ВСЕРЕДИНІ ======
+// Під стелею темніше, ніж у «розрізі» — піднімаємо експозицію тонмапінгу.
+function Exposure({ value }) {
+    const { gl, invalidate } = useThree();
+    /* eslint-disable react-hooks/immutability -- налаштування рендерера, норма r3f */
+    useEffect(() => {
+        gl.toneMappingExposure = value;
+        invalidate();
+    }, [gl, value, invalidate]);
+    /* eslint-enable react-hooks/immutability */
+    return null;
 }
 
 // ====== ВІКНО НА ЗАДНІЙ СТІНІ (+ підвіконня за вибором sills) ======
@@ -714,14 +964,17 @@ function buildHotspots(type, W, D, groups) {
 }
 
 // ====== ГОЛОВНИЙ КОМПОНЕНТ ======
-export default function RoomPreview3D({ room, activeGroup, onHotspotClick }) {
+export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceilingShadow = false }) {
     const { W, D } = roomDims(room);
     const type = room.type;
 
-    // Режим камери: 'orbit' — зовнішній огляд макета, 'fp' — погляд зсередини.
+    // Режим камери: 'orbit' — зовнішній огляд макета, 'fp' — прогулянка всередині.
     // Локальний стан (стор не чіпаємо — той самий принцип, що з матеріалами).
     const [view, setView] = useState('orbit');
     const fp = view === 'fp';
+    // walking вмикається лише коли переліт завершився — під час лету
+    // камерою керує твін, а не хода.
+    const [walking, setWalking] = useState(false);
 
     // Поле стін у санвузлі зветься wall_tile, всюди інде — walls
     const wallField = type === 'bath' ? 'wall_tile' : 'walls';
@@ -737,13 +990,111 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick }) {
     const groups = new Set((ROOM_QUESTIONS_CONFIG[type] || []).map((q) => q.group || 'Інше'));
     const hotspots = buildHotspots(type, W, D, groups);
 
+    const colliders = useMemo(() => buildColliders(type, W, D, room), [type, W, D, room]);
+
+    // --- Введення прогулянки. Все в ref'ах: DOM-обробники пишуть, useFrame читає,
+    // жодного ре-рендера на кадр (інакше 60 setState/с убили б продуктивність).
+    const yawRef = useRef(0);
+    const pitchRef = useRef(0);
+    const keysRef = useRef({});
+    const joyRef = useRef({ x: 0, y: 0 });
+    const lookRef = useRef(null);  // pointerId, яким зараз озираються
+    const lookPosRef = useRef({ x: 0, y: 0 }); // рахуємо дельту самі: movementX
+                                               // не працює для тач-поінтерів у Safari
+    const [joyKnob, setJoyKnob] = useState(null); // тільки для візуалізації джойстика
+
+    // Клавіатура (десктоп)
+    useEffect(() => {
+        if (!fp) return undefined;
+        const map = {
+            KeyW: 'fwd', ArrowUp: 'fwd', KeyS: 'back', ArrowDown: 'back',
+            KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right',
+        };
+        const set = (e, on) => {
+            const k = map[e.code];
+            if (!k) return;
+            keysRef.current[k] = on;
+            e.preventDefault();
+        };
+        const down = (e) => set(e, true);
+        const up = (e) => set(e, false);
+        window.addEventListener('keydown', down);
+        window.addEventListener('keyup', up);
+        return () => {
+            window.removeEventListener('keydown', down);
+            window.removeEventListener('keyup', up);
+            keysRef.current = {};
+        };
+    }, [fp]);
+
+    // Озирання драгом. Джойстик має власний pointerId і сюди не потрапляє.
+    const onLookDown = (e) => {
+        if (!fp || lookRef.current !== null) return;
+        lookRef.current = e.pointerId;
+        lookPosRef.current = { x: e.clientX, y: e.clientY };
+        e.currentTarget.setPointerCapture(e.pointerId);
+    };
+    const onLookMove = (e) => {
+        if (lookRef.current !== e.pointerId) return;
+        const dx = e.clientX - lookPosRef.current.x;
+        const dy = e.clientY - lookPosRef.current.y;
+        lookPosRef.current = { x: e.clientX, y: e.clientY };
+        yawRef.current -= dx * 0.0042;
+        pitchRef.current = Math.min(
+            Math.max(pitchRef.current - dy * 0.0038, PITCH_MIN), PITCH_MAX,
+        );
+    };
+    const onLookUp = (e) => {
+        if (lookRef.current !== e.pointerId) return;
+        lookRef.current = null;
+        e.currentTarget.releasePointerCapture?.(e.pointerId);
+    };
+
+    // Віртуальний джойстик (тач)
+    const joyIdRef = useRef(null);
+    const joyBaseRef = useRef(null);
+    const JOY_R = 46;
+    const onJoyDown = (e) => {
+        e.stopPropagation();
+        joyIdRef.current = e.pointerId;
+        const r = e.currentTarget.getBoundingClientRect();
+        joyBaseRef.current = { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+        e.currentTarget.setPointerCapture(e.pointerId);
+    };
+    const onJoyMove = (e) => {
+        if (joyIdRef.current !== e.pointerId) return;
+        e.stopPropagation();
+        const b = joyBaseRef.current;
+        let dx = e.clientX - b.cx, dy = e.clientY - b.cy;
+        const len = Math.hypot(dx, dy) || 1;
+        const clamped = Math.min(len, JOY_R);
+        dx = (dx / len) * clamped;
+        dy = (dy / len) * clamped;
+        joyRef.current = { x: dx / JOY_R, y: dy / JOY_R };
+        setJoyKnob({ x: dx, y: dy });
+    };
+    const onJoyUp = (e) => {
+        if (joyIdRef.current !== e.pointerId) return;
+        e.stopPropagation();
+        joyIdRef.current = null;
+        joyRef.current = { x: 0, y: 0 };
+        setJoyKnob(null);
+    };
+
     const hasWindow = type !== 'bath' && type !== 'balcony' && type !== 'wardrobe' && W >= 1.9;
     const winX = Math.max(Math.min(W * 0.62, W - 0.85), 0.85);
     const hasDoor = type !== 'bath' && type !== 'balcony' && D >= 1.9;
     const hasGeneric = type !== 'kitchen' && type !== 'bath';
 
     return (
-        <div className="r3d-wrap">
+        <div
+            className="r3d-wrap"
+            onPointerDown={onLookDown}
+            onPointerMove={onLookMove}
+            onPointerUp={onLookUp}
+            onPointerCancel={onLookUp}
+            style={fp ? { touchAction: 'none', cursor: 'grab' } : undefined}
+        >
             {/* frameloop="demand": GPU малює кадр лише коли щось змінилось
                 (вибір матеріалу, обертання камери). Разом із планом квартири
                 на екрані ДВА канваси — без цього обидва крутили б 60 fps
@@ -754,15 +1105,27 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick }) {
                 перебалансовано під неї — див. SunLight/LightFixtures. */}
             <Canvas
                 dpr={[1, 2]}
-                frameloop="demand"
+                // Хода несумісна з "demand" — поки гуляємо, малюємо кожен кадр.
+                frameloop={fp ? 'always' : 'demand'}
                 shadows="soft"
                 gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.12 }}
             >
-                <CameraRig key={`${W.toFixed(1)}x${D.toFixed(1)}`} W={W} D={D} view={view} />
+                <CameraRig
+                    key={`${W.toFixed(1)}x${D.toFixed(1)}`}
+                    W={W} D={D} view={view}
+                    yawRef={yawRef} pitchRef={pitchRef} setWalking={setWalking}
+                />
+                <WalkController
+                    active={fp && walking}
+                    W={W} D={D} colliders={colliders}
+                    yawRef={yawRef} pitchRef={pitchRef} keysRef={keysRef} joyRef={joyRef}
+                />
+                {/* Під замкненою стелею темніше — піднімаємо експозицію */}
+                <Exposure value={fp ? 1.3 : 1.12} />
                 {/* Світло двома шарами: hemisphere (м'який градієнт небо/земля,
                     "оживляє" білі поверхні) + directional з тінями (об'єм).
                     ambient прибрано — його рівень бере на себе hemisphere. */}
-                <hemisphereLight intensity={0.65} color="#ffffff" groundColor="#d8d3ca" />
+                <hemisphereLight intensity={fp ? 0.95 : 0.65} color="#ffffff" groundColor="#d8d3ca" />
                 <SunLight W={W} D={D} />
 
                 {/* Невидима площина під подіумом ловить м'яку тінь моделі —
@@ -777,6 +1140,13 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick }) {
                 </mesh>
 
                 <Shell W={W} D={D} floorFill={floorFill} backFill={backFill} leftFill={leftFill} />
+                {/* Решта стін + стеля — лише в прогулянці (керуємо visible) */}
+                <ClosedShell
+                    W={W} D={D} visible={fp}
+                    frontFill={backFill} rightFill={leftFill}
+                    ceilingValue={room.ceiling}
+                    shadowSeam={ceilingShadow}
+                />
 
                 {hasWindow && <WindowUnit x={winX} sillValue={type === 'room' ? room.sills : undefined} />}
                 {hasDoor && <DoorUnit z={Math.min(D - 0.7, D * 0.78)} />}
@@ -816,28 +1186,69 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick }) {
                 })}
             </Canvas>
 
-            {/* Кнопка-пігулка «зайти в кімнату» / «вийти» поверх канваса */}
-            <button
-                type="button"
-                onClick={() => { vibe('light'); setView(fp ? 'orbit' : 'fp'); }}
-                style={{
-                    position: 'absolute', top: '10px', right: '10px', zIndex: 30,
-                    display: 'flex', alignItems: 'center', gap: '6px',
-                    padding: '6px 12px', borderRadius: '16px', cursor: 'pointer',
-                    fontFamily: 'inherit', fontSize: '12px', fontWeight: 700,
-                    border: `1px solid ${fp ? 'var(--accent)' : 'var(--border-color)'}`,
-                    background: fp ? 'var(--accent)' : 'var(--stage-badge-bg)',
-                    color: fp ? '#fff' : 'var(--text-color)',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
-                }}
-            >
-                {fp ? <LogOut size={15} /> : <DoorOpen size={15} />}
-                {fp ? 'Вийти' : 'Зайти в кімнату'}
-            </button>
+            {/* Сегмент «Макет» / «Зайти в кімнату». stopPropagation — щоб
+                pointer capture озирання не з'їдав клік по кнопці. */}
+            <div onPointerDown={(e) => e.stopPropagation()} style={{
+                position: 'absolute', top: '10px', right: '10px', zIndex: 30,
+                display: 'flex', gap: '4px', padding: '3px', borderRadius: '18px',
+                background: 'var(--stage-badge-bg)', border: '1px solid var(--border-color)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+            }}>
+                {[
+                    { id: 'orbit', label: 'Макет', icon: Box },
+                    { id: 'fp', label: 'Зайти в кімнату', icon: Footprints },
+                ].map(({ id, label, icon }) => {
+                    const ModeIcon = icon;
+                    const on = view === id;
+                    return (
+                        <button
+                            key={id}
+                            type="button"
+                            onClick={() => { if (!on) { vibe('light'); setView(id); } }}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '5px',
+                                padding: '5px 10px', borderRadius: '15px', border: 'none',
+                                cursor: on ? 'default' : 'pointer',
+                                fontFamily: 'inherit', fontSize: '12px', fontWeight: 700,
+                                background: on ? 'var(--accent)' : 'transparent',
+                                color: on ? '#fff' : 'var(--text-color)',
+                            }}
+                        >
+                            <ModeIcon size={14} />
+                            {label}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* Віртуальний джойстик — окремий pointerId, тож ходити й озиратись
+                можна двома пальцями одночасно */}
+            {fp && (
+                <div
+                    onPointerDown={onJoyDown}
+                    onPointerMove={onJoyMove}
+                    onPointerUp={onJoyUp}
+                    onPointerCancel={onJoyUp}
+                    style={{
+                        position: 'absolute', left: '14px', bottom: '44px', zIndex: 30,
+                        width: `${JOY_R * 2}px`, height: `${JOY_R * 2}px`, borderRadius: '50%',
+                        background: 'rgba(20,20,24,0.28)', border: '1px solid rgba(255,255,255,0.28)',
+                        touchAction: 'none', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center',
+                    }}
+                >
+                    <div style={{
+                        width: '38px', height: '38px', borderRadius: '50%',
+                        background: 'rgba(255,255,255,0.75)',
+                        transform: joyKnob ? `translate(${joyKnob.x}px, ${joyKnob.y}px)` : 'none',
+                        pointerEvents: 'none',
+                    }} />
+                </div>
+            )}
 
             <div className="r3d-badge">
                 {fp
-                    ? 'Вид зсередини · тягніть, щоб озирнутись'
+                    ? 'W A S D — ходити · тягніть — озиратись'
                     : `${parseFloat(room.measurements?.floor) > 0 ? `${parseFloat(room.measurements.floor)} м² · ` : ''}${W.toFixed(1)}×${D.toFixed(1)} м · покрутити пальцем`}
             </div>
         </div>

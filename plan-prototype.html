@@ -1,46 +1,24 @@
-# Патч 3: src/components/RoomPreview3D.jsx
+# Патч 5: режим прогулянки в RoomPreview3D (замкнена кімната зі стелею)
 
-Референс поведінки та значень: **room-prototype.html** (setMode, lerpCam, світло).
+**Референс:** `room-walk-prototype.html` (корінь пакета). Це еволюція «першої особи» з патча 03: замість look-around на місці — повноцінна хода по кімнаті, зі стелею і всіма 4 стінами.
 
-## 3.1 ACES-тонмапінг + фізичне світло
-На Canvas додати gl-пропси:
-\`\`\`jsx
-<Canvas dpr={[1, 2]} frameloop="demand" shadows="soft"
-    gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.12 }}>
-\`\`\`
-Світло перебалансувати (ACES темніший за лінійний):
-- ambientLight → видалити (його роль бере hemisphere)
-- hemisphereLight: intensity 0.65
-- SunLight directional: intensity 1.35 → 2.4, mapSize 1024 → 2048
-- pointLight люстри: intensity 4 → 10; спільний pointLight: 2.4 → 6
-- emissiveIntensity смуг/плафонів ×1.3 (бо тонмапінг з'їдає піки)
+## Вимоги (з прототипу)
+1. **Замикання кімнати.** У режимі прогулянки додаються: передня стіна, права стіна, стеля, плінтуси на нових стінах, тіньовий шов по периметру стелі (якщо обрана «Натяжна» + тіньовий шов). Все — в одній групі `shell`, `shell.visible = mode === 'fp'`. В орбітальному режимі група прихована — макет виглядає як розріз, як зараз.
+2. **Камера.** `camera.rotation.order = 'YXZ'`; висота очей EYE = 1.62 м; fov в кімнаті 62 (проти 36 в орбіті). Перехід — lerp позиції+fov за ~850 мс easeInOutQuad (є в патчі 03 як lerpCam).
+3. **Огляд.** Драг по канвасу (pointer events) крутить yaw/pitch: `yaw -= dx*0.0042; pitch -= dy*0.0038`, pitch обмежити [-1.25, 1.35] — можна дивитись і на стелю, і на підлогу. OrbitControls у цьому режимі `enabled = false`.
+4. **Хода.** WASD/стрілки + віртуальний джойстик (телефон): напівпрозоре коло зліва внизу, pointer capture, вектор нормалізується. Швидкість 1.7 м/с, рух у площині XZ повернутий на yaw. Ледь помітний "bob" кроку: `y = EYE + sin(t*8)*0.008*speed`.
+5. **Колізії.** Прості AABB: стіни (margin 0.34 м) + бокси меблів (padding 0.28 м). Push-out по меншій осі проникнення — див. resolveCollisions() у прототипі. Меблі при створенні реєструють свій колайдер.
+6. **Світло всередині.** У fp-режимі: hemisphere 0.65→0.95, exposure 1.12→1.3, туман вимкнути. Інакше під стелею темно.
+7. **UI.** Дві кнопки-пігулки над канвасом: «Макет» / «Зайти в кімнату». У fp: підказка «W A S D — ходити · тягніть — озиратись» (десктоп), джойстик (тач). Бейдж статусу зліва внизу.
 
-## 3.2 surfaceFill: додати roughness
-\`\`\`js
-import { getSurfaceRoughness } from '../utils/proceduralTextures';
-// у surfaceFill():
-return {
-    color: getSurfaceColor(kind),
-    texture: getSurfaceTexture(kind, rx, ry),
-    roughnessMap: getSurfaceRoughness(kind, rx, ry),
-};
-\`\`\`
-В OutlinedSurface (three/Outlined.jsx) прокинути roughnessMap у meshStandardMaterial і ставити roughness={1}, коли карта є. У key матеріалу додати uuid карти (той самий прийом, що з map).
+## Інтеграція в React (@react-three/fiber)
+- `frameloop="demand"` несумісний з ходою — на час fp-режиму перемкнути на `frameloop="always"` (проп на Canvas через стан), назад — 'demand'.
+- Джойстик і кнопки — звичайний DOM поверх Canvas (absolute), не drei Html.
+- Хода — useFrame((state, dt) => …) в компоненті `<WalkController active={mode==='fp'}>`; keys у ref, joyVec у ref (без setState на кожен кадр!).
+- Стеля/стіни-shell: рендерити завжди, керувати `visible` — щоб не було стрибка компіляції шейдерів при вході.
+- Матеріали стелі: «Натяжна матова» roughness 0.95, «сатин» 0.35 + легкий metalness 0.08, «Гіпсокартон» 0.98. Тіньовий шов — чорний бокс 3.5 см по периметру, `visible` залежить від відповіді ceiling_shadow.
 
-## 3.3 Damping
-В OrbitControls: \`enableDamping dampingFactor={0.08}\`. Для frameloop="demand":
-\`\`\`jsx
-const { invalidate } = useThree();
-<OrbitControls ref={ctrl} onChange={() => invalidate()} ... />
-\`\`\`
-і після pointerup ще ~1с викликати invalidate через rAF (або тимчасово frameloop="always" під час взаємодії).
-
-## 3.4 Контактні тіні під меблями
-Радіальний градієнт-blob (32 px canvas, чорний 0.32 → прозорий) на PlaneGeometry, rotation-x=-90°, y=0.005, під ліжком/шафою/гарнітуром. Дешевше за AO і працює з demand. Референс: функція blob() у прототипі.
-
-## 3.5 Режим «Зайти в кімнату»
-Новий локальний стан \`const [view, setView] = useState('orbit')\`. Кнопки-пігулки поверх канваса (top-right, стиль .mode-btn з прототипу: активна = var(--accent), біла типографіка).
-Анімація камери — 900 мс easeInOutQuad лерп position і controls.target (функція lerpCam у прототипі; на час лерпа controls.enabled=false, кожен кадр invalidate()).
-Параметри FP: eye [W*0.78, 1.6, D*0.86], погляд на [W*0.3, 1.35, D*0.2]; controls: minDistance 0.01, maxDistance 0.05, rotateSpeed -0.35, polar 55–110°, azimuth без меж. Повернення — ті самі орбітальні межі, що зараз у CameraRig.
-Хотспоти в FP-режимі сховати (вони прив'язані до зовнішнього погляду).
-Бейдж: «Вид зсередини · тягніть, щоб озирнутись».
+## Definition of done
+- Вхід/вихід плавний, без телепорту; в кімнаті видно стелю зі світильниками (точкові/люстра/LED з відповідей анкети).
+- На телефоні можна ходити джойстиком і озиратись другим пальцем одночасно (різні pointerId — див. прототип).
+- Крізь ліжко/шафу пройти не можна; у стіну впертись можна, застрягти — ні.

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Прототип: 3D-план квартири</title>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.184.0/build/three.module.js",
+    "three/addons/controls/OrbitControls.js": "https://unpkg.com/three@0.184.0/examples/jsm/controls/OrbitControls.js"
+  },
+  "integrity": {
+    "https://unpkg.com/three@0.184.0/build/three.module.js": "sha384-8FCZ1eVO6it4+pbec2aDtnTrwjWXZLJRC+MAGCIPDgsYnUrl/E0A2YlF8ioMKI/J",
+    "https://unpkg.com/three@0.184.0/build/three.core.js": "sha384-dw2ooPewaEIrAgl6oFDBmmBWCE9oW9LxRGcfwZ0hLvEprzo202wXl7vCYHRlSnOT",
+    "https://unpkg.com/three@0.184.0/examples/jsm/controls/OrbitControls.js": "sha384-4rziNxOBZKQ69i+w+f89KJ55TCYquwchVbByQwmaOeIOXdOU2PLDn3kOfXHwIJC9"
+  }
+}
+</script>
+<style>
+:root{--accent:#C2251D;--ink:#16181D;--muted:#5F6368;--paper:#F6F5F2;--card:#fff;--line:#E4E2DD;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.wrap{max-width:960px;margin:0 auto;padding:16px 16px 40px;}
+h1{font-size:20px;font-weight:800;letter-spacing:-0.02em;margin:6px 0 2px;}
+.sub{font-size:13px;color:var(--muted);margin:0 0 14px;}
+.stage{position:relative;border-radius:16px;overflow:hidden;background:#23242a;border:1px solid var(--line);aspect-ratio:16/11;max-height:560px;}
+.stage canvas{display:block;width:100%;height:100%;touch-action:none;}
+.badge{position:absolute;left:12px;bottom:12px;font-size:11px;font-weight:600;color:#c9ccd2;background:rgba(30,31,36,.85);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:4px 10px;pointer-events:none;}
+.legend{position:absolute;top:12px;left:12px;display:flex;flex-direction:column;gap:5px;pointer-events:none;}
+.leg{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;color:#c9ccd2;background:rgba(30,31,36,.85);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:3px 9px;}
+.leg .dot{width:9px;height:9px;border-radius:3px;}
+.rooms{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
+.room-chip{border:1.5px solid var(--line);background:var(--card);font-size:13.5px;font-weight:600;padding:8px 14px;border-radius:20px;cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;transition:all .15s;color:var(--ink);}
+.room-chip .a{font-size:11.5px;color:var(--muted);font-weight:500;}
+.room-chip.active{border-color:var(--accent);color:var(--accent);background:rgba(194,37,29,.06);}
+.room-chip:active{transform:scale(.96);}
+.hint{font-size:12.5px;color:var(--muted);margin-top:10px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>3D-план квартири — прототип «архітектурного макета»</h1>
+  <p class="sub">Подіум-макет · м'які тіні · дошки-лейбли · вибір кімнати підсвіткою · damping-обертання</p>
+  <div class="stage" id="stage">
+    <div class="legend">
+      <div class="leg"><span class="dot" style="background:#C2251D"></span>обрана кімната</div>
+      <div class="leg"><span class="dot" style="background:#8b8fa3"></span>стіни під знос — пунктир</div>
+    </div>
+    <div class="badge">2-кімнатна · 54 м² · тягніть, щоб обертати</div>
+  </div>
+  <div class="rooms" id="rooms"></div>
+  <p class="hint">Клік по кімнаті на плані або по чипу — виділення зони. Той самий data-формат, що в ApartmentScene3D (кімнати як прямокутники на сітці).</p>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ---- apartment data: same rect-per-room shape as the app ----
+const ROOMS=[
+  {id:'hall',   name:'Передпокій', x:0,   z:0,   w:1.8, d:3.4, area:6,  floor:'#c9c2b4'},
+  {id:'kitchen',name:'Кухня',      x:1.8, z:0,   w:3.0, d:3.4, area:10, floor:'#cfc7b6'},
+  {id:'living', name:'Вітальня',   x:1.8, z:3.4, w:4.6, d:3.9, area:18, floor:'#c9a06c'},
+  {id:'bed',    name:'Спальня',    x:-2.8,z:3.4, w:4.6, d:3.9, area:14, floor:'#c9a06c'},
+  {id:'bath',   name:'Санвузол',   x:-2.8,z:0.0, w:1.6, d:2.2, area:4,  floor:'#b9c4c9'},
+  {id:'wc',     name:'Гардероб',   x:-1.2,z:0.0, w:1.2, d:2.2, area:2,  floor:'#cfc7b6'},
+];
+const H=1.15, WT=0.12; // cut-away wall height, thickness
+const minX=Math.min(...ROOMS.map(r=>r.x)), maxX=Math.max(...ROOMS.map(r=>r.x+r.w));
+const minZ=Math.min(...ROOMS.map(r=>r.z)), maxZ=Math.max(...ROOMS.map(r=>r.z+r.d));
+const CX=(minX+maxX)/2, CZ=(minZ+maxZ)/2;
+
+const stage=document.getElementById('stage');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.15;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+stage.prepend(renderer.domElement);
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color('#23242a');
+scene.fog=new THREE.Fog('#23242a',24,46);
+
+const camera=new THREE.PerspectiveCamera(30,16/11,0.1,100);
+camera.position.set(CX+9.5,10.5,CZ+11);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.target.set(CX,0.35,CZ);
+controls.enableDamping=true;controls.dampingFactor=0.08;
+controls.enablePan=false;
+controls.minDistance=7;controls.maxDistance=24;
+controls.minPolarAngle=THREE.MathUtils.degToRad(18);
+controls.maxPolarAngle=THREE.MathUtils.degToRad(72);
+
+// ---- lights ----
+scene.add(new THREE.HemisphereLight('#ffffff','#3a3b42',0.75));
+const sun=new THREE.DirectionalLight('#fff3e0',2.2);
+sun.position.set(CX+8,13,CZ+6);
+sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+const sc=sun.shadow.camera;sc.left=-10;sc.right=10;sc.top=10;sc.bottom=-10;
+sun.shadow.bias=-0.0004;sun.shadow.normalBias=0.04;
+const st=new THREE.Object3D();st.position.set(CX,0,CZ);scene.add(st);sun.target=st;scene.add(sun);
+
+// ---- podium (architectural model base) ----
+const podW=maxX-minX+1.6, podD=maxZ-minZ+1.6;
+function concreteTex(){
+  const c=document.createElement('canvas');c.width=c.height=512;const x=c.getContext('2d');
+  x.fillStyle='#b9b6ae';x.fillRect(0,0,512,512);
+  for(let i=0;i<2200;i++){x.fillStyle=`rgba(${Math.random()<.5?90:230},${Math.random()<.5?90:230},${Math.random()<.5?85:220},${0.05*Math.random()})`;x.fillRect(Math.random()*512,Math.random()*512,3,3);}
+  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+const podium=new THREE.Mesh(new THREE.BoxGeometry(podW,0.5,podD),new THREE.MeshStandardMaterial({map:concreteTex(),roughness:0.95}));
+podium.position.set(CX,-0.27,CZ);podium.receiveShadow=true;podium.castShadow=true;scene.add(podium);
+const podEdge=new THREE.Mesh(new THREE.BoxGeometry(podW+0.14,0.07,podD+0.14),new THREE.MeshStandardMaterial({color:'#17181c',roughness:0.6}));
+podEdge.position.set(CX,-0.545,CZ);scene.add(podEdge);
+
+// ---- rooms ----
+const wallM=new THREE.MeshStandardMaterial({color:'#efece5',roughness:0.85});
+const wallTopM=new THREE.MeshBasicMaterial({color:'#1d1d1f'});
+const pickables=[];const roomGroups={};
+function floorTexFor(col){
+  const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d');
+  x.fillStyle=col;x.fillRect(0,0,256,256);
+  x.strokeStyle='rgba(0,0,0,0.08)';x.lineWidth=2;
+  for(let i=0;i<=8;i++){x.beginPath();x.moveTo(i*32,0);x.lineTo(i*32,256);x.stroke();}
+  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+function wall(g,x1,z1,x2,z2){
+  const len=Math.hypot(x2-x1,z2-z1)+WT;
+  const m=new THREE.Mesh(new THREE.BoxGeometry(len,H,WT),wallM);
+  m.position.set((x1+x2)/2,H/2,(z1+z2)/2);
+  m.rotation.y=-Math.atan2(z2-z1,x2-x1);
+  m.castShadow=m.receiveShadow=true;g.add(m);
+  const cap=new THREE.Mesh(new THREE.BoxGeometry(len+0.02,0.05,WT+0.02),wallTopM);
+  cap.position.set((x1+x2)/2,H+0.025,(z1+z2)/2);cap.rotation.y=m.rotation.y;g.add(cap);
+}
+ROOMS.forEach(r=>{
+  const g=new THREE.Group();scene.add(g);roomGroups[r.id]=g;
+  const fl=new THREE.Mesh(new THREE.BoxGeometry(r.w-0.04,0.06,r.d-0.04),new THREE.MeshStandardMaterial({map:floorTexFor(r.floor),roughness:0.7}));
+  fl.position.set(r.x+r.w/2,0.03,r.z+r.d/2);fl.receiveShadow=true;fl.userData.roomId=r.id;g.add(fl);pickables.push(fl);
+  // highlight ring (hidden by default)
+  const ring=new THREE.Mesh(new THREE.BoxGeometry(r.w+0.1,0.02,r.d+0.1),new THREE.MeshBasicMaterial({color:'#C2251D',transparent:true,opacity:0.0}));
+  ring.position.set(r.x+r.w/2,0.075,r.z+r.d/2);g.add(ring);g.userData.ring=ring;
+  wall(g,r.x,r.z,r.x+r.w,r.z);
+  wall(g,r.x,r.z+r.d,r.x+r.w,r.z+r.d);
+  wall(g,r.x,r.z,r.x,r.z+r.d);
+  wall(g,r.x+r.w,r.z,r.x+r.w,r.z+r.d);
+});
+
+// ---- tiny furniture hints (rounded blocks) ----
+const hintM=new THREE.MeshStandardMaterial({color:'#d8d2c6',roughness:0.9});
+const woodM=new THREE.MeshStandardMaterial({color:'#b08a5e',roughness:0.6});
+function block(x,z,w,h,d,m=hintM,ry=0){
+  const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);
+  o.position.set(x,h/2+0.06,z);o.rotation.y=ry;o.castShadow=o.receiveShadow=true;scene.add(o);
+}
+block(1.8+1.5,3.4+3.0,2.0,0.35,0.85,hintM);          // sofa (living)
+block(1.8+3.8,3.4+1.0,0.9,0.42,0.5,woodM);           // tv stand
+block(-2.8+2.3,3.4+2.6,1.6,0.32,2.0,hintM);          // bed
+block(1.8+1.5,0.35,2.4,0.5,0.6,woodM);               // kitchen counter
+block(-2.8+0.5,0.6,0.75,0.3,0.75,new THREE.MeshStandardMaterial({color:'#dfe7ea',roughness:0.4})); // bath
+
+// ---- label boards (sprite-canvas, чертёжный стиль) ----
+const labelSprites=[];
+function label(r){
+  const c=document.createElement('canvas');c.width=380;c.height=140;const x=c.getContext('2d');
+  x.fillStyle='rgba(23,24,28,0.92)';
+  const rd=26;x.beginPath();x.roundRect(4,4,372,132,rd);x.fill();
+  x.strokeStyle='rgba(255,255,255,0.25)';x.lineWidth=2;x.stroke();
+  x.fillStyle='#f2f1ee';x.font='700 44px -apple-system,Segoe UI,sans-serif';x.textAlign='center';
+  x.fillText(r.name,190,60);
+  x.fillStyle='#a3a7ad';x.font='500 34px -apple-system,Segoe UI,sans-serif';
+  x.fillText(r.area+' м²',190,108);
+  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true}));
+  sp.scale.set(1.35,0.5,1);
+  sp.position.set(r.x+r.w/2,H+0.55,r.z+r.d/2);
+  sp.renderOrder=10;scene.add(sp);labelSprites.push(sp);
+}
+ROOMS.forEach(label);
+
+// ---- selection ----
+let selected=null;
+const chipsBox=document.getElementById('rooms');
+const chipEls={};
+ROOMS.forEach(r=>{
+  const b=document.createElement('button');b.className='room-chip';
+  b.innerHTML=`${r.name} <span class="a">${r.area} м²</span>`;
+  b.onclick=()=>select(selected===r.id?null:r.id);
+  chipsBox.append(b);chipEls[r.id]=b;
+});
+function select(id){
+  selected=id;
+  ROOMS.forEach(r=>{
+    const g=roomGroups[r.id];
+    const on=r.id===id;
+    g.userData.ring.material.opacity=on?0.85:0;
+    g.children.forEach(ch=>{
+      if(ch.material===wallM||ch.material&&ch.material.color&&ch.geometry.type==='BoxGeometry'&&ch.material.roughness===0.85){}
+    });
+    chipEls[r.id].classList.toggle('active',on);
+  });
+  // dim non-selected floors
+  pickables.forEach(fl=>{
+    fl.material.color.set(id&&fl.userData.roomId!==id?'#9a978f':'#ffffff');
+  });
+  labelSprites.forEach((sp,i)=>{sp.material.opacity=id&&ROOMS[i].id!==id?0.35:1;});
+}
+const ray=new THREE.Raycaster(),ptr=new THREE.Vector2();
+let downAt=null;
+renderer.domElement.addEventListener('pointerdown',e=>{downAt=[e.clientX,e.clientY];});
+renderer.domElement.addEventListener('pointerup',e=>{
+  if(!downAt||Math.hypot(e.clientX-downAt[0],e.clientY-downAt[1])>6)return;
+  const rct=renderer.domElement.getBoundingClientRect();
+  ptr.set(((e.clientX-rct.left)/rct.width)*2-1,-((e.clientY-rct.top)/rct.height)*2+1);
+  ray.setFromCamera(ptr,camera);
+  const hit=ray.intersectObjects(pickables)[0];
+  select(hit?(selected===hit.object.userData.roomId?null:hit.object.userData.roomId):null);
+});
+
+// ---- loop ----
+function resize(){
+  const r=stage.getBoundingClientRect();
+  renderer.setSize(r.width,r.height,false);
+  camera.aspect=r.width/r.height;camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);resize();
+renderer.setAnimationLoop(()=>{controls.update();renderer.render(scene,camera);});
+</script>
+</body>
+</html>

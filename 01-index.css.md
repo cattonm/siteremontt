@@ -16,6 +16,8 @@
 2. **patches/02-roughness-maps.js** — roughness-карти в proceduralTextures.js (новий експорт \`getSurfaceRoughness\`).
 3. **patches/03-RoomPreview3D.md** — тонмапінг, damping, roughness, контактні тіні, перша особа.
 4. **patches/04-ApartmentScene3D.md** — макет-подіум, темне паспарту, стиль лейблів.
+5. **patches/05-walk-mode.md** — прогулянка кімнатою: замкнена кімната зі стелею, WASD/джойстик, колізії. Референс: room-walk-prototype.html.
+6. **patches/06-survey-redesign.md** — редизайн анкети (телефон+планшет): степер-шапка, глобальний тумблер S/C/P, липка панель кошторису, фікс семантики rough_plaster_done.
 
 ## Design Tokens (light / dark)
 | Токен | Light | Dark | Роль |
@@ -47,5 +49,6 @@
 
 ## Files
 - room-prototype.html — референс кімнати (матеріали/світло/перша особа)
+- room-walk-prototype.html — референс прогулянки (стеля, хода, колізії, джойстик)
 - plan-prototype.html — референс плану (подіум/лейбли/вибір зони)
-- patches/01-index.css.md, 02-roughness-maps.js, 03-RoomPreview3D.md, 04-ApartmentScene3D.md
+- patches/01-index.css.md, 02-roughness-maps.js, 03-RoomPreview3D.md, 04-ApartmentScene3D.md, 05-walk-mode.md, 06-survey-redesign.md

@@ -45,7 +45,7 @@ export default function Onboarding({ isGuest, onStart }) {
                 background: 'var(--secondary-bg, rgba(127,127,127,0.1))',
                 padding: '6px 12px', borderRadius: '20px',
             }}>
-                <Clock size={14} /> Займе близько 3 хвилин
+                <Clock size={14} aria-hidden="true" /> Займе близько 3 хвилин
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px', marginBottom: '32px' }}>
@@ -57,9 +57,9 @@ export default function Onboarding({ isGuest, onStart }) {
                                 flexShrink: 0, width: '42px', height: '42px', borderRadius: '12px',
                                 background: 'var(--secondary-bg, rgba(127,127,127,0.1))',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                color: 'var(--link-color, #0a84ff)',
+                                color: 'var(--link-color)',
                             }}>
-                                <Icon size={21} />
+                                <Icon size={21} aria-hidden="true" />
                             </div>
                             <div style={{ minWidth: 0 }}>
                                 <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '2px' }}>
@@ -75,14 +75,15 @@ export default function Onboarding({ isGuest, onStart }) {
             </div>
 
             <button
+                type="button"
                 onClick={() => { vibe('medium'); onStart(); }}
                 style={{
                     width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                    background: 'var(--link-color, #0a84ff)', color: '#fff', border: 'none',
+                    background: 'var(--link-color)', color: '#fff', border: 'none',
                     padding: '16px', borderRadius: '14px', fontWeight: 700, fontSize: '16px', cursor: 'pointer',
                 }}
             >
-                Почати <ArrowRight size={18} />
+                Почати <ArrowRight size={18} aria-hidden="true" />
             </button>
 
             {isGuest && (

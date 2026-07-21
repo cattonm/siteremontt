@@ -781,7 +781,7 @@ export default function App() {
                 <button
                     type="button"
                     className="btn-reset menu-item"
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px', width: '100%', borderTop: '1px solid var(--border-color)', color: 'var(--link-color, #0a84ff)', fontWeight: 600 }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px', width: '100%', borderTop: '1px solid var(--border-color)', color: 'var(--link-color)', fontWeight: 600 }}
                     onClick={() => { vibe('medium'); setIsMenuOpen(false); setView((session || role === 'manager' || role === 'admin') ? 'dashboard' : 'login'); }}
                 >
                     <ShieldCheck size={18} aria-hidden="true" /> {(session || role === 'manager' || role === 'admin') ? 'Кабінет менеджера' : 'Вхід для менеджерів'}
@@ -808,12 +808,12 @@ export default function App() {
                 <TierSwitch />
 
                 <div className="chart-container">
-                    <div className="donut-wrapper" style={{ background: `conic-gradient(var(--link-color) 0% ${workPct}%, #34c759 ${workPct}% 100%)` }}>
+                    <div className="donut-wrapper" style={{ background: `conic-gradient(var(--link-color) 0% ${workPct}%, var(--money) ${workPct}% 100%)` }}>
                         <div className="donut-hole"></div>
                     </div>
                     <div className="chart-legend">
-                        <div className="legend-item"><span style={{fontWeight: 600}}><span className="legend-dot" style={{background: 'var(--link-color)'}}></span>Робота ({workPct}%)</span> <b><AnimatedPrice value={totals.work}/> ₴</b></div>
-                        <div className="legend-item"><span style={{fontWeight: 600}}><span className="legend-dot" style={{background: '#34c759'}}></span>Матеріали ({matPct}%)</span> <b><AnimatedPrice value={totals.mat_min}/> ₴</b></div>
+                        <div className="legend-item"><span style={{fontWeight: 600}}><span className="legend-dot" style={{background: 'var(--link-color)'}} aria-hidden="true"></span>Робота ({workPct}%)</span> <b><AnimatedPrice value={totals.work}/> ₴</b></div>
+                        <div className="legend-item"><span style={{fontWeight: 600}}><span className="legend-dot" style={{background: 'var(--money)'}} aria-hidden="true"></span>Матеріали ({matPct}%)</span> <b><AnimatedPrice value={totals.mat_min}/> ₴</b></div>
                         <div className="legend-item" style={{borderTop: '1px solid var(--border-color)', paddingTop: '8px', marginTop: '4px'}}>
                             <span style={{fontWeight: 700}}>Всього (від)</span> <b><AnimatedPrice value={totalCost}/> ₴</b>
                         </div>
@@ -831,7 +831,7 @@ export default function App() {
             <div className="estimate-bar">
                 <div className="estimate-inner">
                     {currentStep >= 0 && currentStep < finalQuestions.length && (
-                        <div className="estimate-sums">
+                        <div className="estimate-sums" aria-live="polite">
                             <span>Роботи <b><AnimatedPrice value={totals.work} /> ₴</b></span>
                             <span>Матеріали <b className="money">від <AnimatedPrice value={totals.mat_min} /> ₴</b></span>
                             {activeRoomSum && (
@@ -844,12 +844,12 @@ export default function App() {
                     )}
                     <div className="estimate-actions">
                         {currentStep >= 0 && (
-                            <button type="button" className="btn btn-back" onClick={goBack}>
-                                <ArrowLeft size={20} />
+                            <button type="button" className="btn btn-back" aria-label="Назад" onClick={goBack}>
+                                <ArrowLeft size={20} aria-hidden="true" />
                             </button>
                         )}
                         <button type="button" className={`btn btn-next ${currentStep >= finalQuestions.length ? 'btn-submit' : ''}`} onClick={goNext}>
-                            {btnNextText} {currentStep >= finalQuestions.length && <Send size={18} />}
+                            {btnNextText} {currentStep >= finalQuestions.length && <Send size={18} aria-hidden="true" />}
                         </button>
                     </div>
                 </div>

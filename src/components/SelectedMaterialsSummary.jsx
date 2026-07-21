@@ -30,7 +30,7 @@ export default function SelectedMaterialsSummary({ room }) {
 
     if (chosen.length === 0) {
         return (
-            <div style={{ padding: '20px', textAlign: 'center', color: '#8e8e93', fontSize: '13px', background: '#f8f8fa', borderRadius: '12px' }}>
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--hint-color)', fontSize: '13px', background: 'var(--secondary-bg)', borderRadius: '12px' }}>
                 Обери матеріали нижче — тут з'являться обрані варіанти
             </div>
         );
@@ -40,7 +40,7 @@ export default function SelectedMaterialsSummary({ room }) {
         <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '4px' }}>
             {chosen.map((item, i) => (
                 <div key={i} style={{ flex: '0 0 auto', width: '110px' }}>
-                    <div style={{ width: '110px', height: '80px', borderRadius: '10px', overflow: 'hidden', background: '#eee' }}>
+                    <div style={{ width: '110px', height: '80px', borderRadius: '10px', overflow: 'hidden', background: 'var(--secondary-bg)' }}>
                         <img src={item.img} alt={item.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
                     <div style={{ fontSize: '10px', color: 'var(--hint-color)', marginTop: '4px' }}>{item.question}</div>

@@ -77,7 +77,7 @@ function OrderDetail({ row }) {
                     </div>
                     <div>
                         <div style={{ fontSize: '11.5px', color: 'var(--hint-color)' }}>Разом</div>
-                        <div style={{ fontWeight: 800, fontSize: '17px', color: '#34c759' }}>{money(b.total)} ₴</div>
+                        <div style={{ fontWeight: 800, fontSize: '17px', color: 'var(--money)' }}>{money(b.total)} ₴</div>
                     </div>
                 </div>
             )}
@@ -109,7 +109,7 @@ function OrderDetail({ row }) {
                     <span style={{ fontSize: '13px', fontWeight: 700 }}>📋 Технічне завдання</span>
                     <button onClick={generate} disabled={gen}
                         style={{ fontSize: '12px', padding: '5px 11px', borderRadius: '8px', border: 'none',
-                                 background: 'var(--button-color, #0a84ff)', color: '#fff', cursor: gen ? 'default' : 'pointer', opacity: gen ? 0.6 : 1 }}>
+                                 background: 'var(--link-color)', color: '#fff', cursor: gen ? 'default' : 'pointer', opacity: gen ? 0.6 : 1 }}>
                         {gen ? 'Генеруємо…' : (report ? '🔄 Перегенерувати' : '✨ Згенерувати ТЗ')}
                     </button>
                 </div>
@@ -399,7 +399,7 @@ function AdminTab() {
                         <code style={{ flex: 1, fontSize: '20px', fontWeight: 800, letterSpacing: '3px', textAlign: 'center', padding: '12px', borderRadius: '10px', background: 'var(--secondary-bg, rgba(127,127,127,0.1))' }}>{code}</code>
                         <button
                             onClick={() => { navigator.clipboard?.writeText(code); setCopied(true); }}
-                            style={{ ...btnIcon, background: copied ? '#34c759' : undefined, color: copied ? '#fff' : undefined }}
+                            style={{ ...btnIcon, background: copied ? 'var(--money)' : undefined, color: copied ? '#fff' : undefined }}
                         >
                             {copied ? <Check size={16} /> : <Copy size={16} />}
                         </button>
@@ -774,7 +774,7 @@ function PricesTab() {
                 const midAuto = d.mat_mid === ''
                     ? Math.round((Number(d.mat_min) + Number(d.mat_max)) / 2) : null;
                 return (
-                    <div key={r.key} style={{ ...card, borderColor: isChanged(r) ? 'var(--link-color, #0a84ff)' : 'var(--border-color)' }}>
+                    <div key={r.key} style={{ ...card, borderColor: isChanged(r) ? 'var(--link-color)' : 'var(--border-color)' }}>
                         <div className="price-head" style={{ marginBottom: '10px' }}>
                             <div style={{ fontWeight: 600, fontSize: '14px' }}>
                                 {r.label || r.key}
@@ -884,7 +884,7 @@ function NumField({ label, value, onChange, placeholder, hint }) {
 const card = { background: 'var(--card-bg, rgba(127,127,127,0.06))', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '14px', marginBottom: '10px' };
 const btnSmall = { display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12.5px', fontWeight: 600, padding: '6px 10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-color)', cursor: 'pointer' };
 const btnIcon = { display: 'flex', alignItems: 'center', justifyContent: 'center', width: '38px', height: '38px', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-color)', cursor: 'pointer', flexShrink: 0 };
-const btnPrimary = { display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 14px', borderRadius: '10px', border: 'none', background: 'var(--link-color, #0a84ff)', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer' };
+const btnPrimary = { display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 14px', borderRadius: '10px', border: 'none', background: 'var(--link-color)', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer' };
 const skeleton = { borderRadius: '14px', background: 'var(--secondary-bg, rgba(127,127,127,0.12))', animation: 'pulse 1.2s ease-in-out infinite' };
 
 function Tab({ active, onClick, children }) {
@@ -894,8 +894,8 @@ function Tab({ active, onClick, children }) {
             flexShrink: 0, whiteSpace: 'nowrap',
             background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px',
             fontWeight: active ? 700 : 500,
-            color: active ? 'var(--link-color, #0a84ff)' : 'var(--hint-color)',
-            borderBottom: active ? '2px solid var(--link-color, #0a84ff)' : '2px solid transparent',
+            color: active ? 'var(--link-color)' : 'var(--hint-color)',
+            borderBottom: active ? '2px solid var(--link-color)' : '2px solid transparent',
             marginBottom: '-1px',
         }}>{children}</button>
     );

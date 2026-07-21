@@ -188,7 +188,11 @@ function CameraRig({ W, D, view, yawRef, pitchRef, setWalking }) {
         const toFov = fp ? FOV_FP : FOV_ORBIT;
 
         // Перший рендер (і зміна площі) — ставимо камеру миттєво, без лету.
-        if (firstRef.current) {
+        // Те саме робимо, якщо користувач попросив менше руху (аудит п.9.5):
+        // твін камери >200мс саме той випадок, який reduced-motion має вимкнути.
+        const reducedMotion = typeof window !== 'undefined'
+            && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        if (firstRef.current || reducedMotion) {
             firstRef.current = false;
             cam.position.copy(toPos);
             ctrl.target.copy(toTgt);
@@ -1181,7 +1185,7 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
                                 aria-label={h.group}
                                 onClick={() => { vibe('light'); onHotspotClick?.(h.group); }}
                             >
-                                <Icon size={16} />
+                                <Icon size={16} aria-hidden="true" />
                             </button>
                         </Html>
                     );

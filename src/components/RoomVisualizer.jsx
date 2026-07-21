@@ -189,7 +189,7 @@ export default function RoomVisualizer() {
                                 const rp = liveBreakdown?.rooms?.[activeRoom.id];
                                 if (!rp || (rp.work <= 0 && rp.mat_min <= 0)) return null;
                                 return (
-                                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#34c759', marginTop: '3px' }}>
+                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--money)', marginTop: '3px' }}>
                                         Робота {Number(rp.work).toLocaleString()} ₴ · Матеріали від {Number(rp.mat_min).toLocaleString()} ₴
                                     </div>
                                 );
@@ -294,14 +294,15 @@ export default function RoomVisualizer() {
                         «{lastRemoved.room.name}» видалено
                     </span>
                     <button
+                        type="button"
                         onClick={() => { vibe('medium'); undoRemove(); setActiveId(lastRemoved.room.id); }}
                         style={{
                             display: 'flex', alignItems: 'center', gap: '5px', background: 'none',
-                            border: 'none', color: '#0a84ff', fontWeight: 700, fontSize: '14px',
+                            border: 'none', color: 'var(--link-color)', fontWeight: 700, fontSize: '14px',
                             cursor: 'pointer', padding: 0, flexShrink: 0,
                         }}
                     >
-                        <Undo2 size={16} /> Скасувати
+                        <Undo2 size={16} aria-hidden="true" /> Скасувати
                     </button>
                 </div>
             )}

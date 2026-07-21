@@ -85,8 +85,8 @@ export default function Login({ onSuccess, onBack }) {
     return (
         <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', background: 'var(--bg-color)', color: 'var(--text-color)' }}>
             <div style={{ width: '100%', maxWidth: '380px', textAlign: 'center' }}>
-                <div style={{ display: 'inline-flex', width: '58px', height: '58px', borderRadius: '16px', alignItems: 'center', justifyContent: 'center', background: 'var(--secondary-bg, rgba(127,127,127,0.1))', color: 'var(--link-color, #0a84ff)', marginBottom: '16px' }}>
-                    <ShieldCheck size={28} />
+                <div style={{ display: 'inline-flex', width: '58px', height: '58px', borderRadius: '16px', alignItems: 'center', justifyContent: 'center', background: 'var(--secondary-bg, rgba(127,127,127,0.1))', color: 'var(--link-color)', marginBottom: '16px' }}>
+                    <ShieldCheck size={28} aria-hidden="true" />
                 </div>
                 <h1 style={{ fontSize: '23px', fontWeight: 800, margin: '0 0 8px' }}>Кабінет менеджера</h1>
                 <p style={{ color: 'var(--hint-color)', fontSize: '14.5px', lineHeight: 1.45, margin: '0 0 24px' }}>
@@ -96,18 +96,18 @@ export default function Login({ onSuccess, onBack }) {
 
                 {status === 'init' && (
                     <div style={{ color: 'var(--hint-color)', display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                        <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Готуємо вхід…
+                        <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" /> Готуємо вхід…
                     </div>
                 )}
 
                 {status === 'waiting' && (
                     <>
-                        <button onClick={openBot} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'var(--link-color, #0a84ff)', color: '#fff', border: 'none', padding: '16px', borderRadius: '14px', fontWeight: 700, fontSize: '16px', cursor: 'pointer' }}>
-                            <ExternalLink size={18} /> Підтвердити в Telegram
+                        <button type="button" onClick={openBot} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: 'var(--link-color)', color: '#fff', border: 'none', padding: '16px', borderRadius: '14px', fontWeight: 700, fontSize: '16px', cursor: 'pointer' }}>
+                            <ExternalLink size={18} aria-hidden="true" /> Підтвердити в Telegram
                         </button>
 
                         <div style={{ marginTop: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--hint-color)', fontSize: '13.5px' }}>
-                            <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
+                            <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
                             Чекаємо підтвердження… {mm}:{ss}
                         </div>
 
@@ -118,10 +118,12 @@ export default function Login({ onSuccess, onBack }) {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                                 <code style={{ flex: 1, fontWeight: 700, fontSize: '14px', color: 'var(--text-color)' }}>/start web_{code}</code>
                                 <button
+                                    type="button"
+                                    aria-label="Скопіювати команду"
                                     onClick={() => { navigator.clipboard?.writeText(`/start web_${code}`); setCopied(true); }}
-                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'transparent', color: copied ? '#34c759' : 'var(--text-color)', cursor: 'pointer' }}
+                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'transparent', color: copied ? 'var(--money)' : 'var(--text-color)', cursor: 'pointer' }}
                                 >
-                                    {copied ? <Check size={15} /> : <Copy size={15} />}
+                                    {copied ? <Check size={15} aria-hidden="true" /> : <Copy size={15} aria-hidden="true" />}
                                 </button>
                             </div>
                         </div>
@@ -133,8 +135,8 @@ export default function Login({ onSuccess, onBack }) {
                         <div style={{ color: '#ff3b30', fontSize: '14px', fontWeight: 600, marginBottom: '14px' }}>
                             {status === 'expired' ? 'Час на підтвердження вичерпано.' : 'Сервер недоступний.'}
                         </div>
-                        <button onClick={start} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '12px 18px', borderRadius: '12px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-color)', fontWeight: 600, cursor: 'pointer' }}>
-                            <RefreshCw size={16} /> Спробувати ще раз
+                        <button type="button" onClick={start} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '12px 18px', borderRadius: '12px', border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-color)', fontWeight: 600, cursor: 'pointer' }}>
+                            <RefreshCw size={16} aria-hidden="true" /> Спробувати ще раз
                         </button>
                     </>
                 )}
@@ -143,14 +145,14 @@ export default function Login({ onSuccess, onBack }) {
                     <div style={{ fontSize: '14px', lineHeight: 1.5, color: 'var(--hint-color)' }}>
                         <b style={{ color: 'var(--text-color)' }}>Доступу поки немає.</b><br />
                         Надішліть боту код доступу від адміністратора, потім
-                        <button onClick={start} style={{ background: 'none', border: 'none', color: 'var(--link-color, #0a84ff)', fontWeight: 700, cursor: 'pointer', padding: '0 4px' }}>
+                        <button type="button" onClick={start} style={{ background: 'none', border: 'none', color: 'var(--link-color)', fontWeight: 700, cursor: 'pointer', padding: '0 4px' }}>
                             повторіть вхід
                         </button>
                     </div>
                 )}
 
-                <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '28px', background: 'none', border: 'none', color: 'var(--hint-color)', fontSize: '14px', cursor: 'pointer' }}>
-                    <ArrowLeft size={15} /> До калькулятора
+                <button type="button" onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '28px', background: 'none', border: 'none', color: 'var(--hint-color)', fontSize: '14px', cursor: 'pointer' }}>
+                    <ArrowLeft size={15} aria-hidden="true" /> До калькулятора
                 </button>
 
                 <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>

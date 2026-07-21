@@ -17,7 +17,9 @@ import * as THREE from 'three';
 import { Plus, Minus, RotateCcw } from 'lucide-react';
 import { getSurfaceKind, getSurfaceColor, getSurfaceTexture, repeatsFor } from '../utils/proceduralTextures';
 import { OutlinedBox, OutlinedCylinder, OutlinedSurface } from './three/Outlined';
+import InvalidateOnVisible from './three/InvalidateOnVisible';
 import { FLOOR_THICKNESS } from './three/sceneConstants';
+import useCanvasVisible from '../hooks/useCanvasVisible';
 import { SLOT_SIZE } from '../utils/layoutEngine';
 import { FURNITURE_LAYOUTS } from '../data/furnitureLayouts';
 import {
@@ -242,6 +244,8 @@ function Podium({ bounds }) {
 
 export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
     const [zoom, setZoom] = useState(1);
+    // 3D-аудит п.8.1: не малюємо кадри плану, поки він поза в'юпортом.
+    const [canvasWrapRef, canvasVisible] = useCanvasVisible();
     // Темна тема читається з body.classList — вся вкладка перемальовується
     // при перемиканні теми, тож окремої реактивності не треба.
     const dark = typeof document !== 'undefined' && document.body.classList.contains('dark-theme');
@@ -263,7 +267,7 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
         setZoom((z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, +(z + delta).toFixed(2))));
 
     return (
-        <div style={{ position: 'relative', width: '100%', height: '380px', background: 'var(--stage-bg)', borderRadius: '12px' }}>
+        <div ref={canvasWrapRef} style={{ position: 'relative', width: '100%', height: '380px', background: 'var(--stage-bg)', borderRadius: '12px' }}>
             {/* Порожній стан: раніше тут показувався макет-шаблон із порожніми
                 зонами, і клік по ньому створював кімнату. Тепер план — це
                 дзеркало реальних кімнат, тож поки їх нема, показуємо підказку,
@@ -283,17 +287,19 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
                 </div>
             )}
             {/* frameloop="demand": сцена статична, тож рендеримо кадр лише при
-                змінах (зум, вибір зони, матеріали) — див. invalidate() в IsoCamera. */}
+                змінах (зум, вибір зони, матеріали) — див. invalidate() в IsoCamera.
+                Поза в'юпортом (п.8.1) — "never", кадри взагалі не йдуть. */}
             <Canvas
                 orthographic
                 dpr={[1, 2]}
-                frameloop="demand"
+                frameloop={canvasVisible ? 'demand' : 'never'}
                 shadows="soft"
                 style={{ width: '100%', height: '100%' }}
                 gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.12 }}
                 role="img"
                 aria-label="3D-план квартири з розташуванням приміщень"
             >
+                <InvalidateOnVisible visible={canvasVisible} />
                 <IsoCamera bounds={bounds} userZoom={zoom} />
                 {/* ACES темніший за лінійний — ambient прибрано, hemisphere/сонце
                     підняті; у темній темі «земля» hemisphere теж темна. */}

@@ -34,12 +34,14 @@ import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { Html, OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { Box, Footprints } from 'lucide-react';
 import { OutlinedBox, OutlinedCylinder, OutlinedSurface } from './three/Outlined';
+import InvalidateOnVisible from './three/InvalidateOnVisible';
 import { getSurfaceKind, getSurfaceColor, getSurfaceTexture, getSurfaceRoughness, repeatsFor } from '../utils/proceduralTextures';
 import { GROUP_ICONS, DEFAULT_GROUP_ICON } from '../data/groupIcons';
 import { ROOM_QUESTIONS_CONFIG } from '../data/questions';
 import { FURNITURE_LAYOUTS } from '../data/furnitureLayouts';
 import { SLOT_SIZE } from '../utils/layoutEngine';
 import { vibe } from '../utils/telegram';
+import useCanvasVisible from '../hooks/useCanvasVisible';
 
 // ====== ГЕОМЕТРІЯ КІМНАТИ ======
 const WALL_H = 2.7;     // висота стін, м
@@ -976,6 +978,10 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
     // Локальний стан (стор не чіпаємо — той самий принцип, що з матеріалами).
     const [view, setView] = useState('orbit');
     const fp = view === 'fp';
+    // 3D-аудит п.8.1: не малюємо кадри, коли канвас поза в'юпортом (план і
+    // прев'ю кімнати рідко видно одночасно на телефоні — лишається один
+    // активний WebGL-контекст).
+    const [canvasWrapRef, canvasVisible] = useCanvasVisible();
     // walking вмикається лише коли переліт завершився — під час лету
     // камерою керує твін, а не хода.
     const [walking, setWalking] = useState(false);
@@ -1092,6 +1098,7 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
 
     return (
         <div
+            ref={canvasWrapRef}
             className="r3d-wrap"
             onPointerDown={onLookDown}
             onPointerMove={onLookMove}
@@ -1110,12 +1117,14 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
             <Canvas
                 dpr={[1, 2]}
                 // Хода несумісна з "demand" — поки гуляємо, малюємо кожен кадр.
-                frameloop={fp ? 'always' : 'demand'}
+                // Поза в'юпортом (п.8.1) — взагалі не малюємо, незалежно від режиму.
+                frameloop={!canvasVisible ? 'never' : (fp ? 'always' : 'demand')}
                 shadows="soft"
                 gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.12 }}
                 role="img"
                 aria-label={`3D-візуалізація приміщення «${room.name}»${fp ? ' у режимі прогулянки' : ''}`}
             >
+                <InvalidateOnVisible visible={canvasVisible} />
                 <CameraRig
                     key={`${W.toFixed(1)}x${D.toFixed(1)}`}
                     W={W} D={D} view={view}

@@ -6,9 +6,9 @@
 // референсі, лишаючись повністю параметричним кодом.
 import React from 'react';
 import * as THREE from 'three';
+import { OUTLINE_COLOR } from './sceneConstants';
 
 const OUTLINE = 0.018; // товщина контуру, метри
-const OUTLINE_COLOR = '#161616';
 
 // Помножити hex-колір покомпонентно на hex-множник (0..1 на канал).
 // Для приглушення невибраних зон плану: множимо і заливку, і map-текстуру.

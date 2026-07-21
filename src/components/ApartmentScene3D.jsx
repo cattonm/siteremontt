@@ -18,14 +18,11 @@ import { Plus, Minus, RotateCcw } from 'lucide-react';
 import { getSurfaceKind, getSurfaceColor, getSurfaceTexture, repeatsFor } from '../utils/proceduralTextures';
 import { OutlinedBox, OutlinedCylinder, OutlinedSurface } from './three/Outlined';
 import InvalidateOnVisible from './three/InvalidateOnVisible';
-import { FLOOR_THICKNESS } from './three/sceneConstants';
+import { FLOOR_THICKNESS, WALL_H_PLAN as WALL_H, CAP_COLOR_PLAN } from './three/sceneConstants';
 import useCanvasVisible from '../hooks/useCanvasVisible';
 import { SLOT_SIZE } from '../utils/layoutEngine';
 import { FURNITURE_LAYOUTS } from '../data/furnitureLayouts';
-import {
-    TEMPLATE_WALL_HEIGHT as WALL_H, SILL_HEIGHT,
-    EXT_THICKNESS, INT_THICKNESS,
-} from '../data/apartmentTemplate';
+import { SILL_HEIGHT, EXT_THICKNESS, INT_THICKNESS } from '../data/apartmentTemplate';
 import { buildFloorPlan } from '../utils/floorPlanLayout';
 
 // ====== НАЛАШТУВАННЯ ВИГЛЯДУ ======
@@ -38,7 +35,7 @@ const ZOOM_STEP = 0.25;
 
 const ACCENT = '#C2251D';          // фірмовий червоний (three-матеріали; у HTML-стилях — 'var(--accent)')
 const WALL_COLOR = '#ffffff';
-const WALL_CAP_COLOR = '#141414';  // чорний зріз стін = лінії плану
+const WALL_CAP_COLOR = CAP_COLOR_PLAN;  // чорний зріз стін = лінії плану
 const CAP_HEIGHT = 0.07;
 const CAP_OVERHANG = 0.02;
 const FLOOR_EMPTY = '#f1f1ee';     // зона без кімнати користувача

@@ -41,14 +41,15 @@ import { ROOM_QUESTIONS_CONFIG } from '../data/questions';
 import { vibe } from '../utils/telegram';
 import useCanvasVisible from '../hooks/useCanvasVisible';
 import { layoutKitchen, layoutBath, layoutGeneric, TUB_LEN, TUB_DEP, TUB_H } from '../utils/roomLayout';
+import { WALL_H_ROOM, CAP_COLOR_ROOM, getBlobTexture } from './three/sceneConstants';
 
 // ====== ГЕОМЕТРІЯ КІМНАТИ ======
-const WALL_H = 2.7;     // висота стін, м
+const WALL_H = WALL_H_ROOM;     // висота стін, м
 const WALL_T = 0.09;    // товщина стін
 const FLOOR_T = 0.09;   // товщина плити підлоги
 const CAP_H = 0.06;     // чорна "кришка" зрізу стіни (лінія плану)
 const CAP_OVER = 0.015;
-const CAP_COLOR = '#161616';
+const CAP_COLOR = CAP_COLOR_ROOM;
 const WOOD = '#cdb293';
 const rad = (deg) => (deg * Math.PI) / 180;
 
@@ -78,24 +79,7 @@ function roomDims(room) {
 }
 
 // ====== КОНТАКТНА ТІНЬ ПІД МЕБЛЯМИ ======
-// М'який радіальний "blob" на площині замість дорогого AO — і працює з
-// frameloop="demand" (нічого не рахує щокадру). Текстура одна на всю сцену.
-let _blobTex = null;
-function getBlobTexture() {
-    if (_blobTex) return _blobTex;
-    if (typeof document === 'undefined') return null;
-    const c = document.createElement('canvas');
-    c.width = c.height = 64;
-    const ctx = c.getContext('2d');
-    const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 32);
-    g.addColorStop(0, 'rgba(0,0,0,0.32)');
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 64, 64);
-    _blobTex = new THREE.CanvasTexture(c);
-    return _blobTex;
-}
-
+// getBlobTexture — спільна для обох 3D-сцен, тепер у three/sceneConstants.js.
 function ContactShadow({ position, size }) {
     const tex = getBlobTexture();
     if (!tex) return null;

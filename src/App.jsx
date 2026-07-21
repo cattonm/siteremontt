@@ -12,6 +12,10 @@ import Summary from './components/Summary';
 import AnimatedPrice from './components/AnimatedPrice';
 import { vibe, vibeError, tg } from './utils/telegram';
 import useFocusTrap from './hooks/useFocusTrap';
+import {
+    showAlert, ping, me, getOrder, getDraft, saveDraft,
+    deleteDraft, saveOrder, createOrder, liveCalc, submitLead,
+} from './utils/api';
 import { Menu, Moon, Sun, ArrowLeft, Send, Trash2, Loader2, ShieldCheck } from 'lucide-react';
 
 // ЛІНИВИЙ імпорт: RoomVisualizer тягне за собою three.js + drei (~850 КБ
@@ -26,22 +30,6 @@ import {
     blockBasement, blockAttic, blockCustomWorks, getBathQuestions, getRoomQuestions,
     getRoomIssues
 } from './data/questions';
-
-const BACKEND_URL = "https://remontnikuav.onrender.com";
-
-// Єдина точка показу алертів. У Telegram беремо нативний showAlert (обов'язково
-// прив'язаний до tg — відв'язаний метод втрачає this), у браузері (гість) —
-// звичайний window.alert.
-const showAlert = (msg) => (tg?.showAlert ? tg.showAlert.bind(tg) : window.alert)(msg);
-
-// Заголовки авторизації: міні-апка йде з initData, веб-кабінет — із сесійним
-// токеном. Сервер розуміє обидва (auth_request) — тому фронтенд просто шле те,
-// що має.
-const authHeaders = () => ({
-    'Content-Type': 'application/json',
-    'X-Telegram-Init-Data': tg?.initData || '',
-    ...(getSession()?.token ? { 'X-Session-Token': getSession().token } : {}),
-});
 
 export default function App() {
     // === 1. ГЛОБАЛЬНИЙ СТАН З ZUSTAND ===
@@ -134,30 +122,20 @@ export default function App() {
         // Прогрів бекенду: free-план Render засинає, перший live_calc міг
         // чекати холодний старт ~30-50 с. Будимо сервер, поки людина
         // заповнює ім'я/площу — до кроку кімнат ціни вже рахуються миттєво.
-        fetch(`${BACKEND_URL}/ping`, { mode: 'no-cors' }).catch(() => {});
+        ping().catch(() => {});
 
         // Хто я? Гість (сайт у браузері) бачить вільний калькулятор і форму
         // контакту в кінці; менеджер — повний потік із відправкою в бота.
-        fetch(`${BACKEND_URL}/api/me`, {
-            headers: {
-                'X-Telegram-Init-Data': tg?.initData || '',
-                ...(getSession()?.token ? { 'X-Session-Token': getSession().token } : {}),
-            },
-        })
+        me()
             .then((r) => (r.ok ? r.json() : { role: 'guest' }))
             .then((d) => setRole(d.role || 'guest'))
             .catch(() => setRole('guest'));
 
         const editId = new URLSearchParams(window.location.search).get('edit_id');
-        
+
         if (editId) {
             // РЕЖИМ РЕДАГУВАННЯ (isLoadingEdit уже true з лінивого ініту)
-            fetch(`${BACKEND_URL}/api/get_order?edit_id=${editId}`, {
-                headers: {
-                    'X-Telegram-Init-Data': tg?.initData || '',
-                    ...(getSession()?.token ? { 'X-Session-Token': getSession().token } : {}),
-                },
-            })
+            getOrder(editId)
                 .then(res => {
                     if(!res.ok) throw new Error("Помилка завантаження");
                     return res.json();
@@ -187,7 +165,7 @@ export default function App() {
         } else if (useStore.getState().currentStep <= -1 && (tg?.initData || getSession())) {
             // РЕЖИМ СТВОРЕННЯ, локальної чернетки НЕМА (новий пристрій, чистий
             // кеш, перевстановлений Telegram) — питаємо серверну.
-            fetch(`${BACKEND_URL}/api/get_draft`, { headers: authHeaders() })
+            getDraft()
                 .then((r) => (r.ok ? r.json() : null))
                 .then((d) => {
                     const draft = d?.draft;
@@ -286,12 +264,7 @@ export default function App() {
                 // АДАПТЕР: Формуємо єдиний об'єкт для сервера
                 const payloadAnswers = { ...answers, rooms: rooms };
                 
-                const res = await fetch(`${BACKEND_URL}/api/live_calc`, { 
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify({ client, answers: payloadAnswers }),
-                    signal: ctrl.signal,
-                });
+                const res = await liveCalc({ client, answers: payloadAnswers }, ctrl.signal);
                 if (res.ok) { 
                     const data = await res.json(); 
                     setTotals({ work: data.work, mat_min: data.mat_min }); 
@@ -331,12 +304,8 @@ export default function App() {
 
         const ctrl = new AbortController();
         const t = setTimeout(() => {
-            fetch(`${BACKEND_URL}/api/save_draft`, {
-                method: 'POST',
-                headers: authHeaders(),
-                body: JSON.stringify({ currentStep, client, answers: { ...answers, rooms } }),
-                signal: ctrl.signal,
-            }).catch(() => {}); // мовчазний фейл: локальна чернетка все одно лишається
+            saveDraft({ currentStep, client, answers: { ...answers, rooms } }, ctrl.signal)
+                .catch(() => {}); // мовчазний фейл: локальна чернетка все одно лишається
         }, 3000);
         return () => { clearTimeout(t); ctrl.abort(); };
     }, [client, answers, rooms, currentStep, session]);
@@ -365,16 +334,12 @@ export default function App() {
                 vibe('heavy');
                 setIsSendingLead(true);
                 const { website: hp, ...clientClean } = client;   // hp — honeypot, у заявку не пишемо
-                fetch(`${BACKEND_URL}/api/submit_lead`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        client: clientClean,
-                        answers: { ...answers, rooms },
-                        // Honeypot: приховане поле форми. РАНІШЕ тут стояла порожня
-                        // константа — тобто пастка не спрацьовувала взагалі ніколи.
-                        website: hp || '',
-                    }),
+                submitLead({
+                    client: clientClean,
+                    answers: { ...answers, rooms },
+                    // Honeypot: приховане поле форми. РАНІШЕ тут стояла порожня
+                    // константа — тобто пастка не спрацьовувала взагалі ніколи.
+                    website: hp || '',
                 })
                     .then((r) => {
                         if (!r.ok) throw new Error('fail');
@@ -412,18 +377,11 @@ export default function App() {
                 handleResetDraftSilent();
                 // Заявку здано — прибираємо серверну чернетку, щоб через 24 год
                 // бот не нагадував про вже завершену роботу.
-                fetch(`${BACKEND_URL}/api/delete_draft`, {
-                    method: 'POST',
-                    headers: authHeaders(),
-                }).catch(() => {});
+                deleteDraft().catch(() => {});
             }
 
-            if (editId) { 
-                fetch(`${BACKEND_URL}/api/save_order`, { 
-                    method: 'POST', 
-                    headers: authHeaders(), 
-                    body: JSON.stringify(data) 
-                }).then((r) => {
+            if (editId) {
+                saveOrder(data).then((r) => {
                     // ВАЖЛИВО: чистимо не лише прапорець редагування, а й САМІ
                     // дані анкети. Раніше вони лишались у чернетці, і при
                     // наступному відкритті застосунок пропонував «продовжити
@@ -440,11 +398,7 @@ export default function App() {
                 // ВЕБ-КАБІНЕТ: tg.sendData у браузері не існує — раніше заявка
                 // менеджера тут просто зникала б у нікуди. Зберігаємо через API
                 // (авторство сервер бере з сесії, а не з тіла запиту).
-                fetch(`${BACKEND_URL}/api/create_order`, {
-                    method: 'POST',
-                    headers: authHeaders(),
-                    body: JSON.stringify(data),
-                })
+                createOrder(data)
                     .then((r) => { if (!r.ok) throw new Error('fail'); submissionIdRef.current = null; setView('dashboard'); })
                     .catch(() => showAlert('Не вдалося зберегти заявку. Спробуйте ще раз.'));
             }
@@ -734,10 +688,7 @@ export default function App() {
                                 onClick={() => {
                                     vibe('light');
                                     setServerDraft(null);
-                                    fetch(`${BACKEND_URL}/api/delete_draft`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' },
-                                    }).catch(() => {});
+                                    deleteDraft().catch(() => {});
                                 }}
                                 style={{ background: 'rgba(255, 59, 48, 0.1)', color: '#ff3b30', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}
                             >Почати нову</button>

@@ -455,10 +455,39 @@ export function getSurfaceColor(kind) {
     return KINDS[kind]?.color || '#d9d9dd';
 }
 
-// Скільки повторів текстури треба, щоб вкрити `meters` метрів поверхні
+// Скільки повторів текстури треба, щоб вкрити `meters` метрів поверхні.
+// Квантовано до кроку 0.5 (3D-аудит п.8.3): rx/ry рахуються з W/D кімнати —
+// неперервні значення, тож кожна зміна площі (15 → 15.5 → 16 м²) раніше
+// породжувала нову CanvasTexture, яка ніколи не звільнялась. Крок 0.5
+// підвищує влучання в кеш приблизно на порядок, а візуально непомітний.
 export function repeatsFor(kind, meters) {
     const m = KINDS[kind]?.m || 1;
-    return Math.max(meters / m, 0.05);
+    const raw = Math.max(meters / m, 0.05);
+    return Math.max(Math.round(raw / 0.5) * 0.5, 0.5);
+}
+
+// М'який LRU-ліміт для кешів текстур, ключованих rx/ry (на відміну від
+// canvasCache/roughCanvasCache — ті ключуються лише kind'ом і тому скінченні
+// самі по собі, чіпати їх не треба). Map зберігає порядок вставки — при
+// читанні переносимо ключ у кінець (найсвіжіший), при переповненні видаляємо
+// найстаріший і звільняємо його GPU-текстуру через dispose().
+const TEXTURE_CACHE_LIMIT = 80;
+
+function lruGet(cache, key) {
+    if (!cache.has(key)) return undefined;
+    const val = cache.get(key);
+    cache.delete(key);
+    cache.set(key, val);
+    return val;
+}
+
+function lruSet(cache, key, val) {
+    cache.set(key, val);
+    if (cache.size > TEXTURE_CACHE_LIMIT) {
+        const oldestKey = cache.keys().next().value;
+        cache.get(oldestKey)?.dispose?.();
+        cache.delete(oldestKey);
+    }
 }
 
 const canvasCache = new Map();  // kind -> HTMLCanvasElement
@@ -484,7 +513,8 @@ function getCanvas(kind) {
 // Ніяких промісів: canvas малюється миттєво при першому зверненні.
 export function getSurfaceTexture(kind, repeatX = 1, repeatY = 1) {
     const key = `${kind}|${repeatX.toFixed(2)}|${repeatY.toFixed(2)}`;
-    if (textureCache.has(key)) return textureCache.get(key);
+    const cached = lruGet(textureCache, key);
+    if (cached) return cached;
     const canvas = getCanvas(kind);
     if (!canvas) return null;
     const tex = new THREE.CanvasTexture(canvas);
@@ -492,7 +522,7 @@ export function getSurfaceTexture(kind, repeatX = 1, repeatY = 1) {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
     tex.repeat.set(repeatX, repeatY);
-    textureCache.set(key, tex);
+    lruSet(textureCache, key, tex);
     return tex;
 }
 
@@ -553,13 +583,14 @@ function getRoughCanvas(kind) {
 
 export function getSurfaceRoughness(kind, repeatX = 1, repeatY = 1) {
     const key = `${kind}|${repeatX.toFixed(2)}|${repeatY.toFixed(2)}`;
-    if (roughTextureCache.has(key)) return roughTextureCache.get(key);
+    const cached = lruGet(roughTextureCache, key);
+    if (cached) return cached;
     const canvas = getRoughCanvas(kind);
     if (!canvas) return null;
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     tex.repeat.set(repeatX, repeatY);
     // БЕЗ colorSpace = SRGB: карти даних лишаються лінійними
-    roughTextureCache.set(key, tex);
+    lruSet(roughTextureCache, key, tex);
     return tex;
 }

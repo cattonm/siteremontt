@@ -12,9 +12,11 @@ import Summary from './components/Summary';
 import AnimatedPrice from './components/AnimatedPrice';
 import { vibe, vibeError, tg } from './utils/telegram';
 import useFocusTrap from './hooks/useFocusTrap';
+import useLiveCalc from './hooks/useLiveCalc';
+import useServerDraft from './hooks/useServerDraft';
 import {
-    showAlert, ping, me, getOrder, getDraft, saveDraft,
-    deleteDraft, saveOrder, createOrder, liveCalc, submitLead,
+    showAlert, ping, me, getOrder,
+    deleteDraft, saveOrder, createOrder, submitLead,
 } from './utils/api';
 import { Menu, Moon, Sun, ArrowLeft, Send, Trash2, Loader2, ShieldCheck } from 'lucide-react';
 
@@ -60,18 +62,6 @@ export default function App() {
         const isEdit = new URLSearchParams(window.location.search).get('edit_id');
         return !isEdit && useStore.getState().currentStep > -1; // persist гідратується синхронно
     });
-    const [totals, setTotals] = useState({ work: 0, mat_min: 0 });
-    // Чернетка, знайдена на сервері (інший пристрій) — показуємо банер
-    // «Продовжити?», а не мовчки підміняємо стан.
-    const [serverDraft, setServerDraft] = useState(null);
-
-    // Фокус-пастки модалок (аудит п.9.2): фокус на перший елемент при
-    // відкритті, Tab циклічно всередині, Escape закриває де є onClose.
-    const menuTrapRef = useFocusTrap(isMenuOpen, () => setIsMenuOpen(false));
-    const imageModalTrapRef = useFocusTrap(!!modalImg, () => setModalImg(null));
-    const cartTrapRef = useFocusTrap(isCartOpen, () => setIsCartOpen(false));
-    const draftPromptTrapRef = useFocusTrap(showDraftPrompt, null);
-    const serverDraftTrapRef = useFocusTrap(!!serverDraft, null);
     // РОЛЬ: 'guest' (публічний калькулятор) | 'manager' | 'admin'.
     // Визначається бекендом за initData — фронтенд їй лише вірить у частині
     // UI; усі перевірки доступу однаково робляться на сервері.
@@ -94,6 +84,18 @@ export default function App() {
     });
     // Гість — лише той, у кого немає НІ веб-сесії, НІ доступу через Telegram.
     const isGuest = role === 'guest' && !session;
+
+    // Живий кошторис і серверна чернетка (патч 07 — винесено в хуки).
+    const [totals, setTotals] = useLiveCalc(client, answers, rooms, currentStep);
+    const [serverDraft, setServerDraft] = useServerDraft(client, answers, rooms, currentStep, session);
+
+    // Фокус-пастки модалок (аудит п.9.2): фокус на перший елемент при
+    // відкритті, Tab циклічно всередині, Escape закриває де є onClose.
+    const menuTrapRef = useFocusTrap(isMenuOpen, () => setIsMenuOpen(false));
+    const imageModalTrapRef = useFocusTrap(!!modalImg, () => setModalImg(null));
+    const cartTrapRef = useFocusTrap(isCartOpen, () => setIsCartOpen(false));
+    const draftPromptTrapRef = useFocusTrap(showDraftPrompt, null);
+    const serverDraftTrapRef = useFocusTrap(!!serverDraft, null);
     const [isSendingLead, setIsSendingLead] = useState(false);
     const [leadSent, setLeadSent] = useState(false);
     // Суму фіксуємо ДО скидання чернетки: після resetDraft анкета порожня,
@@ -162,21 +164,9 @@ export default function App() {
                     if(tg) tg.showAlert("Не вдалося завантажити анкету для редагування.");
                 })
                 .finally(() => setIsLoadingEdit(false));
-        } else if (useStore.getState().currentStep <= -1 && (tg?.initData || getSession())) {
-            // РЕЖИМ СТВОРЕННЯ, локальної чернетки НЕМА (новий пристрій, чистий
-            // кеш, перевстановлений Telegram) — питаємо серверну.
-            getDraft()
-                .then((r) => (r.ok ? r.json() : null))
-                .then((d) => {
-                    const draft = d?.draft;
-                    if (!draft?.payload) return;
-                    // Не перетираємо роботу, яку користувач уже почав у цій сесії.
-                    if (useStore.getState().currentStep > -1) return;
-                    setServerDraft(draft);
-                })
-                .catch(() => {});
         }
-        // Режим створення: prompt чернетки виставлений лінивим useState вище.
+        // Режим створення: підтягування серверної чернетки — у useServerDraft;
+        // prompt локальної чернетки виставлений лінивим useState вище.
     }, [setClient, setAnswers, setCurrentStep]); // zustand-сеттери стабільні — ефект фактично one-shot
 
     // Повне скидання чернетки (UI + Store)
@@ -250,65 +240,6 @@ export default function App() {
         const t = setTimeout(warm, 2500);
         return () => clearTimeout(t);
     }, []);
-
-    // === 5. LIVE CALC: ЖИВИЙ РОЗРАХУНОК ===
-    useEffect(() => {
-        if (currentStep < 0 && currentStep !== 9999) return; 
-        // AbortController проти гонки відповідей: без нього повільний
-        // старий запит (напр., холодний старт Render) міг прилетіти ПІСЛЯ
-        // швидкого нового і перезаписати кошик застарілими сумами.
-        const ctrl = new AbortController();
-        const delay = setTimeout(async () => {
-            if(!navigator.onLine || !client.area) return;
-            try {
-                // АДАПТЕР: Формуємо єдиний об'єкт для сервера
-                const payloadAnswers = { ...answers, rooms: rooms };
-                
-                const res = await liveCalc({ client, answers: payloadAnswers }, ctrl.signal);
-                if (res.ok) { 
-                    const data = await res.json(); 
-                    setTotals({ work: data.work, mat_min: data.mat_min }); 
-                    // Розбивка по приміщеннях + «загальні роботи» — для чипа
-                    // ціни в візуалізаторі та секції приміщень у підсумку.
-                    // Старий бекенд цих полів не має — тоді просто порожньо.
-                    useStore.getState().setLiveBreakdown({
-                        rooms: data.rooms || {},
-                        general: data.general || null,
-                        roomLines: data.room_lines || {},
-                        generalLines: data.general_lines || [],
-                    });
-                }
-            } catch(e) { if (e.name !== 'AbortError') console.log("Calc error", e); }
-        }, 500);
-        return () => { clearTimeout(delay); ctrl.abort(); };
-    }, [client, answers, rooms, currentStep]);
-
-    // === 5.1 СЕРВЕРНА ЧЕРНЕТКА ===
-    // Раніше чернетка жила ЛИШЕ в localStorage телефона: зміна пристрою або
-    // чистка кешу — і робота зникала. Тепер вона дублюється на сервер:
-    //  • можна продовжити з іншого пристрою;
-    //  • бот нагадає про незавершену заявку через 24 год.
-    // Дебаунс 3 с (довший за live-calc: тут ходимо в Google Sheets, не варто
-    // смикати на кожен клік). Режим редагування не чіпаємо — там уже є заявка.
-    useEffect(() => {
-        // Джерело правди про «ми в режимі редагування» — URL АБО збережений
-        // editingOrderId. Раніше дивились лише в URL: якщо менеджер відкривав
-        // застосунок заново (вже без ?edit_id), вміст ЧУЖОЇ збереженої заявки
-        // їхав на сервер як його «незавершена чернетка» — і бот ще й нагадував
-        // про неї через добу.
-        const editId = new URLSearchParams(window.location.search).get('edit_id')
-            || useStore.getState().editingOrderId;
-        if (editId || currentStep < 0) return;
-        if (!tg?.initData && !session) return;   // гість чернетки на сервері не має
-        if (!client.name && !client.area && rooms.length === 0) return; // порожню не шлемо
-
-        const ctrl = new AbortController();
-        const t = setTimeout(() => {
-            saveDraft({ currentStep, client, answers: { ...answers, rooms } }, ctrl.signal)
-                .catch(() => {}); // мовчазний фейл: локальна чернетка все одно лишається
-        }, 3000);
-        return () => { clearTimeout(t); ctrl.abort(); };
-    }, [client, answers, rooms, currentStep, session]);
 
     // === 6. НАВІГАЦІЯ ===
     const goNext = () => {

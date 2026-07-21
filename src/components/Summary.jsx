@@ -83,7 +83,7 @@ export default function Summary({ client, setClient, answers, finalQuestions, sh
     return (
         <div className="animated-step">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
-                <CheckCircle2 color="#34c759" size={28} />
+                <CheckCircle2 color="var(--money)" size={28} aria-hidden="true" />
                 <h3 style={{ margin: 0 }}>{isGuest ? 'Ваш кошторис' : 'Перевірка даних'}</h3>
             </div>
             <p style={{ color: 'var(--hint-color)', fontSize: '14px', marginTop: 0, marginBottom: '20px' }}>
@@ -93,12 +93,18 @@ export default function Summary({ client, setClient, answers, finalQuestions, sh
             </p>
 
             <div className="summary-box" style={{ padding: '0 20px' }}>
-                <div className="accordion-header" onClick={() => toggleZone("👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ")}>
-                    <div className="accordion-title"><User size={18} /> ІНФОРМАЦІЯ ПРО ОБ'ЄКТ</div>
-                    {openZones["👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ"] ? <ChevronUp size={20} color="var(--hint-color)" /> : <ChevronDown size={20} color="var(--hint-color)" />}
-                </div>
-                <div className={`accordion-content ${openZones["👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ"] ? 'open' : ''}`}>
-                    <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'10px' }}><div className="edit-btn" onClick={() => editStep(-1)}><Edit3 size={14}/> Змінити</div></div>
+                <button
+                    type="button" className="btn-reset accordion-header" style={{ width: '100%' }}
+                    onClick={() => toggleZone("👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ")}
+                    aria-expanded={!!openZones["👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ"]} aria-controls="summary-info"
+                >
+                    <div className="accordion-title"><User size={18} aria-hidden="true" /> ІНФОРМАЦІЯ ПРО ОБ'ЄКТ</div>
+                    {openZones["👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ"] ? <ChevronUp size={20} color="var(--hint-color)" aria-hidden="true" /> : <ChevronDown size={20} color="var(--hint-color)" aria-hidden="true" />}
+                </button>
+                <div id="summary-info" className={`accordion-content ${openZones["👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ"] ? 'open' : ''}`}>
+                    <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'10px' }}>
+                        <button type="button" className="btn-reset edit-btn" onClick={() => editStep(-1)}><Edit3 size={14} aria-hidden="true" /> Змінити</button>
+                    </div>
                     {/* Гість не вводив ім'я і телефон на першому кроці — їх у нього
                         питають унизу цієї ж сторінки. Показувати тут порожні
                         прочерки, які «Змінити» все одно не дозволить заповнити,
@@ -119,11 +125,15 @@ export default function Summary({ client, setClient, answers, finalQuestions, sh
                 «Змінити» веде на крок структури і ФОКУСУЄ саме цю кімнату. */}
             {rooms.length > 0 && (
                 <div className="summary-box" style={{ padding: '0 20px' }}>
-                    <div className="accordion-header" onClick={() => toggleZone("🏠 ПРИМІЩЕННЯ")}>
-                        <div className="accordion-title"><Home size={18} /> ПРИМІЩЕННЯ ({rooms.length})</div>
-                        {openZones["🏠 ПРИМІЩЕННЯ"] ? <ChevronUp size={20} color="var(--hint-color)" /> : <ChevronDown size={20} color="var(--hint-color)" />}
-                    </div>
-                    <div className={`accordion-content ${openZones["🏠 ПРИМІЩЕННЯ"] ? 'open' : ''}`}>
+                    <button
+                        type="button" className="btn-reset accordion-header" style={{ width: '100%' }}
+                        onClick={() => toggleZone("🏠 ПРИМІЩЕННЯ")}
+                        aria-expanded={!!openZones["🏠 ПРИМІЩЕННЯ"]} aria-controls="summary-rooms"
+                    >
+                        <div className="accordion-title"><Home size={18} aria-hidden="true" /> ПРИМІЩЕННЯ ({rooms.length})</div>
+                        {openZones["🏠 ПРИМІЩЕННЯ"] ? <ChevronUp size={20} color="var(--hint-color)" aria-hidden="true" /> : <ChevronDown size={20} color="var(--hint-color)" aria-hidden="true" />}
+                    </button>
+                    <div id="summary-rooms" className={`accordion-content ${openZones["🏠 ПРИМІЩЕННЯ"] ? 'open' : ''}`}>
                         {rooms.map((room, rIdx) => {
                             const cfg = ROOM_QUESTIONS_CONFIG[room.type] || [];
                             const lines = cfg
@@ -139,12 +149,16 @@ export default function Summary({ client, setClient, answers, finalQuestions, sh
                                         <div>
                                             <div style={{ fontWeight: 700 }}>{room.name} <span style={{ color: 'var(--hint-color)', fontWeight: 500, fontSize: '13px' }}>· {area} м²</span></div>
                                             {rp && (rp.work > 0 || rp.mat_min > 0) && (
-                                                <div style={{ fontSize: '13px', fontWeight: 700, color: '#34c759', marginTop: '2px' }}>
+                                                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--money)', marginTop: '2px' }}>
                                                     Робота {Number(rp.work).toLocaleString()} ₴ · Матеріали від {Number(rp.mat_min).toLocaleString()} ₴
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="edit-btn" onClick={() => { requestVisualizerFocus(room.id, null); editStep(measIndex); }}><Edit3 size={14}/></div>
+                                        <button
+                                            type="button" className="btn-reset edit-btn"
+                                            aria-label={`Редагувати приміщення «${room.name}»`}
+                                            onClick={() => { requestVisualizerFocus(room.id, null); editStep(measIndex); }}
+                                        ><Edit3 size={14} aria-hidden="true" /></button>
                                     </div>
                                     {lines.length > 0 ? (
                                         <div style={{ marginTop: '6px' }}>
@@ -163,15 +177,17 @@ export default function Summary({ client, setClient, answers, finalQuestions, sh
                                         клієнт бачить, з чого складається цифра. */}
                                     {priceLines.length > 0 && (
                                         <>
-                                            <div
+                                            <button
+                                                type="button" className="btn-reset"
                                                 onClick={() => { vibe(); setOpenRooms((p) => ({ ...p, [room.id]: !p[room.id] })); }}
-                                                style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: 'var(--link-color, #0a84ff)' }}
+                                                aria-expanded={isOpen} aria-controls={`price-details-${room.id}`}
+                                                style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: 'var(--link-color)' }}
                                             >
-                                                {isOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                                                {isOpen ? <ChevronUp size={15} aria-hidden="true" /> : <ChevronDown size={15} aria-hidden="true" />}
                                                 {isOpen ? 'Згорнути розрахунок' : `Детальний розрахунок (${priceLines.length})`}
-                                            </div>
+                                            </button>
                                             {isOpen && (
-                                                <div style={{ marginTop: '8px', background: 'var(--secondary-bg, rgba(127,127,127,0.07))', borderRadius: '10px', padding: '10px 12px' }}>
+                                                <div id={`price-details-${room.id}`} style={{ marginTop: '8px', background: 'var(--secondary-bg, rgba(127,127,127,0.07))', borderRadius: '10px', padding: '10px 12px' }}>
                                                     {priceLines.map((pl, i) => (
                                                         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontSize: '12.5px', padding: '4px 0', borderBottom: i === priceLines.length - 1 ? 'none' : '1px dashed var(--border-color)' }}>
                                                             <span style={{ minWidth: 0 }}>
@@ -201,20 +217,24 @@ export default function Summary({ client, setClient, answers, finalQuestions, sh
                 </div>
             )}
 
-            {Object.entries(grouped).map(([zone, items]) => (
+            {Object.entries(grouped).map(([zone, items], zIdx) => (
                 <div key={zone} className="summary-box" style={{ padding: '0 20px' }}>
-                    <div className="accordion-header" onClick={() => toggleZone(zone)}>
-                        <div className="accordion-title"><Settings size={18} /> {zone.replace(' ЗАМІРИ ПРИМІЩЕНЬ', '')}</div>
-                        {openZones[zone] ? <ChevronUp size={20} color="var(--hint-color)" /> : <ChevronDown size={20} color="var(--hint-color)" />}
-                    </div>
-                    <div className={`accordion-content ${openZones[zone] ? 'open' : ''}`}>
+                    <button
+                        type="button" className="btn-reset accordion-header" style={{ width: '100%' }}
+                        onClick={() => toggleZone(zone)}
+                        aria-expanded={!!openZones[zone]} aria-controls={`summary-zone-${zIdx}`}
+                    >
+                        <div className="accordion-title"><Settings size={18} aria-hidden="true" /> {zone.replace(' ЗАМІРИ ПРИМІЩЕНЬ', '')}</div>
+                        {openZones[zone] ? <ChevronUp size={20} color="var(--hint-color)" aria-hidden="true" /> : <ChevronDown size={20} color="var(--hint-color)" aria-hidden="true" />}
+                    </button>
+                    <div id={`summary-zone-${zIdx}`} className={`accordion-content ${openZones[zone] ? 'open' : ''}`}>
                         {items.map((item, i) => (
                             <div key={i} className="summary-item" style={{ alignItems:'center', borderBottom: i === items.length-1 ? 'none' : '1px solid var(--border-color)' }}>
                                 <div style={{ flex:1, paddingRight:'10px' }}>
                                     <div style={{ fontSize:'13px', color:'var(--hint-color)', marginBottom:'4px' }}>{item.label}</div>
                                     <div style={{ fontWeight:500 }}>{item.valStr}</div>
                                 </div>
-                                <div className="edit-btn" onClick={() => editStep(item.idx)}><Edit3 size={14}/></div>
+                                <button type="button" className="btn-reset edit-btn" aria-label={`Редагувати «${item.label}»`} onClick={() => editStep(item.idx)}><Edit3 size={14} aria-hidden="true" /></button>
                             </div>
                         ))}
                         <div style={{height: '15px'}}></div>
@@ -223,13 +243,17 @@ export default function Summary({ client, setClient, answers, finalQuestions, sh
             ))}
 
             <div className="summary-box" style={{ padding: '0 20px' }}>
-                <div className="accordion-header" onClick={() => toggleZone("⭐️ НЕСТАНДАРТНІ РОБОТИ")}>
-                    <div className="accordion-title"><Wrench size={18} /> НЕСТАНДАРТНІ РОБОТИ</div>
-                    {openZones["⭐️ НЕСТАНДАРТНІ РОБОТИ"] ? <ChevronUp size={20} color="var(--hint-color)" /> : <ChevronDown size={20} color="var(--hint-color)" />}
-                </div>
-                <div className={`accordion-content ${openZones["⭐️ НЕСТАНДАРТНІ РОБОТИ"] ? 'open' : ''}`}>
+                <button
+                    type="button" className="btn-reset accordion-header" style={{ width: '100%' }}
+                    onClick={() => toggleZone("⭐️ НЕСТАНДАРТНІ РОБОТИ")}
+                    aria-expanded={!!openZones["⭐️ НЕСТАНДАРТНІ РОБОТИ"]} aria-controls="summary-custom"
+                >
+                    <div className="accordion-title"><Wrench size={18} aria-hidden="true" /> НЕСТАНДАРТНІ РОБОТИ</div>
+                    {openZones["⭐️ НЕСТАНДАРТНІ РОБОТИ"] ? <ChevronUp size={20} color="var(--hint-color)" aria-hidden="true" /> : <ChevronDown size={20} color="var(--hint-color)" aria-hidden="true" />}
+                </button>
+                <div id="summary-custom" className={`accordion-content ${openZones["⭐️ НЕСТАНДАРТНІ РОБОТИ"] ? 'open' : ''}`}>
                     <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:'10px' }}>
-                        <div className="edit-btn" onClick={() => editStep(customIndex)}><Edit3 size={14}/> {cWorks.length > 0 ? 'Змінити' : 'Додати'}</div>
+                        <button type="button" className="btn-reset edit-btn" onClick={() => editStep(customIndex)}><Edit3 size={14} aria-hidden="true" /> {cWorks.length > 0 ? 'Змінити' : 'Додати'}</button>
                     </div>
                     {cWorks.length > 0 ? cWorks.map((cw, idx) => (
                         <div key={idx} className="summary-item" style={{ display:'block', borderBottom: idx === cWorks.length-1 ? 'none' : '1px solid var(--border-color)' }}>
@@ -241,8 +265,8 @@ export default function Summary({ client, setClient, answers, finalQuestions, sh
                 </div>
             </div>
 
-            <div className="summary-box" style={{ background: 'rgba(52, 199, 89, 0.1)', borderColor: '#34c759', padding: '15px 20px' }}>
-                <div style={{ textAlign: 'center', color: '#34c759', fontWeight: 700, fontSize: '16px', marginBottom: '10px' }}>ВАРТІСТЬ ЗАРАЗ</div>
+            <div className="summary-box" style={{ background: 'var(--money-soft)', borderColor: 'var(--money)', padding: '15px 20px' }}>
+                <div style={{ textAlign: 'center', color: 'var(--money)', fontWeight: 700, fontSize: '16px', marginBottom: '10px' }}>ВАРТІСТЬ ЗАРАЗ</div>
                 <div style={{ display: 'flex', justifyContent: 'space-around' }}>
                     <div style={{ textAlign: 'center' }}>
                         <div style={{ fontSize: '12px', color: 'var(--text-color)' }}>Робота</div>
@@ -260,21 +284,23 @@ export default function Summary({ client, setClient, answers, finalQuestions, sh
                 просимо телефон тоді, коли людина вже бачить цінність, а не «щоб
                 продовжити». Класична помилка — питати контакти на вході. */}
             {isGuest && (
-                <div className="summary-box" style={{ padding: '20px', border: '2px solid var(--link-color, #0a84ff)' }}>
+                <div className="summary-box" style={{ padding: '20px', border: '2px solid var(--link-color)' }}>
                     <h3 style={{ margin: '0 0 6px', fontSize: '17px' }}>Куди надіслати кошторис?</h3>
                     <p style={{ color: 'var(--hint-color)', fontSize: '13.5px', lineHeight: 1.45, margin: '0 0 14px' }}>
                         Менеджер зателефонує та уточнить деталі.
                         Точну ціну підтверджують лише на об'єкті.
                     </p>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '5px' }}>Ваше ім'я</label>
+                    <label htmlFor="summary-guest-name" style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '5px' }}>Ваше ім'я</label>
                     <input
+                        id="summary-guest-name"
                         type="text" value={client.name || ''}
                         onChange={(e) => setClient((p) => ({ ...p, name: e.target.value }))}
                         placeholder="Як до вас звертатись"
                         style={{ width: '100%', boxSizing: 'border-box', marginBottom: '12px' }}
                     />
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '5px' }}>Телефон</label>
+                    <label htmlFor="summary-guest-phone" style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '5px' }}>Телефон</label>
                     <input
+                        id="summary-guest-phone"
                         type="tel" inputMode="tel" value={client.phone || ''}
                         onChange={(e) => setClient((p) => ({ ...p, phone: e.target.value }))}
                         placeholder="+380 (XX) XXX-XX-XX"

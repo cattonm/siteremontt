@@ -291,6 +291,8 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
                 shadows="soft"
                 style={{ width: '100%', height: '100%' }}
                 gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.12 }}
+                role="img"
+                aria-label="3D-план квартири з розташуванням приміщень"
             >
                 <IsoCamera bounds={bounds} userZoom={zoom} />
                 {/* ACES темніший за лінійний — ambient прибрано, hemisphere/сонце

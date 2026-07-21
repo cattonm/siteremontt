@@ -11,6 +11,7 @@ import CustomWorks from './components/CustomWorks';
 import Summary from './components/Summary';
 import AnimatedPrice from './components/AnimatedPrice';
 import { vibe, vibeError, tg } from './utils/telegram';
+import useFocusTrap from './hooks/useFocusTrap';
 import { Menu, Moon, Sun, ArrowLeft, Send, Trash2, Loader2, ShieldCheck } from 'lucide-react';
 
 // ЛІНИВИЙ імпорт: RoomVisualizer тягне за собою three.js + drei (~850 КБ
@@ -75,6 +76,14 @@ export default function App() {
     // Чернетка, знайдена на сервері (інший пристрій) — показуємо банер
     // «Продовжити?», а не мовчки підміняємо стан.
     const [serverDraft, setServerDraft] = useState(null);
+
+    // Фокус-пастки модалок (аудит п.9.2): фокус на перший елемент при
+    // відкритті, Tab циклічно всередині, Escape закриває де є onClose.
+    const menuTrapRef = useFocusTrap(isMenuOpen, () => setIsMenuOpen(false));
+    const imageModalTrapRef = useFocusTrap(!!modalImg, () => setModalImg(null));
+    const cartTrapRef = useFocusTrap(isCartOpen, () => setIsCartOpen(false));
+    const draftPromptTrapRef = useFocusTrap(showDraftPrompt, null);
+    const serverDraftTrapRef = useFocusTrap(!!serverDraft, null);
     // РОЛЬ: 'guest' (публічний калькулятор) | 'manager' | 'admin'.
     // Визначається бекендом за initData — фронтенд їй лише вірить у частині
     // UI; усі перевірки доступу однаково робляться на сервері.
@@ -604,13 +613,13 @@ export default function App() {
                         </button>
                         <div className="head-titles">
                             <div className="head-zone">{menuZones[currentZoneIndex]?.name || 'Анкета'}</div>
-                            <div className="head-step">Крок {currentStep + 1} з {finalQuestions.length}</div>
+                            <div className="head-step" id="head-step-label">Крок {currentStep + 1} з {finalQuestions.length}</div>
                         </div>
                         <button type="button" className="head-icon-btn" onClick={toggleTheme} aria-label="Тема">
-                            {isDark ? <Sun size={19}/> : <Moon size={19}/>}
+                            {isDark ? <Sun size={19} aria-hidden="true" /> : <Moon size={19} aria-hidden="true" />}
                         </button>
                         <button type="button" className="head-icon-btn" onClick={() => { vibe('light'); setIsMenuOpen(true); }} aria-label="Меню">
-                            <Menu size={20} />
+                            <Menu size={20} aria-hidden="true" />
                         </button>
                     </div>
 
@@ -628,7 +637,11 @@ export default function App() {
                         <div className="head-desk-tier"><TierSwitch compact /></div>
                     </div>
 
-                    <div id="progress-container" style={{ marginTop: '10px', marginBottom: 0 }}>
+                    <div
+                        id="progress-container" style={{ marginTop: '10px', marginBottom: 0 }}
+                        role="progressbar" aria-valuenow={currentStep + 1} aria-valuemin={1} aria-valuemax={finalQuestions.length}
+                        aria-describedby="head-step-label"
+                    >
                         {menuZones.map((z, idx) => (
                             <div key={idx} className={`progress-segment ${idx === currentZoneIndex ? 'active' : (idx < currentZoneIndex ? 'passed' : '')}`}></div>
                         ))}
@@ -653,10 +666,10 @@ export default function App() {
                 <div className="head-mobile"><TierSwitch /></div>
 
                 {isEditingFromSummary && (
-                    <div onClick={() => { setIsEditingFromSummary(false); setCurrentStep(finalQuestions.length); vibe(); }}
-                         style={{background: 'var(--link-color)', color: 'white', padding: '10px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', textAlign: 'center', marginBottom: '15px'}}>
+                    <button type="button" onClick={() => { setIsEditingFromSummary(false); setCurrentStep(finalQuestions.length); vibe(); }}
+                         style={{width: '100%', background: 'var(--link-color)', color: 'white', padding: '10px', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', border: 'none', cursor: 'pointer', textAlign: 'center', marginBottom: '15px'}}>
                         🔙 Повернутися до підсумку
-                    </div>
+                    </button>
                 )}
 
                 {q.type === 'trigger_meas' ? (
@@ -692,7 +705,7 @@ export default function App() {
             {serverDraft && (
                 <>
                     <div className="sheet-overlay open" style={{ zIndex: 9998 }}></div>
-                    <div className="image-modal open" style={{ zIndex: 9999, padding: '25px', textAlign: 'center', background: 'var(--modal-bg)' }}>
+                    <div ref={serverDraftTrapRef} className="image-modal open" role="dialog" aria-modal="true" aria-label="Незавершена заявка" style={{ zIndex: 9999, padding: '25px', textAlign: 'center', background: 'var(--modal-bg)' }}>
                         <h3 style={{ marginTop: 0, fontSize: '20px' }}>Незавершена заявка</h3>
                         <p style={{ color: 'var(--hint-color)', fontSize: '15px', lineHeight: '1.4', marginBottom: 0 }}>
                             На сервері збережена анкета
@@ -702,6 +715,7 @@ export default function App() {
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
                             <button
+                                type="button"
                                 onClick={() => {
                                     vibe('medium');
                                     const p = serverDraft.payload;
@@ -716,6 +730,7 @@ export default function App() {
                                 style={{ background: 'var(--link-color)', color: 'white', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}
                             >Продовжити</button>
                             <button
+                                type="button"
                                 onClick={() => {
                                     vibe('light');
                                     setServerDraft(null);
@@ -734,7 +749,7 @@ export default function App() {
             {showDraftPrompt && (
                 <>
                     <div className="sheet-overlay open" style={{ zIndex: 9998 }}></div>
-                    <div className="image-modal open" style={{ zIndex: 9999, padding: '25px', textAlign: 'center', background: 'var(--modal-bg)' }}>
+                    <div ref={draftPromptTrapRef} className="image-modal open" role="dialog" aria-modal="true" aria-label="Відновлення" style={{ zIndex: 9999, padding: '25px', textAlign: 'center', background: 'var(--modal-bg)' }}>
                         <h3 style={{ marginTop: 0, fontSize: '20px' }}>Відновлення</h3>
                         <p style={{ color: 'var(--hint-color)', fontSize: '15px', lineHeight: '1.4', marginBottom: 0 }}>
                             {editingOrderId
@@ -742,10 +757,10 @@ export default function App() {
                                 : 'Знайдено незбережену анкету. Бажаєте продовжити заповнення з місця зупинки?'}
                         </p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
-                            <button onClick={() => { vibe('medium'); setShowDraftPrompt(false); }} style={{ background: 'var(--link-color)', color: 'white', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>
+                            <button type="button" onClick={() => { vibe('medium'); setShowDraftPrompt(false); }} style={{ background: 'var(--link-color)', color: 'white', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>
                                 {editingOrderId ? 'Продовжити редагування' : 'Продовжити збережену'}
                             </button>
-                            <button onClick={() => { vibe('light'); handleResetDraftSilent(); setShowDraftPrompt(false); }} style={{ background: 'rgba(255, 59, 48, 0.1)', color: '#ff3b30', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>Почати заново</button>
+                            <button type="button" onClick={() => { vibe('light'); handleResetDraftSilent(); setShowDraftPrompt(false); }} style={{ background: 'rgba(255, 59, 48, 0.1)', color: '#ff3b30', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>Почати заново</button>
                         </div>
                     </div>
                 </>
@@ -753,35 +768,36 @@ export default function App() {
 
             <div className={`sheet-overlay ${isCartOpen || isMenuOpen || modalImg ? 'open' : ''}`} onClick={() => { setIsCartOpen(false); setIsMenuOpen(false); setModalImg(null); }}></div>
 
-            <div id="side-menu" className={isMenuOpen ? 'open' : ''}>
+            <div id="side-menu" ref={menuTrapRef} className={isMenuOpen ? 'open' : ''} role="dialog" aria-modal={isMenuOpen} aria-label="Розділи анкети">
                 <div className="menu-header">📋 Розділи анкети</div>
                 {menuZones.map((z, i) => (
-                    <div key={i} className="menu-item" onClick={() => jumpToMenuStep(z.step)}> {z.name} </div>
+                    <button key={i} type="button" className="btn-reset menu-item" style={{ display: 'block', width: '100%' }} onClick={() => jumpToMenuStep(z.step)}> {z.name} </button>
                 ))}
 
                 {/* ВХІД / ПОВЕРНЕННЯ В КАБІНЕТ — доступні ЗАВЖДИ.
                     Раніше посилання жило лише на екрані онбордингу, а той
                     показується один раз: після першого проходження кнопка
                     ставала недосяжною, і потрапити в кабінет було ніяк. */}
-                <div
-                    className="menu-item"
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px', borderTop: '1px solid var(--border-color)', color: 'var(--link-color, #0a84ff)', fontWeight: 600 }}
+                <button
+                    type="button"
+                    className="btn-reset menu-item"
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px', width: '100%', borderTop: '1px solid var(--border-color)', color: 'var(--link-color, #0a84ff)', fontWeight: 600 }}
                     onClick={() => { vibe('medium'); setIsMenuOpen(false); setView((session || role === 'manager' || role === 'admin') ? 'dashboard' : 'login'); }}
                 >
-                    <ShieldCheck size={18} /> {(session || role === 'manager' || role === 'admin') ? 'Кабінет менеджера' : 'Вхід для менеджерів'}
-                </div>
+                    <ShieldCheck size={18} aria-hidden="true" /> {(session || role === 'manager' || role === 'admin') ? 'Кабінет менеджера' : 'Вхід для менеджерів'}
+                </button>
 
-                <div className="menu-item" style={{ color: '#ff3b30', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: 'none' }} onClick={resetDraft}>
-                    <Trash2 size={18} /> Почати заново
-                </div>
+                <button type="button" className="btn-reset menu-item" style={{ color: '#ff3b30', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', borderBottom: 'none' }} onClick={resetDraft}>
+                    <Trash2 size={18} aria-hidden="true" /> Почати заново
+                </button>
             </div>
 
-            <div className={`image-modal ${modalImg ? 'open' : ''}`}>
+            <div ref={imageModalTrapRef} className={`image-modal ${modalImg ? 'open' : ''}`} role="dialog" aria-modal={!!modalImg} aria-label="Збільшене фото">
                 {modalImg && <img src={modalImg} alt="Збільшене фото" />}
-                <button className="cart-close-btn" onClick={() => setModalImg(null)} style={{ marginTop: '15px' }}>Закрити</button>
+                <button type="button" className="cart-close-btn" onClick={() => setModalImg(null)} style={{ marginTop: '15px' }}>Закрити</button>
             </div>
 
-            <div className={`bottom-sheet ${isCartOpen ? 'open' : ''}`}>
+            <div ref={cartTrapRef} className={`bottom-sheet ${isCartOpen ? 'open' : ''}`} role="dialog" aria-modal={isCartOpen} aria-label="Структура вартості">
                 <div className="drag-handle"></div>
                 <h3 style={{marginBottom: '5px'}}>Структура вартості</h3>
                 <p style={{color: 'var(--hint-color)', fontSize: '13px', marginTop:0}}>Попередній прорахунок на основі відповідей.</p>
@@ -803,7 +819,7 @@ export default function App() {
                         </div>
                     </div>
                 </div>
-                <button className="cart-close-btn" onClick={() => setIsCartOpen(false)} style={{marginTop: '25px'}}>Закрити кошик</button>
+                <button type="button" className="cart-close-btn" onClick={() => setIsCartOpen(false)} style={{marginTop: '25px'}}>Закрити кошик</button>
             </div>
 
             {/* app-shell обмежує контент до 1000px на планшеті (патч 6.6) */}

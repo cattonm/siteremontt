@@ -54,22 +54,22 @@ export default function CustomWorks({ answers, setAnswers }) {
             
             {customWorks.map((work, idx) => (
                 <div key={idx} style={{ background: 'var(--secondary-bg)', border: '1.5px solid var(--border-color)', borderRadius: '12px', padding: '15px', marginBottom: '15px', boxShadow: '0 2px 8px var(--shadow-color)' }}>
-                    
-                    <label style={{ fontSize: '12px', color: 'var(--hint-color)', marginBottom: '4px' }}>Назва роботи</label>
-                    <input type="text" placeholder="Наприклад: Монтаж сейфу" value={work.name} onChange={(e) => updateWork(idx, 'name', e.target.value)} style={{ padding: '12px', marginBottom: '8px', borderRadius: '8px' }} />
-                    
+
+                    <label htmlFor={`cw-${idx}-name`} style={{ fontSize: '12px', color: 'var(--hint-color)', marginBottom: '4px' }}>Назва роботи</label>
+                    <input id={`cw-${idx}-name`} type="text" placeholder="Наприклад: Монтаж сейфу" value={work.name} onChange={(e) => updateWork(idx, 'name', e.target.value)} style={{ padding: '12px', marginBottom: '8px', borderRadius: '8px' }} />
+
                     <div className="tag-container">
                         {popularTags.map(tag => (
-                            <div key={tag} className="tag-pill" onClick={() => applyTag(idx, tag)}>+ {tag}</div>
+                            <button key={tag} type="button" className="btn-reset tag-pill" onClick={() => applyTag(idx, tag)}>+ {tag}</button>
                         ))}
                     </div>
 
-                    <label style={{ fontSize: '12px', color: 'var(--hint-color)', marginBottom: '4px' }}>Прив'язка та Розрахунок</label>
+                    <label htmlFor={`cw-${idx}-zone`} style={{ fontSize: '12px', color: 'var(--hint-color)', marginBottom: '4px' }}>Прив'язка та Розрахунок</label>
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
-                        <select value={work.zone} onChange={(e) => updateWork(idx, 'zone', e.target.value)} style={{ flex: 1, padding: '12px', borderRadius: '8px', marginBottom: 0 }}>
+                        <select id={`cw-${idx}-zone`} value={work.zone} onChange={(e) => updateWork(idx, 'zone', e.target.value)} style={{ flex: 1, padding: '12px', borderRadius: '8px', marginBottom: 0 }}>
                             {zoneOptions.map(z => <option key={z} value={z}>{z}</option>)}
                         </select>
-                        <select value={work.calc_type} onChange={(e) => updateWork(idx, 'calc_type', e.target.value)} style={{ flex: 1, padding: '12px', borderRadius: '8px', marginBottom: 0 }}>
+                        <select aria-label="Тип розрахунку" value={work.calc_type} onChange={(e) => updateWork(idx, 'calc_type', e.target.value)} style={{ flex: 1, padding: '12px', borderRadius: '8px', marginBottom: 0 }}>
                             <option value="Фіксована ціна">Фіксована ціна</option>
                             <option value="За м² підлоги">За м² підлоги</option>
                             <option value="За м² стін">За м² стін</option>
@@ -78,23 +78,23 @@ export default function CustomWorks({ answers, setAnswers }) {
 
                     <div style={{ display: 'flex', gap: '10px' }}>
                         <div style={{ flex: 1 }}>
-                            <label style={{ fontSize: '12px', color: 'var(--hint-color)', marginBottom: '4px' }}>Робота (₴)</label>
-                            <input type="number" inputMode="decimal" placeholder="0" value={work.work_price} onChange={(e) => updateWork(idx, 'work_price', parseFloat(e.target.value)||'')} style={{ padding: '12px', marginBottom: '12px', borderRadius: '8px' }} />
+                            <label htmlFor={`cw-${idx}-work-price`} style={{ fontSize: '12px', color: 'var(--hint-color)', marginBottom: '4px' }}>Робота (₴)</label>
+                            <input id={`cw-${idx}-work-price`} type="number" inputMode="decimal" placeholder="0" value={work.work_price} onChange={(e) => updateWork(idx, 'work_price', parseFloat(e.target.value)||'')} style={{ padding: '12px', marginBottom: '12px', borderRadius: '8px' }} />
                         </div>
                         <div style={{ flex: 1 }}>
-                            <label style={{ fontSize: '12px', color: 'var(--hint-color)', marginBottom: '4px' }}>Матеріал (₴)</label>
-                            <input type="number" inputMode="decimal" placeholder="0" value={work.mat_price} onChange={(e) => updateWork(idx, 'mat_price', parseFloat(e.target.value)||'')} style={{ padding: '12px', marginBottom: '12px', borderRadius: '8px' }} />
+                            <label htmlFor={`cw-${idx}-mat-price`} style={{ fontSize: '12px', color: 'var(--hint-color)', marginBottom: '4px' }}>Матеріал (₴)</label>
+                            <input id={`cw-${idx}-mat-price`} type="number" inputMode="decimal" placeholder="0" value={work.mat_price} onChange={(e) => updateWork(idx, 'mat_price', parseFloat(e.target.value)||'')} style={{ padding: '12px', marginBottom: '12px', borderRadius: '8px' }} />
                         </div>
                     </div>
-                    
-                    <button onClick={() => removeWork(idx)} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', width: '100%', padding: '12px', background: 'rgba(255, 59, 48, 0.1)', color: '#ff3b30', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
-                        <Trash2 size={16} /> Видалити роботу
+
+                    <button type="button" onClick={() => removeWork(idx)} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', width: '100%', padding: '12px', background: 'rgba(255, 59, 48, 0.1)', color: '#ff3b30', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}>
+                        <Trash2 size={16} aria-hidden="true" /> Видалити роботу
                     </button>
                 </div>
             ))}
 
-            <button onClick={addWork} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', width: '100%', padding: '15px', background: 'rgba(10, 132, 255, 0.1)', color: 'var(--link-color)', border: '2px dashed var(--link-color)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>
-                <PlusCircle size={20} /> Додати нестандартну роботу
+            <button type="button" onClick={addWork} style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', width: '100%', padding: '15px', background: 'var(--accent-soft)', color: 'var(--link-color)', border: '2px dashed var(--link-color)', borderRadius: '12px', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>
+                <PlusCircle size={20} aria-hidden="true" /> Додати нестандартну роботу
             </button>
         </div>
     );

@@ -1109,6 +1109,8 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
                 frameloop={fp ? 'always' : 'demand'}
                 shadows="soft"
                 gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.12 }}
+                role="img"
+                aria-label={`3D-візуалізація приміщення «${room.name}»${fp ? ' у режимі прогулянки' : ''}`}
             >
                 <CameraRig
                     key={`${W.toFixed(1)}x${D.toFixed(1)}`}

@@ -38,35 +38,35 @@ export default function ClientForm({ client, setClient, isGuest = false }) {
             </p>
 
             {!isGuest && (<>
-            <label>Ім'я клієнта</label>
-            <input type="text" name="name" value={client.name || ''} onChange={handleChange} placeholder="Введіть ім'я" />
+            <label htmlFor="cf-name">Ім'я клієнта</label>
+            <input id="cf-name" type="text" name="name" value={client.name || ''} onChange={handleChange} placeholder="Введіть ім'я" />
 
-            <label>Телефон</label>
-            <input type="tel" name="phone" inputMode="tel" value={client.phone || ''} onChange={handleChange} placeholder="+380 (XX) XXX-XX-XX" />
+            <label htmlFor="cf-phone">Телефон</label>
+            <input id="cf-phone" type="tel" name="phone" inputMode="tel" value={client.phone || ''} onChange={handleChange} placeholder="+380 (XX) XXX-XX-XX" />
             </>)}
 
-            <label>Тип об'єкту</label>
-            <select name="object_type" value={client.object_type || 'Квартира (Новобудова)'} onChange={handleChange}>
+            <label htmlFor="cf-object-type">Тип об'єкту</label>
+            <select id="cf-object-type" name="object_type" value={client.object_type || 'Квартира (Новобудова)'} onChange={handleChange}>
                 <option value="Квартира (Новобудова)">Квартира (Новобудова)</option>
                 <option value="Квартира (Вторинна)">Квартира (Вторинна)</option>
                 <option value="Будинок">Будинок</option>
                 <option value="Комерція">Комерція</option>
             </select>
 
-            <label>Адреса</label>
-            <input type="text" name="address" value={client.address || ''} onChange={handleChange} placeholder="Вулиця / ЖК" />
+            <label htmlFor="cf-address">Адреса</label>
+            <input id="cf-address" type="text" name="address" value={client.address || ''} onChange={handleChange} placeholder="Вулиця / ЖК" />
 
-            <label>Загальна площа об'єкта (м²)</label>
-            <input type="number" inputMode="decimal" name="area" value={client.area || ''} onChange={handleChange} placeholder="Наприклад: 65" />
+            <label htmlFor="cf-area">Загальна площа об'єкта (м²)</label>
+            <input id="cf-area" type="number" inputMode="decimal" name="area" value={client.area || ''} onChange={handleChange} placeholder="Наприклад: 65" />
 
             <div style={{ display: 'flex', gap: '10px' }}>
                 <div style={{ flex: 1 }}>
-                    <label>Поверх</label>
-                    <input type="number" inputMode="numeric" name="floor" value={client.floor || '1'} onChange={handleChange} placeholder="1" />
+                    <label htmlFor="cf-floor">Поверх</label>
+                    <input id="cf-floor" type="number" inputMode="numeric" name="floor" value={client.floor || '1'} onChange={handleChange} placeholder="1" />
                 </div>
                 <div style={{ flex: 1 }}>
-                    <label>Ліфт</label>
-                    <select name="elevator" value={client.elevator || 'Немає'} onChange={handleChange}>
+                    <label htmlFor="cf-elevator">Ліфт</label>
+                    <select id="cf-elevator" name="elevator" value={client.elevator || 'Немає'} onChange={handleChange}>
                         <option value="Вантажний">Вантажний</option>
                         <option value="Пасажирський">Пасажирський</option>
                         <option value="Немає">Немає</option>

@@ -298,21 +298,26 @@ function OrdersTab() {
                 return (
                     <div key={o.row} style={card}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start' }}>
-                            <div style={{ minWidth: 0, flex: 1, cursor: 'pointer' }} onClick={() => setOpenRow(isOpen ? null : o.row)}>
+                            <button
+                                type="button" className="btn-reset"
+                                style={{ minWidth: 0, flex: 1, cursor: 'pointer', display: 'block', textAlign: 'left' }}
+                                onClick={() => setOpenRow(isOpen ? null : o.row)}
+                                aria-expanded={isOpen} aria-controls={`order-details-${o.row}`}
+                            >
                                 <div style={{ fontWeight: 700, fontSize: '15px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                     {/* Префікс розрізняє походження заявки: 👔 створив менеджер, 🌐 прийшла з сайту */}
-                                    <span title={o.source === 'web' ? 'Заявка з сайту' : 'Створена менеджером'}>
+                                    <span title={o.source === 'web' ? 'Заявка з сайту' : 'Створена менеджером'} aria-hidden="true">
                                         {o.source === 'web' ? '🌐' : '👔'}
                                     </span>
                                     {o.name || 'Без імені'}
-                                    {isOpen ? <ChevronUp size={14} color="var(--hint-color)" /> : <ChevronDown size={14} color="var(--hint-color)" />}
+                                    {isOpen ? <ChevronUp size={14} color="var(--hint-color)" aria-hidden="true" /> : <ChevronDown size={14} color="var(--hint-color)" aria-hidden="true" />}
                                 </div>
                                 <div style={{ fontSize: '13px', color: 'var(--hint-color)', marginTop: '2px' }}>{o.date}</div>
                                 <div style={{ fontSize: '12.5px', color: 'var(--hint-color)', marginTop: '2px' }}>{o.address}</div>
                                 {o.manager_name && (
                                     <div style={{ fontSize: '12px', color: 'var(--hint-color)', marginTop: '3px' }}>👔 {o.manager_name}</div>
                                 )}
-                            </div>
+                            </button>
                         </div>
 
                         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px', alignItems: 'center' }}>
@@ -332,7 +337,7 @@ function OrdersTab() {
                             ><Trash2 size={13} /></button>
                         </div>
 
-                        {isOpen && <OrderDetail row={o.row} />}
+                        {isOpen && <div id={`order-details-${o.row}`}><OrderDetail row={o.row} /></div>}
                     </div>
                 );
             })}

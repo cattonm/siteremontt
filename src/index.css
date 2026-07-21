@@ -6,6 +6,7 @@
     --accent: #C2251D;
     --accent-soft: rgba(194, 37, 29, 0.08);
     --money: #1F7A4D;
+    --money-soft: rgba(31, 122, 77, 0.1);
     --secondary-bg: #FFFFFF;
     --card-bg: #FFFFFF;
     --border-color: #E4E2DD;
@@ -24,6 +25,7 @@ body.dark-theme {
     --accent: #EF4D43;
     --accent-soft: rgba(239, 77, 67, 0.12);
     --money: #4CC38A;
+    --money-soft: rgba(76, 195, 138, 0.14);
     --secondary-bg: #1D1F24;
     --card-bg: #1D1F24;
     --border-color: #33363C;
@@ -37,6 +39,33 @@ body.dark-theme {
 /* padding-bottom тримає місце під липку панель кошторису (.estimate-bar) */
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 20px; padding-bottom: 180px; margin: 0; background: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; overflow-x: hidden;}
 .hidden { display: none !important; }
+
+/* ==== Доступність (аудит п.9) ==== */
+/* Скидання нативного вигляду <button>, коли він виконує роль клікабельного
+   div (картки/пігулки/пункти меню) — решту зовнішнього вигляду й далі
+   задають власні класи (.card/.pill/...), це лише прибирає browser-default
+   рамку/фон/шрифт кнопки. */
+.btn-reset {
+    background: none; border: none; font: inherit; color: inherit;
+    text-align: inherit; cursor: pointer; -webkit-appearance: none; appearance: none;
+}
+/* Клавіатурний фокус — видимий скрізь; :focus (миша/тач) лишається чистим */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:focus:not(:focus-visible) { outline: none; }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Тач-таргет tier-кнопки розширюємо псевдоелементом до ~44px висоти, не
+   змінюючи видиму висоту (було ~30px). */
+.tier-btn { position: relative; }
+.tier-btn::after { content: ''; position: absolute; inset: -7px 0; }
 
 #progress-container { width: 100%; display: flex; gap: 4px; margin-bottom: 20px; border-radius: 0; background: transparent;}
 .progress-segment { flex: 1; height: 6px; background: var(--border-color); border-radius: 3px; transition: background 0.3s; }
@@ -77,7 +106,7 @@ input:focus, select:focus { border-color: var(--link-color); box-shadow: 0 0 0 3
 .card.selected { border-color: var(--link-color); background: var(--accent-soft); box-shadow: 0 4px 16px var(--shadow-color); }
 .img-wrapper { position: relative; width: 100%; height: 110px; margin-bottom: 10px; border-radius: 10px; overflow: hidden;}
 .card img { width: 100%; height: 100%; object-fit: cover; background-color: var(--secondary-bg); }
-.zoom-icon { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.5); color: white; padding: 4px 8px; border-radius: 20px; font-size: 13px; cursor: pointer; z-index: 10; transition: background 0.2s; backdrop-filter: blur(4px);}
+.zoom-icon { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.5); color: white; padding: 4px 8px; border: none; border-radius: 20px; font-size: 13px; font-family: inherit; cursor: pointer; z-index: 10; transition: background 0.2s; backdrop-filter: blur(4px);}
 .card-label { font-weight: 500; font-size: 14px; }
 
 .compact-question { margin-bottom: 18px; }
@@ -93,7 +122,7 @@ input:focus, select:focus { border-color: var(--link-color); box-shadow: 0 0 0 3
 .pill.selected .pill-radio::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--link-color); }
 .pill.selected .pill-check { background: var(--link-color); }
 .tier-container { display: flex; background: var(--zone-badge-bg); border-radius: 8px; padding: 3px; margin-top: 10px; width: 100%; box-sizing: border-box;}
-.tier-btn { flex: 1; padding: 8px 0; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--hint-color); text-align: center; transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1); }
+.tier-btn { flex: 1; padding: 8px 0; border: none; border-radius: 6px; font-size: 13px; font-family: inherit; font-weight: 600; cursor: pointer; color: var(--hint-color); background: none; text-align: center; transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1); }
 .tier-btn.active { background: var(--card-bg); color: var(--text-color); box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
 
 .list-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid var(--border-color); flex-wrap: wrap; transition: background 0.2s; border-radius: 12px; margin-bottom: 5px; background: var(--secondary-bg); box-shadow: 0 2px 8px var(--shadow-color);}

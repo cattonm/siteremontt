@@ -8,7 +8,7 @@
 //  3. Пропс `required`: якщо секція обов'язкова і в ній ще нічого не
 //     обрано — під назвою показується червона позначка «Необхідно обрати»
 //     (як на референсі Kapitel).
-import React, { useState } from 'react';
+import React, { useState, useId } from 'react';
 import { Plus, Minus } from 'lucide-react';
 import { vibe } from '../utils/telegram';
 import { GROUP_ICONS, DEFAULT_GROUP_ICON } from '../data/groupIcons';
@@ -31,6 +31,7 @@ export default function AccordionGroup({
     const [openLocal, setOpenLocal] = useState(defaultOpen);
     const isControlled = openProp !== undefined && openProp !== null;
     const open = isControlled ? openProp : openLocal;
+    const contentId = useId();
 
     const answeredCount = questions.filter((q) => isAnswered(q, room)).length;
     const Icon = GROUP_ICONS[name] || DEFAULT_GROUP_ICON;
@@ -44,7 +45,10 @@ export default function AccordionGroup({
 
     return (
         <div style={{ borderBottom: '1.5px solid var(--border-color)' }}>
-            <div className="accordion-header" onClick={toggle}>
+            <button
+                type="button" className="btn-reset accordion-header" style={{ width: '100%' }}
+                onClick={toggle} aria-expanded={open} aria-controls={contentId}
+            >
                 <div className="accordion-title" style={{ alignItems: 'flex-start' }}>
                     <Icon size={18} style={{ marginTop: showRequired ? '2px' : 0 }} />
                     <div>
@@ -72,9 +76,9 @@ export default function AccordionGroup({
                         )}
                     </div>
                 </div>
-                {open ? <Minus size={18} color="var(--hint-color)" /> : <Plus size={18} color="var(--hint-color)" />}
-            </div>
-            <div className={`accordion-content ${open ? 'open' : ''}`}>
+                {open ? <Minus size={18} color="var(--hint-color)" aria-hidden="true" /> : <Plus size={18} color="var(--hint-color)" aria-hidden="true" />}
+            </button>
+            <div id={contentId} className={`accordion-content ${open ? 'open' : ''}`}>
                 <div style={{ paddingBottom: '15px' }}>
                     {questions.map((q) => renderQuestion(q))}
                 </div>

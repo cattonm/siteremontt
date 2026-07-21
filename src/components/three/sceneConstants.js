@@ -27,6 +27,12 @@ export const CAP_COLOR_PLAN = '#141414';
 // локально в Outlined.jsx.
 export const OUTLINE_COLOR = '#161616';
 
+// Бюджет мобільних (3D-аудит п.8.6): на пристроях з малою RAM (deviceMemory —
+// підтримує Chrome/Android, Safari/Firefox не підтримують — тоді просто 2)
+// обмежуємо pixel ratio нижче типового максимуму 2, щоб не рендерити зайві
+// пікселі на слабких GPU.
+export const DPR_CAP = (typeof navigator !== 'undefined' && navigator.deviceMemory && navigator.deviceMemory <= 4) ? 1.5 : 2;
+
 // Контактна тінь під меблями: м'який радіальний "blob" на площині замість
 // дорогого AO, і працює з frameloop="demand" (нічого не рахує щокадру).
 // Текстура одна на всю сцену (лінива ініціалізація — canvas недоступний

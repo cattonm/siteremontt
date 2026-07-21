@@ -41,7 +41,7 @@ import { ROOM_QUESTIONS_CONFIG } from '../data/questions';
 import { vibe } from '../utils/telegram';
 import useCanvasVisible from '../hooks/useCanvasVisible';
 import { layoutKitchen, layoutBath, layoutGeneric, TUB_LEN, TUB_DEP, TUB_H } from '../utils/roomLayout';
-import { WALL_H_ROOM, CAP_COLOR_ROOM, getBlobTexture } from './three/sceneConstants';
+import { WALL_H_ROOM, CAP_COLOR_ROOM, getBlobTexture, DPR_CAP } from './three/sceneConstants';
 
 // ====== ГЕОМЕТРІЯ КІМНАТИ ======
 const WALL_H = WALL_H_ROOM;     // висота стін, м
@@ -343,8 +343,8 @@ function SunLight({ W, D }) {
                 color="#fff6ea"
                 position={[W / 2 + R * 1.1 + 1.2, R * 1.5 + 4, D / 2 + R * 0.9 + 1]}
                 intensity={2.4}
-                shadow-mapSize-width={2048}
-                shadow-mapSize-height={2048}
+                shadow-mapSize-width={1024}
+                shadow-mapSize-height={1024}
                 shadow-camera-left={-ext}
                 shadow-camera-right={ext}
                 shadow-camera-top={ext}
@@ -1061,7 +1061,7 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
                 (пікові емісіви й відблиски не «вигорають», тіні глибші). Світло
                 перебалансовано під неї — див. SunLight/LightFixtures. */}
             <Canvas
-                dpr={[1, 2]}
+                dpr={[1, DPR_CAP]}
                 // Хода несумісна з "demand" — поки гуляємо, малюємо кожен кадр.
                 // Поза в'юпортом (п.8.1) — взагалі не малюємо, незалежно від режиму.
                 frameloop={!canvasVisible ? 'never' : (fp ? 'always' : 'demand')}

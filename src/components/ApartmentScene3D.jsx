@@ -18,7 +18,7 @@ import { Plus, Minus, RotateCcw } from 'lucide-react';
 import { getSurfaceKind, getSurfaceColor, getSurfaceTexture, repeatsFor } from '../utils/proceduralTextures';
 import { OutlinedBox, OutlinedCylinder, OutlinedSurface } from './three/Outlined';
 import InvalidateOnVisible from './three/InvalidateOnVisible';
-import { FLOOR_THICKNESS, WALL_H_PLAN as WALL_H, CAP_COLOR_PLAN } from './three/sceneConstants';
+import { FLOOR_THICKNESS, WALL_H_PLAN as WALL_H, CAP_COLOR_PLAN, DPR_CAP } from './three/sceneConstants';
 import useCanvasVisible from '../hooks/useCanvasVisible';
 import { SLOT_SIZE } from '../utils/layoutEngine';
 import { FURNITURE_LAYOUTS } from '../data/furnitureLayouts';
@@ -288,7 +288,7 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
                 Поза в'юпортом (п.8.1) — "never", кадри взагалі не йдуть. */}
             <Canvas
                 orthographic
-                dpr={[1, 2]}
+                dpr={[1, DPR_CAP]}
                 frameloop={canvasVisible ? 'demand' : 'never'}
                 shadows="soft"
                 style={{ width: '100%', height: '100%' }}
@@ -308,8 +308,10 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
                     castShadow
                     position={[10, 16, 8]}
                     intensity={2.0}
-                    shadow-mapSize-width={2048}
-                    shadow-mapSize-height={2048}
+                    // Ізометрія дрібна на екрані — різниці з 2048 не видно
+                    // (3D-аудит п.8.6, бюджет мобільних).
+                    shadow-mapSize-width={1024}
+                    shadow-mapSize-height={1024}
                     shadow-camera-left={-(Math.max(bounds.width, bounds.depth) * 0.72 + 1.5)}
                     shadow-camera-right={Math.max(bounds.width, bounds.depth) * 0.72 + 1.5}
                     shadow-camera-top={Math.max(bounds.width, bounds.depth) * 0.72 + 1.5}

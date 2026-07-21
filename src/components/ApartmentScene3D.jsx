@@ -17,13 +17,12 @@ import * as THREE from 'three';
 import { Plus, Minus, RotateCcw } from 'lucide-react';
 import { getSurfaceKind, getSurfaceColor, getSurfaceTexture, repeatsFor } from '../utils/proceduralTextures';
 import { OutlinedBox, OutlinedCylinder, OutlinedSurface } from './three/Outlined';
-import { FLOOR_THICKNESS } from './three/sceneConstants';
+import InvalidateOnVisible from './three/InvalidateOnVisible';
+import { FLOOR_THICKNESS, WALL_H_PLAN as WALL_H, CAP_COLOR_PLAN, DPR_CAP } from './three/sceneConstants';
+import useCanvasVisible from '../hooks/useCanvasVisible';
 import { SLOT_SIZE } from '../utils/layoutEngine';
 import { FURNITURE_LAYOUTS } from '../data/furnitureLayouts';
-import {
-    TEMPLATE_WALL_HEIGHT as WALL_H, SILL_HEIGHT,
-    EXT_THICKNESS, INT_THICKNESS,
-} from '../data/apartmentTemplate';
+import { SILL_HEIGHT, EXT_THICKNESS, INT_THICKNESS } from '../data/apartmentTemplate';
 import { buildFloorPlan } from '../utils/floorPlanLayout';
 
 // ====== НАЛАШТУВАННЯ ВИГЛЯДУ ======
@@ -36,7 +35,7 @@ const ZOOM_STEP = 0.25;
 
 const ACCENT = '#C2251D';          // фірмовий червоний (three-матеріали; у HTML-стилях — 'var(--accent)')
 const WALL_COLOR = '#ffffff';
-const WALL_CAP_COLOR = '#141414';  // чорний зріз стін = лінії плану
+const WALL_CAP_COLOR = CAP_COLOR_PLAN;  // чорний зріз стін = лінії плану
 const CAP_HEIGHT = 0.07;
 const CAP_OVERHANG = 0.02;
 const FLOOR_EMPTY = '#f1f1ee';     // зона без кімнати користувача
@@ -242,6 +241,8 @@ function Podium({ bounds }) {
 
 export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
     const [zoom, setZoom] = useState(1);
+    // 3D-аудит п.8.1: не малюємо кадри плану, поки він поза в'юпортом.
+    const [canvasWrapRef, canvasVisible] = useCanvasVisible();
     // Темна тема читається з body.classList — вся вкладка перемальовується
     // при перемиканні теми, тож окремої реактивності не треба.
     const dark = typeof document !== 'undefined' && document.body.classList.contains('dark-theme');
@@ -263,7 +264,7 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
         setZoom((z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, +(z + delta).toFixed(2))));
 
     return (
-        <div style={{ position: 'relative', width: '100%', height: '380px', background: 'var(--stage-bg)', borderRadius: '12px' }}>
+        <div ref={canvasWrapRef} style={{ position: 'relative', width: '100%', height: '380px', background: 'var(--stage-bg)', borderRadius: '12px' }}>
             {/* Порожній стан: раніше тут показувався макет-шаблон із порожніми
                 зонами, і клік по ньому створював кімнату. Тепер план — це
                 дзеркало реальних кімнат, тож поки їх нема, показуємо підказку,
@@ -283,17 +284,19 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
                 </div>
             )}
             {/* frameloop="demand": сцена статична, тож рендеримо кадр лише при
-                змінах (зум, вибір зони, матеріали) — див. invalidate() в IsoCamera. */}
+                змінах (зум, вибір зони, матеріали) — див. invalidate() в IsoCamera.
+                Поза в'юпортом (п.8.1) — "never", кадри взагалі не йдуть. */}
             <Canvas
                 orthographic
-                dpr={[1, 2]}
-                frameloop="demand"
+                dpr={[1, DPR_CAP]}
+                frameloop={canvasVisible ? 'demand' : 'never'}
                 shadows="soft"
                 style={{ width: '100%', height: '100%' }}
                 gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.12 }}
                 role="img"
                 aria-label="3D-план квартири з розташуванням приміщень"
             >
+                <InvalidateOnVisible visible={canvasVisible} />
                 <IsoCamera bounds={bounds} userZoom={zoom} />
                 {/* ACES темніший за лінійний — ambient прибрано, hemisphere/сонце
                     підняті; у темній темі «земля» hemisphere теж темна. */}
@@ -305,8 +308,10 @@ export default function ApartmentScene3D({ rooms, activeId, onZonePress }) {
                     castShadow
                     position={[10, 16, 8]}
                     intensity={2.0}
-                    shadow-mapSize-width={2048}
-                    shadow-mapSize-height={2048}
+                    // Ізометрія дрібна на екрані — різниці з 2048 не видно
+                    // (3D-аудит п.8.6, бюджет мобільних).
+                    shadow-mapSize-width={1024}
+                    shadow-mapSize-height={1024}
                     shadow-camera-left={-(Math.max(bounds.width, bounds.depth) * 0.72 + 1.5)}
                     shadow-camera-right={Math.max(bounds.width, bounds.depth) * 0.72 + 1.5}
                     shadow-camera-top={Math.max(bounds.width, bounds.depth) * 0.72 + 1.5}

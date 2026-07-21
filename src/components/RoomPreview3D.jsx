@@ -34,20 +34,22 @@ import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { Html, OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { Box, Footprints } from 'lucide-react';
 import { OutlinedBox, OutlinedCylinder, OutlinedSurface } from './three/Outlined';
+import InvalidateOnVisible from './three/InvalidateOnVisible';
 import { getSurfaceKind, getSurfaceColor, getSurfaceTexture, getSurfaceRoughness, repeatsFor } from '../utils/proceduralTextures';
 import { GROUP_ICONS, DEFAULT_GROUP_ICON } from '../data/groupIcons';
 import { ROOM_QUESTIONS_CONFIG } from '../data/questions';
-import { FURNITURE_LAYOUTS } from '../data/furnitureLayouts';
-import { SLOT_SIZE } from '../utils/layoutEngine';
 import { vibe } from '../utils/telegram';
+import useCanvasVisible from '../hooks/useCanvasVisible';
+import { layoutKitchen, layoutBath, layoutGeneric, TUB_LEN, TUB_DEP, TUB_H } from '../utils/roomLayout';
+import { WALL_H_ROOM, CAP_COLOR_ROOM, getBlobTexture, DPR_CAP } from './three/sceneConstants';
 
 // ====== ГЕОМЕТРІЯ КІМНАТИ ======
-const WALL_H = 2.7;     // висота стін, м
+const WALL_H = WALL_H_ROOM;     // висота стін, м
 const WALL_T = 0.09;    // товщина стін
 const FLOOR_T = 0.09;   // товщина плити підлоги
 const CAP_H = 0.06;     // чорна "кришка" зрізу стіни (лінія плану)
 const CAP_OVER = 0.015;
-const CAP_COLOR = '#161616';
+const CAP_COLOR = CAP_COLOR_ROOM;
 const WOOD = '#cdb293';
 const rad = (deg) => (deg * Math.PI) / 180;
 
@@ -77,24 +79,7 @@ function roomDims(room) {
 }
 
 // ====== КОНТАКТНА ТІНЬ ПІД МЕБЛЯМИ ======
-// М'який радіальний "blob" на площині замість дорогого AO — і працює з
-// frameloop="demand" (нічого не рахує щокадру). Текстура одна на всю сцену.
-let _blobTex = null;
-function getBlobTexture() {
-    if (_blobTex) return _blobTex;
-    if (typeof document === 'undefined') return null;
-    const c = document.createElement('canvas');
-    c.width = c.height = 64;
-    const ctx = c.getContext('2d');
-    const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 32);
-    g.addColorStop(0, 'rgba(0,0,0,0.32)');
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 64, 64);
-    _blobTex = new THREE.CanvasTexture(c);
-    return _blobTex;
-}
-
+// getBlobTexture — спільна для обох 3D-сцен, тепер у three/sceneConstants.js.
 function ContactShadow({ position, size }) {
     const tex = getBlobTexture();
     if (!tex) return null;
@@ -358,8 +343,8 @@ function SunLight({ W, D }) {
                 color="#fff6ea"
                 position={[W / 2 + R * 1.1 + 1.2, R * 1.5 + 4, D / 2 + R * 0.9 + 1]}
                 intensity={2.4}
-                shadow-mapSize-width={2048}
-                shadow-mapSize-height={2048}
+                shadow-mapSize-width={1024}
+                shadow-mapSize-height={1024}
                 shadow-camera-left={-ext}
                 shadow-camera-right={ext}
                 shadow-camera-top={ext}
@@ -513,39 +498,24 @@ function buildColliders(type, W, D, room) {
     const push = (x, z, w, d) => list.push({ x, z, hw: w / 2, hd: d / 2 });
 
     if (type === 'kitchen') {
-        const withFridge = W >= 2.55;
-        const fridgeW = 0.66;
-        const setW = Math.min(W - 0.3 - (withFridge ? fridgeW + 0.1 : 0), 3.4);
-        const x0 = 0.15;
+        const { withFridge, fridgeW, setW, x0 } = layoutKitchen(W);
         push(x0 + setW / 2, 0.31, setW, 0.6);
         if (withFridge) push(x0 + setW + 0.1 + fridgeW / 2, 0.33, fridgeW, 0.64);
         return list;
     }
 
     if (type === 'bath') {
-        const showerArr = (Array.isArray(room.shower) ? room.shower : []).filter((v) => v !== 'Не обладнувати');
-        const showerAny = showerArr.length > 0;
-        const S = Math.min(0.95, W - 0.5, D - 0.5);
+        const { showerAny, S, tubType, free, tubStartX, tubFits, tubAlt } = layoutBath(W, D, room);
         if (showerAny) push(0.12 + S / 2, 0.12 + S / 2, S, S);
-
-        const tubType = room.tub?.type && room.tub.type !== 'Не обладнувати' ? room.tub.type : null;
         if (tubType) {
-            const tubLen = 1.65, tubDep = 0.75;
-            const free = room.tub?.type === 'Окремостояча';
-            const tubStartX = showerAny ? 0.12 + S + 0.2 : 0.15;
-            const tubFits = W - tubStartX >= tubLen + 0.1;
-            const tubAlt = !tubFits && D >= tubLen + 0.6;
-            if (tubFits) push(tubStartX + tubLen / 2, free ? 0.62 : 0.42, tubLen, tubDep);
-            else if (tubAlt) push(W - tubDep / 2 - 0.12, D - tubLen / 2 - 0.25, tubDep, tubLen);
+            if (tubFits) push(tubStartX + TUB_LEN / 2, free ? 0.62 : 0.42, TUB_LEN, TUB_DEP);
+            else if (tubAlt) push(W - TUB_DEP / 2 - 0.12, D - TUB_LEN / 2 - 0.25, TUB_DEP, TUB_LEN);
         }
         return list;
     }
 
-    const pieces = FURNITURE_LAYOUTS[type];
+    const { pieces, sx, sz } = layoutGeneric(type, W, D);
     if (!pieces) return list;
-    const slot = SLOT_SIZE[type] || { width: 2.0, depth: 1.8 };
-    const sx = W / slot.width;
-    const sz = D / slot.depth;
     const clamp = (v, max) => Math.min(Math.max(v, 0.35), max - 0.35);
     for (const p of pieces) {
         if (p.shape === 'cylinder') continue;
@@ -722,11 +692,7 @@ function LightFixtures({ lightArr, W, D }) {
 
 // ====== КУХОННИЙ ГАРНІТУР (фартух реагує на вибір apron) ======
 function KitchenSet({ W, room }) {
-    const withFridge = W >= 2.55;
-    const fridgeW = 0.66;
-    const setW = Math.min(W - 0.3 - (withFridge ? fridgeW + 0.1 : 0), 3.4);
-    const x0 = 0.15;
-    const cx = x0 + setW / 2;
+    const { withFridge, fridgeW, setW, x0, cx } = layoutKitchen(W);
 
     const counterFill = surfaceFill('apron', 'Матеріал стільниці', setW, 0.63); // stoneSlab
     const apronFill = surfaceFill('apron', room.apron, setW, 0.6, '#edeff1');
@@ -790,26 +756,11 @@ function GlassPane({ args, position }) {
 }
 
 function BathSet({ W, D, room }) {
-    const tubType = room.tub?.type && room.tub.type !== 'Не обладнувати' ? room.tub.type : null;
-    const showerArr = (Array.isArray(room.shower) ? room.shower : []).filter((v) => v !== 'Не обладнувати');
-    const hasTray = showerArr.includes('Піддон (акрил/камінь)');
-    const hasTrap = showerArr.includes('Душовий трап (з плитки)');
-    const glassWall = showerArr.includes('Скляна перегородка');
-    const glassDoor = showerArr.includes('Скляна конструкція з дверима');
-    const showerAny = hasTray || hasTrap || glassWall || glassDoor;
-    const toiletType = room.toilet?.type && room.toilet.type !== 'Ні' ? room.toilet.type : null;
-
-    // Душова зона в дальньому лівому куті
-    const S = Math.min(0.95, W - 0.5, D - 0.5);
-    const showerCx = 0.12 + S / 2;
-
-    // Ванна вздовж задньої стіни, правіше душа. Якщо не влазить — уздовж
-    // правого краю (перпендикулярно). Окремостояча відступає від стіни.
-    const tubLen = 1.65, tubDep = 0.75, tubH = 0.52;
-    const free = room.tub?.type === 'Окремостояча';
-    const tubStartX = showerAny ? 0.12 + S + 0.2 : 0.15;
-    const tubFits = W - tubStartX >= tubLen + 0.1;
-    const tubAlt = !tubFits && D >= tubLen + 0.6;
+    const {
+        hasTray, hasTrap, glassWall, glassDoor, showerAny, S, showerCx,
+        tubType, free, tubStartX, tubFits, tubAlt, toiletType,
+    } = layoutBath(W, D, room);
+    const tubLen = TUB_LEN, tubDep = TUB_DEP, tubH = TUB_H;
 
     return (
         <group>
@@ -917,11 +868,8 @@ function BathSet({ W, D, room }) {
 
 // ====== СИЛУЕТИ МЕБЛІВ для решти типів (той самий підхід, що на плані) ======
 function GenericFurniture({ type, W, D }) {
-    const pieces = FURNITURE_LAYOUTS[type];
+    const { pieces, sx, sz } = layoutGeneric(type, W, D);
     if (!pieces) return null;
-    const slot = SLOT_SIZE[type] || { width: 2.0, depth: 1.8 };
-    const sx = W / slot.width;
-    const sz = D / slot.depth;
     const clamp = (v, max) => Math.min(Math.max(v, 0.35), max - 0.35);
     return (
         <group>
@@ -955,7 +903,7 @@ function buildHotspots(type, W, D, groups) {
     add('Підлога', [W * 0.6, 0.07, D * 0.68]);
     add('Стіни', busyWalls ? [0.06, 1.7, D * 0.42] : [Math.min(W * 0.92, W - 0.3), 1.55, 0.06]);
     if (type === 'kitchen') {
-        const setW = Math.min(W - 0.3 - (W >= 2.55 ? 0.76 : 0), 3.4);
+        const { setW } = layoutKitchen(W);
         add('Фартух', [0.15 + setW * 0.68, 1.15, 0.09]);
         add('Сантехніка', [0.15 + setW * 0.3, 1.02, 0.5]);
     }
@@ -976,6 +924,10 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
     // Локальний стан (стор не чіпаємо — той самий принцип, що з матеріалами).
     const [view, setView] = useState('orbit');
     const fp = view === 'fp';
+    // 3D-аудит п.8.1: не малюємо кадри, коли канвас поза в'юпортом (план і
+    // прев'ю кімнати рідко видно одночасно на телефоні — лишається один
+    // активний WebGL-контекст).
+    const [canvasWrapRef, canvasVisible] = useCanvasVisible();
     // walking вмикається лише коли переліт завершився — під час лету
     // камерою керує твін, а не хода.
     const [walking, setWalking] = useState(false);
@@ -1020,7 +972,12 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
             keysRef.current[k] = on;
             e.preventDefault();
         };
-        const down = (e) => set(e, true);
+        const down = (e) => {
+            // Escape — очікувана поведінка виходу з режиму прогулянки
+            // (3D-аудит п.8.7), як і в решті модалок застосунку.
+            if (e.code === 'Escape') { setView('orbit'); return; }
+            set(e, true);
+        };
         const up = (e) => set(e, false);
         window.addEventListener('keydown', down);
         window.addEventListener('keyup', up);
@@ -1092,6 +1049,7 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
 
     return (
         <div
+            ref={canvasWrapRef}
             className="r3d-wrap"
             onPointerDown={onLookDown}
             onPointerMove={onLookMove}
@@ -1108,14 +1066,16 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
                 (пікові емісіви й відблиски не «вигорають», тіні глибші). Світло
                 перебалансовано під неї — див. SunLight/LightFixtures. */}
             <Canvas
-                dpr={[1, 2]}
+                dpr={[1, DPR_CAP]}
                 // Хода несумісна з "demand" — поки гуляємо, малюємо кожен кадр.
-                frameloop={fp ? 'always' : 'demand'}
+                // Поза в'юпортом (п.8.1) — взагалі не малюємо, незалежно від режиму.
+                frameloop={!canvasVisible ? 'never' : (fp ? 'always' : 'demand')}
                 shadows="soft"
                 gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.12 }}
                 role="img"
                 aria-label={`3D-візуалізація приміщення «${room.name}»${fp ? ' у режимі прогулянки' : ''}`}
             >
+                <InvalidateOnVisible visible={canvasVisible} />
                 <CameraRig
                     key={`${W.toFixed(1)}x${D.toFixed(1)}`}
                     W={W} D={D} view={view}

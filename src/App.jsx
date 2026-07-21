@@ -3,8 +3,12 @@ import useStore from './store/useStore';
 import ClientForm from './components/ClientForm';
 import Onboarding from './components/Onboarding';
 import TierSwitch from './components/TierSwitch';
-import Login from './components/Login';
-import Dashboard from './components/Dashboard';
+// ЛІНИВІ імпорти: Login/Dashboard — суто менеджерський функціонал (панель,
+// таблиця заявок, адмінка), гостю чи клієнту в Telegram ці ~50 КБ коду не
+// потрібні жодного разу за сесію. Вантажаться лише коли view переходить у
+// 'login'/'dashboard'.
+const Login = lazy(() => import('./components/Login'));
+const Dashboard = lazy(() => import('./components/Dashboard'));
 import { getSession } from './utils/auth';
 import Survey from './components/Survey';
 import CustomWorks from './components/CustomWorks';
@@ -12,7 +16,19 @@ import Summary from './components/Summary';
 import AnimatedPrice from './components/AnimatedPrice';
 import { vibe, vibeError, tg } from './utils/telegram';
 import useFocusTrap from './hooks/useFocusTrap';
-import { Menu, Moon, Sun, ArrowLeft, Send, Trash2, Loader2, ShieldCheck } from 'lucide-react';
+import useLiveCalc from './hooks/useLiveCalc';
+import useServerDraft from './hooks/useServerDraft';
+import {
+    showAlert, ping, me, getOrder,
+    deleteDraft, saveOrder, createOrder, submitLead,
+} from './utils/api';
+import ServerDraftPrompt from './components/modals/ServerDraftPrompt';
+import DraftPrompt from './components/modals/DraftPrompt';
+import ImageModal from './components/modals/ImageModal';
+import CartSheet from './components/modals/CartSheet';
+import SideMenu from './components/modals/SideMenu';
+import ThanksScreen from './components/modals/ThanksScreen';
+import { Menu, Moon, Sun, ArrowLeft, Send, Loader2 } from 'lucide-react';
 
 // ЛІНИВИЙ імпорт: RoomVisualizer тягне за собою three.js + drei (~850 КБ
 // сирого JS). Без lazy усе це вантажилось КОЖНОМУ користувачу одразу на
@@ -27,21 +43,15 @@ import {
     getRoomIssues
 } from './data/questions';
 
-const BACKEND_URL = "https://remontnikuav.onrender.com";
-
-// Єдина точка показу алертів. У Telegram беремо нативний showAlert (обов'язково
-// прив'язаний до tg — відв'язаний метод втрачає this), у браузері (гість) —
-// звичайний window.alert.
-const showAlert = (msg) => (tg?.showAlert ? tg.showAlert.bind(tg) : window.alert)(msg);
-
-// Заголовки авторизації: міні-апка йде з initData, веб-кабінет — із сесійним
-// токеном. Сервер розуміє обидва (auth_request) — тому фронтенд просто шле те,
-// що має.
-const authHeaders = () => ({
-    'Content-Type': 'application/json',
-    'X-Telegram-Init-Data': tg?.initData || '',
-    ...(getSession()?.token ? { 'X-Session-Token': getSession().token } : {}),
-});
+// Заглушка на час підвантаження lazy Login/Dashboard.
+function PanelLoadingFallback() {
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-color)', color: 'var(--link-color)' }}>
+            <Loader2 size={40} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+            <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
+        </div>
+    );
+}
 
 export default function App() {
     // === 1. ГЛОБАЛЬНИЙ СТАН З ZUSTAND ===
@@ -72,18 +82,6 @@ export default function App() {
         const isEdit = new URLSearchParams(window.location.search).get('edit_id');
         return !isEdit && useStore.getState().currentStep > -1; // persist гідратується синхронно
     });
-    const [totals, setTotals] = useState({ work: 0, mat_min: 0 });
-    // Чернетка, знайдена на сервері (інший пристрій) — показуємо банер
-    // «Продовжити?», а не мовчки підміняємо стан.
-    const [serverDraft, setServerDraft] = useState(null);
-
-    // Фокус-пастки модалок (аудит п.9.2): фокус на перший елемент при
-    // відкритті, Tab циклічно всередині, Escape закриває де є onClose.
-    const menuTrapRef = useFocusTrap(isMenuOpen, () => setIsMenuOpen(false));
-    const imageModalTrapRef = useFocusTrap(!!modalImg, () => setModalImg(null));
-    const cartTrapRef = useFocusTrap(isCartOpen, () => setIsCartOpen(false));
-    const draftPromptTrapRef = useFocusTrap(showDraftPrompt, null);
-    const serverDraftTrapRef = useFocusTrap(!!serverDraft, null);
     // РОЛЬ: 'guest' (публічний калькулятор) | 'manager' | 'admin'.
     // Визначається бекендом за initData — фронтенд їй лише вірить у частині
     // UI; усі перевірки доступу однаково робляться на сервері.
@@ -106,6 +104,18 @@ export default function App() {
     });
     // Гість — лише той, у кого немає НІ веб-сесії, НІ доступу через Telegram.
     const isGuest = role === 'guest' && !session;
+
+    // Живий кошторис і серверна чернетка (патч 07 — винесено в хуки).
+    const [totals, setTotals] = useLiveCalc(client, answers, rooms, currentStep);
+    const [serverDraft, setServerDraft] = useServerDraft(client, answers, rooms, currentStep, session);
+
+    // Фокус-пастки модалок (аудит п.9.2): фокус на перший елемент при
+    // відкритті, Tab циклічно всередині, Escape закриває де є onClose.
+    const menuTrapRef = useFocusTrap(isMenuOpen, () => setIsMenuOpen(false));
+    const imageModalTrapRef = useFocusTrap(!!modalImg, () => setModalImg(null));
+    const cartTrapRef = useFocusTrap(isCartOpen, () => setIsCartOpen(false));
+    const draftPromptTrapRef = useFocusTrap(showDraftPrompt, null);
+    const serverDraftTrapRef = useFocusTrap(!!serverDraft, null);
     const [isSendingLead, setIsSendingLead] = useState(false);
     const [leadSent, setLeadSent] = useState(false);
     // Суму фіксуємо ДО скидання чернетки: після resetDraft анкета порожня,
@@ -134,30 +144,20 @@ export default function App() {
         // Прогрів бекенду: free-план Render засинає, перший live_calc міг
         // чекати холодний старт ~30-50 с. Будимо сервер, поки людина
         // заповнює ім'я/площу — до кроку кімнат ціни вже рахуються миттєво.
-        fetch(`${BACKEND_URL}/ping`, { mode: 'no-cors' }).catch(() => {});
+        ping().catch(() => {});
 
         // Хто я? Гість (сайт у браузері) бачить вільний калькулятор і форму
         // контакту в кінці; менеджер — повний потік із відправкою в бота.
-        fetch(`${BACKEND_URL}/api/me`, {
-            headers: {
-                'X-Telegram-Init-Data': tg?.initData || '',
-                ...(getSession()?.token ? { 'X-Session-Token': getSession().token } : {}),
-            },
-        })
+        me()
             .then((r) => (r.ok ? r.json() : { role: 'guest' }))
             .then((d) => setRole(d.role || 'guest'))
             .catch(() => setRole('guest'));
 
         const editId = new URLSearchParams(window.location.search).get('edit_id');
-        
+
         if (editId) {
             // РЕЖИМ РЕДАГУВАННЯ (isLoadingEdit уже true з лінивого ініту)
-            fetch(`${BACKEND_URL}/api/get_order?edit_id=${editId}`, {
-                headers: {
-                    'X-Telegram-Init-Data': tg?.initData || '',
-                    ...(getSession()?.token ? { 'X-Session-Token': getSession().token } : {}),
-                },
-            })
+            getOrder(editId)
                 .then(res => {
                     if(!res.ok) throw new Error("Помилка завантаження");
                     return res.json();
@@ -184,21 +184,9 @@ export default function App() {
                     if(tg) tg.showAlert("Не вдалося завантажити анкету для редагування.");
                 })
                 .finally(() => setIsLoadingEdit(false));
-        } else if (useStore.getState().currentStep <= -1 && (tg?.initData || getSession())) {
-            // РЕЖИМ СТВОРЕННЯ, локальної чернетки НЕМА (новий пристрій, чистий
-            // кеш, перевстановлений Telegram) — питаємо серверну.
-            fetch(`${BACKEND_URL}/api/get_draft`, { headers: authHeaders() })
-                .then((r) => (r.ok ? r.json() : null))
-                .then((d) => {
-                    const draft = d?.draft;
-                    if (!draft?.payload) return;
-                    // Не перетираємо роботу, яку користувач уже почав у цій сесії.
-                    if (useStore.getState().currentStep > -1) return;
-                    setServerDraft(draft);
-                })
-                .catch(() => {});
         }
-        // Режим створення: prompt чернетки виставлений лінивим useState вище.
+        // Режим створення: підтягування серверної чернетки — у useServerDraft;
+        // prompt локальної чернетки виставлений лінивим useState вище.
     }, [setClient, setAnswers, setCurrentStep]); // zustand-сеттери стабільні — ефект фактично one-shot
 
     // Повне скидання чернетки (UI + Store)
@@ -273,74 +261,6 @@ export default function App() {
         return () => clearTimeout(t);
     }, []);
 
-    // === 5. LIVE CALC: ЖИВИЙ РОЗРАХУНОК ===
-    useEffect(() => {
-        if (currentStep < 0 && currentStep !== 9999) return; 
-        // AbortController проти гонки відповідей: без нього повільний
-        // старий запит (напр., холодний старт Render) міг прилетіти ПІСЛЯ
-        // швидкого нового і перезаписати кошик застарілими сумами.
-        const ctrl = new AbortController();
-        const delay = setTimeout(async () => {
-            if(!navigator.onLine || !client.area) return;
-            try {
-                // АДАПТЕР: Формуємо єдиний об'єкт для сервера
-                const payloadAnswers = { ...answers, rooms: rooms };
-                
-                const res = await fetch(`${BACKEND_URL}/api/live_calc`, { 
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify({ client, answers: payloadAnswers }),
-                    signal: ctrl.signal,
-                });
-                if (res.ok) { 
-                    const data = await res.json(); 
-                    setTotals({ work: data.work, mat_min: data.mat_min }); 
-                    // Розбивка по приміщеннях + «загальні роботи» — для чипа
-                    // ціни в візуалізаторі та секції приміщень у підсумку.
-                    // Старий бекенд цих полів не має — тоді просто порожньо.
-                    useStore.getState().setLiveBreakdown({
-                        rooms: data.rooms || {},
-                        general: data.general || null,
-                        roomLines: data.room_lines || {},
-                        generalLines: data.general_lines || [],
-                    });
-                }
-            } catch(e) { if (e.name !== 'AbortError') console.log("Calc error", e); }
-        }, 500);
-        return () => { clearTimeout(delay); ctrl.abort(); };
-    }, [client, answers, rooms, currentStep]);
-
-    // === 5.1 СЕРВЕРНА ЧЕРНЕТКА ===
-    // Раніше чернетка жила ЛИШЕ в localStorage телефона: зміна пристрою або
-    // чистка кешу — і робота зникала. Тепер вона дублюється на сервер:
-    //  • можна продовжити з іншого пристрою;
-    //  • бот нагадає про незавершену заявку через 24 год.
-    // Дебаунс 3 с (довший за live-calc: тут ходимо в Google Sheets, не варто
-    // смикати на кожен клік). Режим редагування не чіпаємо — там уже є заявка.
-    useEffect(() => {
-        // Джерело правди про «ми в режимі редагування» — URL АБО збережений
-        // editingOrderId. Раніше дивились лише в URL: якщо менеджер відкривав
-        // застосунок заново (вже без ?edit_id), вміст ЧУЖОЇ збереженої заявки
-        // їхав на сервер як його «незавершена чернетка» — і бот ще й нагадував
-        // про неї через добу.
-        const editId = new URLSearchParams(window.location.search).get('edit_id')
-            || useStore.getState().editingOrderId;
-        if (editId || currentStep < 0) return;
-        if (!tg?.initData && !session) return;   // гість чернетки на сервері не має
-        if (!client.name && !client.area && rooms.length === 0) return; // порожню не шлемо
-
-        const ctrl = new AbortController();
-        const t = setTimeout(() => {
-            fetch(`${BACKEND_URL}/api/save_draft`, {
-                method: 'POST',
-                headers: authHeaders(),
-                body: JSON.stringify({ currentStep, client, answers: { ...answers, rooms } }),
-                signal: ctrl.signal,
-            }).catch(() => {}); // мовчазний фейл: локальна чернетка все одно лишається
-        }, 3000);
-        return () => { clearTimeout(t); ctrl.abort(); };
-    }, [client, answers, rooms, currentStep, session]);
-
     // === 6. НАВІГАЦІЯ ===
     const goNext = () => {
         vibe('medium');
@@ -365,16 +285,12 @@ export default function App() {
                 vibe('heavy');
                 setIsSendingLead(true);
                 const { website: hp, ...clientClean } = client;   // hp — honeypot, у заявку не пишемо
-                fetch(`${BACKEND_URL}/api/submit_lead`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        client: clientClean,
-                        answers: { ...answers, rooms },
-                        // Honeypot: приховане поле форми. РАНІШЕ тут стояла порожня
-                        // константа — тобто пастка не спрацьовувала взагалі ніколи.
-                        website: hp || '',
-                    }),
+                submitLead({
+                    client: clientClean,
+                    answers: { ...answers, rooms },
+                    // Honeypot: приховане поле форми. РАНІШЕ тут стояла порожня
+                    // константа — тобто пастка не спрацьовувала взагалі ніколи.
+                    website: hp || '',
                 })
                     .then((r) => {
                         if (!r.ok) throw new Error('fail');
@@ -412,18 +328,11 @@ export default function App() {
                 handleResetDraftSilent();
                 // Заявку здано — прибираємо серверну чернетку, щоб через 24 год
                 // бот не нагадував про вже завершену роботу.
-                fetch(`${BACKEND_URL}/api/delete_draft`, {
-                    method: 'POST',
-                    headers: authHeaders(),
-                }).catch(() => {});
+                deleteDraft().catch(() => {});
             }
 
-            if (editId) { 
-                fetch(`${BACKEND_URL}/api/save_order`, { 
-                    method: 'POST', 
-                    headers: authHeaders(), 
-                    body: JSON.stringify(data) 
-                }).then((r) => {
+            if (editId) {
+                saveOrder(data).then((r) => {
                     // ВАЖЛИВО: чистимо не лише прапорець редагування, а й САМІ
                     // дані анкети. Раніше вони лишались у чернетці, і при
                     // наступному відкритті застосунок пропонував «продовжити
@@ -440,11 +349,7 @@ export default function App() {
                 // ВЕБ-КАБІНЕТ: tg.sendData у браузері не існує — раніше заявка
                 // менеджера тут просто зникала б у нікуди. Зберігаємо через API
                 // (авторство сервер бере з сесії, а не з тіла запиту).
-                fetch(`${BACKEND_URL}/api/create_order`, {
-                    method: 'POST',
-                    headers: authHeaders(),
-                    body: JSON.stringify(data),
-                })
+                createOrder(data)
                     .then((r) => { if (!r.ok) throw new Error('fail'); submissionIdRef.current = null; setView('dashboard'); })
                     .catch(() => showAlert('Не вдалося зберегти заявку. Спробуйте ще раз.'));
             }
@@ -502,10 +407,6 @@ export default function App() {
         };
     }, [activeRoomId, liveBreakdown, rooms]);
 
-    const totalCost = totals.work + totals.mat_min;
-    const workPct = totalCost > 0 ? Math.round((totals.work / totalCost) * 100) : 0;
-    const matPct = totalCost > 0 ? 100 - workPct : 0;
-
     // === 7. ВІДМАЛЬОВКА ІНТЕРФЕЙСУ ===
     if (isLoadingEdit) {
         return (
@@ -521,10 +422,12 @@ export default function App() {
     // Вхід менеджера: підпис Telegram → сесійний токен → кабінет.
     if (view === 'login') {
         return (
-            <Login
-                onSuccess={(s) => { setSessionState(s); setRole(s.role); setView('dashboard'); }}
-                onBack={() => setView('calc')}
-            />
+            <Suspense fallback={<PanelLoadingFallback />}>
+                <Login
+                    onSuccess={(s) => { setSessionState(s); setRole(s.role); setView('dashboard'); }}
+                    onBack={() => setView('calc')}
+                />
+            </Suspense>
         );
     }
     // Кабінет: у браузері — після входу (session), у Telegram — одразу за роллю.
@@ -533,34 +436,21 @@ export default function App() {
     if (view === 'dashboard' && panelSession) {
         return (
             <div style={{ minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-color)' }}>
-                <Dashboard
-                    session={panelSession}
-                    onNewOrder={() => { handleResetDraftSilent(); setView('calc'); }}
-                />
+                <Suspense fallback={<PanelLoadingFallback />}>
+                    <Dashboard
+                        session={panelSession}
+                        onNewOrder={() => { handleResetDraftSilent(); setView('calc'); }}
+                    />
+                </Suspense>
             </div>
         );
     }
 
-    // ОНБОРДИНГ — окремий повноекранний крок. Раніше він рендерився
-    // ЕКРАН ПОДЯКИ — окремий повноекранний крок.
-    // Раніше він малювався ВСЕРЕДИНІ анкети, тому знизу лишалася її кнопка
-    // «Далі»: натиснувши, людина отримувала «Вкажіть площу об'єкта!» на вже
-    // надісланій заявці. Тепер жодних чужих кнопок тут немає.
+    // ЕКРАН ПОДЯКИ — окремий повноекранний крок. Раніше він малювався
+    // ВСЕРЕДИНІ анкети, тому знизу лишалася її кнопка «Далі»: натиснувши,
+    // людина отримувала «Вкажіть площу об'єкта!» на вже надісланій заявці.
     if (leadSent) {
-        return (
-            <div style={{ minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-                <div style={{ textAlign: 'center', maxWidth: '380px', animation: 'fadeIn 0.35s ease' }}>
-                    <div style={{ fontSize: '54px', lineHeight: 1, marginBottom: '18px' }}>✅</div>
-                    <h2 style={{ margin: '0 0 10px', fontSize: '22px', fontWeight: 800 }}>Заявку надіслано</h2>
-                    <p style={{ color: 'var(--hint-color)', fontSize: '15px', lineHeight: 1.5, margin: 0 }}>
-                        {sentTotal > 0 && (
-                            <>Ваш кошторис — <b style={{ color: 'var(--text-color)' }}>від {sentTotal.toLocaleString()} ₴</b>.<br /></>
-                        )}
-                        Менеджер зателефонує найближчим часом і уточнить деталі.
-                    </p>
-                </div>
-            </div>
-        );
+        return <ThanksScreen sentTotal={sentTotal} />;
     }
 
     // ОНБОРДИНГ показуємо ЗАВЖДИ на початку нової анкети — це і пояснення
@@ -703,124 +593,47 @@ export default function App() {
             {/* СЕРВЕРНА ЧЕРНЕТКА: знайдена на бекенді, локальної нема.
                 Типовий кейс — менеджер почав на телефоні, продовжує на планшеті. */}
             {serverDraft && (
-                <>
-                    <div className="sheet-overlay open" style={{ zIndex: 9998 }}></div>
-                    <div ref={serverDraftTrapRef} className="image-modal open" role="dialog" aria-modal="true" aria-label="Незавершена заявка" style={{ zIndex: 9999, padding: '25px', textAlign: 'center', background: 'var(--modal-bg)' }}>
-                        <h3 style={{ marginTop: 0, fontSize: '20px' }}>Незавершена заявка</h3>
-                        <p style={{ color: 'var(--hint-color)', fontSize: '15px', lineHeight: '1.4', marginBottom: 0 }}>
-                            На сервері збережена анкета
-                            {serverDraft.payload?.client?.name ? <> клієнта <b>{serverDraft.payload.client.name}</b></> : null}
-                            {serverDraft.updated_at ? <> від {new Date(serverDraft.updated_at).toLocaleString('uk-UA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}</> : null}.
-                            Продовжити з місця зупинки?
-                        </p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    vibe('medium');
-                                    const p = serverDraft.payload;
-                                    if (p.client) setClient(p.client);
-                                    if (p.answers) {
-                                        setAnswers(p.answers);
-                                        if (p.answers.rooms) useStore.setState({ rooms: p.answers.rooms });
-                                    }
-                                    setCurrentStep(typeof p.currentStep === 'number' ? p.currentStep : 0);
-                                    setServerDraft(null);
-                                }}
-                                style={{ background: 'var(--link-color)', color: 'white', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}
-                            >Продовжити</button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    vibe('light');
-                                    setServerDraft(null);
-                                    fetch(`${BACKEND_URL}/api/delete_draft`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' },
-                                    }).catch(() => {});
-                                }}
-                                style={{ background: 'rgba(255, 59, 48, 0.1)', color: '#ff3b30', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}
-                            >Почати нову</button>
-                        </div>
-                    </div>
-                </>
+                <ServerDraftPrompt
+                    draft={serverDraft}
+                    trapRef={serverDraftTrapRef}
+                    onContinue={() => {
+                        const p = serverDraft.payload;
+                        if (p.client) setClient(p.client);
+                        if (p.answers) {
+                            setAnswers(p.answers);
+                            if (p.answers.rooms) useStore.setState({ rooms: p.answers.rooms });
+                        }
+                        setCurrentStep(typeof p.currentStep === 'number' ? p.currentStep : 0);
+                        setServerDraft(null);
+                    }}
+                    onDiscard={() => { setServerDraft(null); deleteDraft().catch(() => {}); }}
+                />
             )}
 
             {showDraftPrompt && (
-                <>
-                    <div className="sheet-overlay open" style={{ zIndex: 9998 }}></div>
-                    <div ref={draftPromptTrapRef} className="image-modal open" role="dialog" aria-modal="true" aria-label="Відновлення" style={{ zIndex: 9999, padding: '25px', textAlign: 'center', background: 'var(--modal-bg)' }}>
-                        <h3 style={{ marginTop: 0, fontSize: '20px' }}>Відновлення</h3>
-                        <p style={{ color: 'var(--hint-color)', fontSize: '15px', lineHeight: '1.4', marginBottom: 0 }}>
-                            {editingOrderId
-                                ? `Ви редагували заявку №${editingOrderId}, але не зберегли зміни. Продовжити редагування? Збереження оновить ту саму заявку, а не створить нову.`
-                                : 'Знайдено незбережену анкету. Бажаєте продовжити заповнення з місця зупинки?'}
-                        </p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
-                            <button type="button" onClick={() => { vibe('medium'); setShowDraftPrompt(false); }} style={{ background: 'var(--link-color)', color: 'white', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>
-                                {editingOrderId ? 'Продовжити редагування' : 'Продовжити збережену'}
-                            </button>
-                            <button type="button" onClick={() => { vibe('light'); handleResetDraftSilent(); setShowDraftPrompt(false); }} style={{ background: 'rgba(255, 59, 48, 0.1)', color: '#ff3b30', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>Почати заново</button>
-                        </div>
-                    </div>
-                </>
+                <DraftPrompt
+                    trapRef={draftPromptTrapRef}
+                    editingOrderId={editingOrderId}
+                    onContinue={() => setShowDraftPrompt(false)}
+                    onRestart={() => { handleResetDraftSilent(); setShowDraftPrompt(false); }}
+                />
             )}
 
             <div className={`sheet-overlay ${isCartOpen || isMenuOpen || modalImg ? 'open' : ''}`} onClick={() => { setIsCartOpen(false); setIsMenuOpen(false); setModalImg(null); }}></div>
 
-            <div id="side-menu" ref={menuTrapRef} className={isMenuOpen ? 'open' : ''} role="dialog" aria-modal={isMenuOpen} aria-label="Розділи анкети">
-                <div className="menu-header">📋 Розділи анкети</div>
-                {menuZones.map((z, i) => (
-                    <button key={i} type="button" className="btn-reset menu-item" style={{ display: 'block', width: '100%' }} onClick={() => jumpToMenuStep(z.step)}> {z.name} </button>
-                ))}
+            <SideMenu
+                open={isMenuOpen}
+                trapRef={menuTrapRef}
+                zones={menuZones}
+                panelLabel={(session || role === 'manager' || role === 'admin') ? 'Кабінет менеджера' : 'Вхід для менеджерів'}
+                onJumpToStep={jumpToMenuStep}
+                onOpenPanel={() => { vibe('medium'); setIsMenuOpen(false); setView((session || role === 'manager' || role === 'admin') ? 'dashboard' : 'login'); }}
+                onResetDraft={resetDraft}
+            />
 
-                {/* ВХІД / ПОВЕРНЕННЯ В КАБІНЕТ — доступні ЗАВЖДИ.
-                    Раніше посилання жило лише на екрані онбордингу, а той
-                    показується один раз: після першого проходження кнопка
-                    ставала недосяжною, і потрапити в кабінет було ніяк. */}
-                <button
-                    type="button"
-                    className="btn-reset menu-item"
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px', width: '100%', borderTop: '1px solid var(--border-color)', color: 'var(--link-color)', fontWeight: 600 }}
-                    onClick={() => { vibe('medium'); setIsMenuOpen(false); setView((session || role === 'manager' || role === 'admin') ? 'dashboard' : 'login'); }}
-                >
-                    <ShieldCheck size={18} aria-hidden="true" /> {(session || role === 'manager' || role === 'admin') ? 'Кабінет менеджера' : 'Вхід для менеджерів'}
-                </button>
+            <ImageModal img={modalImg} trapRef={imageModalTrapRef} onClose={() => setModalImg(null)} />
 
-                <button type="button" className="btn-reset menu-item" style={{ color: '#ff3b30', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', borderBottom: 'none' }} onClick={resetDraft}>
-                    <Trash2 size={18} aria-hidden="true" /> Почати заново
-                </button>
-            </div>
-
-            <div ref={imageModalTrapRef} className={`image-modal ${modalImg ? 'open' : ''}`} role="dialog" aria-modal={!!modalImg} aria-label="Збільшене фото">
-                {modalImg && <img src={modalImg} alt="Збільшене фото" />}
-                <button type="button" className="cart-close-btn" onClick={() => setModalImg(null)} style={{ marginTop: '15px' }}>Закрити</button>
-            </div>
-
-            <div ref={cartTrapRef} className={`bottom-sheet ${isCartOpen ? 'open' : ''}`} role="dialog" aria-modal={isCartOpen} aria-label="Структура вартості">
-                <div className="drag-handle"></div>
-                <h3 style={{marginBottom: '5px'}}>Структура вартості</h3>
-                <p style={{color: 'var(--hint-color)', fontSize: '13px', marginTop:0}}>Попередній прорахунок на основі відповідей.</p>
-
-                {/* Тумблер рівня продубльовано тут — там, де людина дивиться
-                    на цифри: перемкнув і одразу бачить, як змінилась сума.
-                    Основний (глобальний) живе в шапці — стан у сторі спільний. */}
-                <TierSwitch />
-
-                <div className="chart-container">
-                    <div className="donut-wrapper" style={{ background: `conic-gradient(var(--link-color) 0% ${workPct}%, var(--money) ${workPct}% 100%)` }}>
-                        <div className="donut-hole"></div>
-                    </div>
-                    <div className="chart-legend">
-                        <div className="legend-item"><span style={{fontWeight: 600}}><span className="legend-dot" style={{background: 'var(--link-color)'}} aria-hidden="true"></span>Робота ({workPct}%)</span> <b><AnimatedPrice value={totals.work}/> ₴</b></div>
-                        <div className="legend-item"><span style={{fontWeight: 600}}><span className="legend-dot" style={{background: 'var(--money)'}} aria-hidden="true"></span>Матеріали ({matPct}%)</span> <b><AnimatedPrice value={totals.mat_min}/> ₴</b></div>
-                        <div className="legend-item" style={{borderTop: '1px solid var(--border-color)', paddingTop: '8px', marginTop: '4px'}}>
-                            <span style={{fontWeight: 700}}>Всього (від)</span> <b><AnimatedPrice value={totalCost}/> ₴</b>
-                        </div>
-                    </div>
-                </div>
-                <button type="button" className="cart-close-btn" onClick={() => setIsCartOpen(false)} style={{marginTop: '25px'}}>Закрити кошик</button>
-            </div>
+            <CartSheet open={isCartOpen} trapRef={cartTrapRef} totals={totals} onClose={() => setIsCartOpen(false)} />
 
             {/* app-shell обмежує контент до 1000px на планшеті (патч 6.6) */}
             <div className="app-shell">{renderCurrentStep()}</div>

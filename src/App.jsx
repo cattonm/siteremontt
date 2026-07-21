@@ -3,8 +3,12 @@ import useStore from './store/useStore';
 import ClientForm from './components/ClientForm';
 import Onboarding from './components/Onboarding';
 import TierSwitch from './components/TierSwitch';
-import Login from './components/Login';
-import Dashboard from './components/Dashboard';
+// ЛІНИВІ імпорти: Login/Dashboard — суто менеджерський функціонал (панель,
+// таблиця заявок, адмінка), гостю чи клієнту в Telegram ці ~50 КБ коду не
+// потрібні жодного разу за сесію. Вантажаться лише коли view переходить у
+// 'login'/'dashboard'.
+const Login = lazy(() => import('./components/Login'));
+const Dashboard = lazy(() => import('./components/Dashboard'));
 import { getSession } from './utils/auth';
 import Survey from './components/Survey';
 import CustomWorks from './components/CustomWorks';
@@ -38,6 +42,16 @@ import {
     blockBasement, blockAttic, blockCustomWorks, getBathQuestions, getRoomQuestions,
     getRoomIssues
 } from './data/questions';
+
+// Заглушка на час підвантаження lazy Login/Dashboard.
+function PanelLoadingFallback() {
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-color)', color: 'var(--link-color)' }}>
+            <Loader2 size={40} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+            <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
+        </div>
+    );
+}
 
 export default function App() {
     // === 1. ГЛОБАЛЬНИЙ СТАН З ZUSTAND ===
@@ -408,10 +422,12 @@ export default function App() {
     // Вхід менеджера: підпис Telegram → сесійний токен → кабінет.
     if (view === 'login') {
         return (
-            <Login
-                onSuccess={(s) => { setSessionState(s); setRole(s.role); setView('dashboard'); }}
-                onBack={() => setView('calc')}
-            />
+            <Suspense fallback={<PanelLoadingFallback />}>
+                <Login
+                    onSuccess={(s) => { setSessionState(s); setRole(s.role); setView('dashboard'); }}
+                    onBack={() => setView('calc')}
+                />
+            </Suspense>
         );
     }
     // Кабінет: у браузері — після входу (session), у Telegram — одразу за роллю.
@@ -420,10 +436,12 @@ export default function App() {
     if (view === 'dashboard' && panelSession) {
         return (
             <div style={{ minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-color)' }}>
-                <Dashboard
-                    session={panelSession}
-                    onNewOrder={() => { handleResetDraftSilent(); setView('calc'); }}
-                />
+                <Suspense fallback={<PanelLoadingFallback />}>
+                    <Dashboard
+                        session={panelSession}
+                        onNewOrder={() => { handleResetDraftSilent(); setView('calc'); }}
+                    />
+                </Suspense>
             </div>
         );
     }

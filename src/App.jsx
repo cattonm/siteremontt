@@ -18,7 +18,13 @@ import {
     showAlert, ping, me, getOrder,
     deleteDraft, saveOrder, createOrder, submitLead,
 } from './utils/api';
-import { Menu, Moon, Sun, ArrowLeft, Send, Trash2, Loader2, ShieldCheck } from 'lucide-react';
+import ServerDraftPrompt from './components/modals/ServerDraftPrompt';
+import DraftPrompt from './components/modals/DraftPrompt';
+import ImageModal from './components/modals/ImageModal';
+import CartSheet from './components/modals/CartSheet';
+import SideMenu from './components/modals/SideMenu';
+import ThanksScreen from './components/modals/ThanksScreen';
+import { Menu, Moon, Sun, ArrowLeft, Send, Loader2 } from 'lucide-react';
 
 // ЛІНИВИЙ імпорт: RoomVisualizer тягне за собою three.js + drei (~850 КБ
 // сирого JS). Без lazy усе це вантажилось КОЖНОМУ користувачу одразу на
@@ -387,10 +393,6 @@ export default function App() {
         };
     }, [activeRoomId, liveBreakdown, rooms]);
 
-    const totalCost = totals.work + totals.mat_min;
-    const workPct = totalCost > 0 ? Math.round((totals.work / totalCost) * 100) : 0;
-    const matPct = totalCost > 0 ? 100 - workPct : 0;
-
     // === 7. ВІДМАЛЬОВКА ІНТЕРФЕЙСУ ===
     if (isLoadingEdit) {
         return (
@@ -426,26 +428,11 @@ export default function App() {
         );
     }
 
-    // ОНБОРДИНГ — окремий повноекранний крок. Раніше він рендерився
-    // ЕКРАН ПОДЯКИ — окремий повноекранний крок.
-    // Раніше він малювався ВСЕРЕДИНІ анкети, тому знизу лишалася її кнопка
-    // «Далі»: натиснувши, людина отримувала «Вкажіть площу об'єкта!» на вже
-    // надісланій заявці. Тепер жодних чужих кнопок тут немає.
+    // ЕКРАН ПОДЯКИ — окремий повноекранний крок. Раніше він малювався
+    // ВСЕРЕДИНІ анкети, тому знизу лишалася її кнопка «Далі»: натиснувши,
+    // людина отримувала «Вкажіть площу об'єкта!» на вже надісланій заявці.
     if (leadSent) {
-        return (
-            <div style={{ minHeight: '100vh', background: 'var(--bg-color)', color: 'var(--text-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-                <div style={{ textAlign: 'center', maxWidth: '380px', animation: 'fadeIn 0.35s ease' }}>
-                    <div style={{ fontSize: '54px', lineHeight: 1, marginBottom: '18px' }}>✅</div>
-                    <h2 style={{ margin: '0 0 10px', fontSize: '22px', fontWeight: 800 }}>Заявку надіслано</h2>
-                    <p style={{ color: 'var(--hint-color)', fontSize: '15px', lineHeight: 1.5, margin: 0 }}>
-                        {sentTotal > 0 && (
-                            <>Ваш кошторис — <b style={{ color: 'var(--text-color)' }}>від {sentTotal.toLocaleString()} ₴</b>.<br /></>
-                        )}
-                        Менеджер зателефонує найближчим часом і уточнить деталі.
-                    </p>
-                </div>
-            </div>
-        );
+        return <ThanksScreen sentTotal={sentTotal} />;
     }
 
     // ОНБОРДИНГ показуємо ЗАВЖДИ на початку нової анкети — це і пояснення
@@ -588,121 +575,47 @@ export default function App() {
             {/* СЕРВЕРНА ЧЕРНЕТКА: знайдена на бекенді, локальної нема.
                 Типовий кейс — менеджер почав на телефоні, продовжує на планшеті. */}
             {serverDraft && (
-                <>
-                    <div className="sheet-overlay open" style={{ zIndex: 9998 }}></div>
-                    <div ref={serverDraftTrapRef} className="image-modal open" role="dialog" aria-modal="true" aria-label="Незавершена заявка" style={{ zIndex: 9999, padding: '25px', textAlign: 'center', background: 'var(--modal-bg)' }}>
-                        <h3 style={{ marginTop: 0, fontSize: '20px' }}>Незавершена заявка</h3>
-                        <p style={{ color: 'var(--hint-color)', fontSize: '15px', lineHeight: '1.4', marginBottom: 0 }}>
-                            На сервері збережена анкета
-                            {serverDraft.payload?.client?.name ? <> клієнта <b>{serverDraft.payload.client.name}</b></> : null}
-                            {serverDraft.updated_at ? <> від {new Date(serverDraft.updated_at).toLocaleString('uk-UA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}</> : null}.
-                            Продовжити з місця зупинки?
-                        </p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    vibe('medium');
-                                    const p = serverDraft.payload;
-                                    if (p.client) setClient(p.client);
-                                    if (p.answers) {
-                                        setAnswers(p.answers);
-                                        if (p.answers.rooms) useStore.setState({ rooms: p.answers.rooms });
-                                    }
-                                    setCurrentStep(typeof p.currentStep === 'number' ? p.currentStep : 0);
-                                    setServerDraft(null);
-                                }}
-                                style={{ background: 'var(--link-color)', color: 'white', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}
-                            >Продовжити</button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    vibe('light');
-                                    setServerDraft(null);
-                                    deleteDraft().catch(() => {});
-                                }}
-                                style={{ background: 'rgba(255, 59, 48, 0.1)', color: '#ff3b30', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}
-                            >Почати нову</button>
-                        </div>
-                    </div>
-                </>
+                <ServerDraftPrompt
+                    draft={serverDraft}
+                    trapRef={serverDraftTrapRef}
+                    onContinue={() => {
+                        const p = serverDraft.payload;
+                        if (p.client) setClient(p.client);
+                        if (p.answers) {
+                            setAnswers(p.answers);
+                            if (p.answers.rooms) useStore.setState({ rooms: p.answers.rooms });
+                        }
+                        setCurrentStep(typeof p.currentStep === 'number' ? p.currentStep : 0);
+                        setServerDraft(null);
+                    }}
+                    onDiscard={() => { setServerDraft(null); deleteDraft().catch(() => {}); }}
+                />
             )}
 
             {showDraftPrompt && (
-                <>
-                    <div className="sheet-overlay open" style={{ zIndex: 9998 }}></div>
-                    <div ref={draftPromptTrapRef} className="image-modal open" role="dialog" aria-modal="true" aria-label="Відновлення" style={{ zIndex: 9999, padding: '25px', textAlign: 'center', background: 'var(--modal-bg)' }}>
-                        <h3 style={{ marginTop: 0, fontSize: '20px' }}>Відновлення</h3>
-                        <p style={{ color: 'var(--hint-color)', fontSize: '15px', lineHeight: '1.4', marginBottom: 0 }}>
-                            {editingOrderId
-                                ? `Ви редагували заявку №${editingOrderId}, але не зберегли зміни. Продовжити редагування? Збереження оновить ту саму заявку, а не створить нову.`
-                                : 'Знайдено незбережену анкету. Бажаєте продовжити заповнення з місця зупинки?'}
-                        </p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
-                            <button type="button" onClick={() => { vibe('medium'); setShowDraftPrompt(false); }} style={{ background: 'var(--link-color)', color: 'white', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>
-                                {editingOrderId ? 'Продовжити редагування' : 'Продовжити збережену'}
-                            </button>
-                            <button type="button" onClick={() => { vibe('light'); handleResetDraftSilent(); setShowDraftPrompt(false); }} style={{ background: 'rgba(255, 59, 48, 0.1)', color: '#ff3b30', padding: '14px', borderRadius: '12px', border: 'none', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>Почати заново</button>
-                        </div>
-                    </div>
-                </>
+                <DraftPrompt
+                    trapRef={draftPromptTrapRef}
+                    editingOrderId={editingOrderId}
+                    onContinue={() => setShowDraftPrompt(false)}
+                    onRestart={() => { handleResetDraftSilent(); setShowDraftPrompt(false); }}
+                />
             )}
 
             <div className={`sheet-overlay ${isCartOpen || isMenuOpen || modalImg ? 'open' : ''}`} onClick={() => { setIsCartOpen(false); setIsMenuOpen(false); setModalImg(null); }}></div>
 
-            <div id="side-menu" ref={menuTrapRef} className={isMenuOpen ? 'open' : ''} role="dialog" aria-modal={isMenuOpen} aria-label="Розділи анкети">
-                <div className="menu-header">📋 Розділи анкети</div>
-                {menuZones.map((z, i) => (
-                    <button key={i} type="button" className="btn-reset menu-item" style={{ display: 'block', width: '100%' }} onClick={() => jumpToMenuStep(z.step)}> {z.name} </button>
-                ))}
+            <SideMenu
+                open={isMenuOpen}
+                trapRef={menuTrapRef}
+                zones={menuZones}
+                panelLabel={(session || role === 'manager' || role === 'admin') ? 'Кабінет менеджера' : 'Вхід для менеджерів'}
+                onJumpToStep={jumpToMenuStep}
+                onOpenPanel={() => { vibe('medium'); setIsMenuOpen(false); setView((session || role === 'manager' || role === 'admin') ? 'dashboard' : 'login'); }}
+                onResetDraft={resetDraft}
+            />
 
-                {/* ВХІД / ПОВЕРНЕННЯ В КАБІНЕТ — доступні ЗАВЖДИ.
-                    Раніше посилання жило лише на екрані онбордингу, а той
-                    показується один раз: після першого проходження кнопка
-                    ставала недосяжною, і потрапити в кабінет було ніяк. */}
-                <button
-                    type="button"
-                    className="btn-reset menu-item"
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px', width: '100%', borderTop: '1px solid var(--border-color)', color: 'var(--link-color)', fontWeight: 600 }}
-                    onClick={() => { vibe('medium'); setIsMenuOpen(false); setView((session || role === 'manager' || role === 'admin') ? 'dashboard' : 'login'); }}
-                >
-                    <ShieldCheck size={18} aria-hidden="true" /> {(session || role === 'manager' || role === 'admin') ? 'Кабінет менеджера' : 'Вхід для менеджерів'}
-                </button>
+            <ImageModal img={modalImg} trapRef={imageModalTrapRef} onClose={() => setModalImg(null)} />
 
-                <button type="button" className="btn-reset menu-item" style={{ color: '#ff3b30', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', borderBottom: 'none' }} onClick={resetDraft}>
-                    <Trash2 size={18} aria-hidden="true" /> Почати заново
-                </button>
-            </div>
-
-            <div ref={imageModalTrapRef} className={`image-modal ${modalImg ? 'open' : ''}`} role="dialog" aria-modal={!!modalImg} aria-label="Збільшене фото">
-                {modalImg && <img src={modalImg} alt="Збільшене фото" />}
-                <button type="button" className="cart-close-btn" onClick={() => setModalImg(null)} style={{ marginTop: '15px' }}>Закрити</button>
-            </div>
-
-            <div ref={cartTrapRef} className={`bottom-sheet ${isCartOpen ? 'open' : ''}`} role="dialog" aria-modal={isCartOpen} aria-label="Структура вартості">
-                <div className="drag-handle"></div>
-                <h3 style={{marginBottom: '5px'}}>Структура вартості</h3>
-                <p style={{color: 'var(--hint-color)', fontSize: '13px', marginTop:0}}>Попередній прорахунок на основі відповідей.</p>
-
-                {/* Тумблер рівня продубльовано тут — там, де людина дивиться
-                    на цифри: перемкнув і одразу бачить, як змінилась сума.
-                    Основний (глобальний) живе в шапці — стан у сторі спільний. */}
-                <TierSwitch />
-
-                <div className="chart-container">
-                    <div className="donut-wrapper" style={{ background: `conic-gradient(var(--link-color) 0% ${workPct}%, var(--money) ${workPct}% 100%)` }}>
-                        <div className="donut-hole"></div>
-                    </div>
-                    <div className="chart-legend">
-                        <div className="legend-item"><span style={{fontWeight: 600}}><span className="legend-dot" style={{background: 'var(--link-color)'}} aria-hidden="true"></span>Робота ({workPct}%)</span> <b><AnimatedPrice value={totals.work}/> ₴</b></div>
-                        <div className="legend-item"><span style={{fontWeight: 600}}><span className="legend-dot" style={{background: 'var(--money)'}} aria-hidden="true"></span>Матеріали ({matPct}%)</span> <b><AnimatedPrice value={totals.mat_min}/> ₴</b></div>
-                        <div className="legend-item" style={{borderTop: '1px solid var(--border-color)', paddingTop: '8px', marginTop: '4px'}}>
-                            <span style={{fontWeight: 700}}>Всього (від)</span> <b><AnimatedPrice value={totalCost}/> ₴</b>
-                        </div>
-                    </div>
-                </div>
-                <button type="button" className="cart-close-btn" onClick={() => setIsCartOpen(false)} style={{marginTop: '25px'}}>Закрити кошик</button>
-            </div>
+            <CartSheet open={isCartOpen} trapRef={cartTrapRef} totals={totals} onClose={() => setIsCartOpen(false)} />
 
             {/* app-shell обмежує контент до 1000px на планшеті (патч 6.6) */}
             <div className="app-shell">{renderCurrentStep()}</div>

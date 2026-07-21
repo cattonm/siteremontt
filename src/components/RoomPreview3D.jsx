@@ -972,7 +972,12 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
             keysRef.current[k] = on;
             e.preventDefault();
         };
-        const down = (e) => set(e, true);
+        const down = (e) => {
+            // Escape — очікувана поведінка виходу з режиму прогулянки
+            // (3D-аудит п.8.7), як і в решті модалок застосунку.
+            if (e.code === 'Escape') { setView('orbit'); return; }
+            set(e, true);
+        };
         const up = (e) => set(e, false);
         window.addEventListener('keydown', down);
         window.addEventListener('keyup', up);

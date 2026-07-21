@@ -38,10 +38,9 @@ import InvalidateOnVisible from './three/InvalidateOnVisible';
 import { getSurfaceKind, getSurfaceColor, getSurfaceTexture, getSurfaceRoughness, repeatsFor } from '../utils/proceduralTextures';
 import { GROUP_ICONS, DEFAULT_GROUP_ICON } from '../data/groupIcons';
 import { ROOM_QUESTIONS_CONFIG } from '../data/questions';
-import { FURNITURE_LAYOUTS } from '../data/furnitureLayouts';
-import { SLOT_SIZE } from '../utils/layoutEngine';
 import { vibe } from '../utils/telegram';
 import useCanvasVisible from '../hooks/useCanvasVisible';
+import { layoutKitchen, layoutBath, layoutGeneric, TUB_LEN, TUB_DEP, TUB_H } from '../utils/roomLayout';
 
 // ====== ГЕОМЕТРІЯ КІМНАТИ ======
 const WALL_H = 2.7;     // висота стін, м
@@ -515,39 +514,24 @@ function buildColliders(type, W, D, room) {
     const push = (x, z, w, d) => list.push({ x, z, hw: w / 2, hd: d / 2 });
 
     if (type === 'kitchen') {
-        const withFridge = W >= 2.55;
-        const fridgeW = 0.66;
-        const setW = Math.min(W - 0.3 - (withFridge ? fridgeW + 0.1 : 0), 3.4);
-        const x0 = 0.15;
+        const { withFridge, fridgeW, setW, x0 } = layoutKitchen(W);
         push(x0 + setW / 2, 0.31, setW, 0.6);
         if (withFridge) push(x0 + setW + 0.1 + fridgeW / 2, 0.33, fridgeW, 0.64);
         return list;
     }
 
     if (type === 'bath') {
-        const showerArr = (Array.isArray(room.shower) ? room.shower : []).filter((v) => v !== 'Не обладнувати');
-        const showerAny = showerArr.length > 0;
-        const S = Math.min(0.95, W - 0.5, D - 0.5);
+        const { showerAny, S, tubType, free, tubStartX, tubFits, tubAlt } = layoutBath(W, D, room);
         if (showerAny) push(0.12 + S / 2, 0.12 + S / 2, S, S);
-
-        const tubType = room.tub?.type && room.tub.type !== 'Не обладнувати' ? room.tub.type : null;
         if (tubType) {
-            const tubLen = 1.65, tubDep = 0.75;
-            const free = room.tub?.type === 'Окремостояча';
-            const tubStartX = showerAny ? 0.12 + S + 0.2 : 0.15;
-            const tubFits = W - tubStartX >= tubLen + 0.1;
-            const tubAlt = !tubFits && D >= tubLen + 0.6;
-            if (tubFits) push(tubStartX + tubLen / 2, free ? 0.62 : 0.42, tubLen, tubDep);
-            else if (tubAlt) push(W - tubDep / 2 - 0.12, D - tubLen / 2 - 0.25, tubDep, tubLen);
+            if (tubFits) push(tubStartX + TUB_LEN / 2, free ? 0.62 : 0.42, TUB_LEN, TUB_DEP);
+            else if (tubAlt) push(W - TUB_DEP / 2 - 0.12, D - TUB_LEN / 2 - 0.25, TUB_DEP, TUB_LEN);
         }
         return list;
     }
 
-    const pieces = FURNITURE_LAYOUTS[type];
+    const { pieces, sx, sz } = layoutGeneric(type, W, D);
     if (!pieces) return list;
-    const slot = SLOT_SIZE[type] || { width: 2.0, depth: 1.8 };
-    const sx = W / slot.width;
-    const sz = D / slot.depth;
     const clamp = (v, max) => Math.min(Math.max(v, 0.35), max - 0.35);
     for (const p of pieces) {
         if (p.shape === 'cylinder') continue;
@@ -724,11 +708,7 @@ function LightFixtures({ lightArr, W, D }) {
 
 // ====== КУХОННИЙ ГАРНІТУР (фартух реагує на вибір apron) ======
 function KitchenSet({ W, room }) {
-    const withFridge = W >= 2.55;
-    const fridgeW = 0.66;
-    const setW = Math.min(W - 0.3 - (withFridge ? fridgeW + 0.1 : 0), 3.4);
-    const x0 = 0.15;
-    const cx = x0 + setW / 2;
+    const { withFridge, fridgeW, setW, x0, cx } = layoutKitchen(W);
 
     const counterFill = surfaceFill('apron', 'Матеріал стільниці', setW, 0.63); // stoneSlab
     const apronFill = surfaceFill('apron', room.apron, setW, 0.6, '#edeff1');
@@ -792,26 +772,11 @@ function GlassPane({ args, position }) {
 }
 
 function BathSet({ W, D, room }) {
-    const tubType = room.tub?.type && room.tub.type !== 'Не обладнувати' ? room.tub.type : null;
-    const showerArr = (Array.isArray(room.shower) ? room.shower : []).filter((v) => v !== 'Не обладнувати');
-    const hasTray = showerArr.includes('Піддон (акрил/камінь)');
-    const hasTrap = showerArr.includes('Душовий трап (з плитки)');
-    const glassWall = showerArr.includes('Скляна перегородка');
-    const glassDoor = showerArr.includes('Скляна конструкція з дверима');
-    const showerAny = hasTray || hasTrap || glassWall || glassDoor;
-    const toiletType = room.toilet?.type && room.toilet.type !== 'Ні' ? room.toilet.type : null;
-
-    // Душова зона в дальньому лівому куті
-    const S = Math.min(0.95, W - 0.5, D - 0.5);
-    const showerCx = 0.12 + S / 2;
-
-    // Ванна вздовж задньої стіни, правіше душа. Якщо не влазить — уздовж
-    // правого краю (перпендикулярно). Окремостояча відступає від стіни.
-    const tubLen = 1.65, tubDep = 0.75, tubH = 0.52;
-    const free = room.tub?.type === 'Окремостояча';
-    const tubStartX = showerAny ? 0.12 + S + 0.2 : 0.15;
-    const tubFits = W - tubStartX >= tubLen + 0.1;
-    const tubAlt = !tubFits && D >= tubLen + 0.6;
+    const {
+        hasTray, hasTrap, glassWall, glassDoor, showerAny, S, showerCx,
+        tubType, free, tubStartX, tubFits, tubAlt, toiletType,
+    } = layoutBath(W, D, room);
+    const tubLen = TUB_LEN, tubDep = TUB_DEP, tubH = TUB_H;
 
     return (
         <group>
@@ -919,11 +884,8 @@ function BathSet({ W, D, room }) {
 
 // ====== СИЛУЕТИ МЕБЛІВ для решти типів (той самий підхід, що на плані) ======
 function GenericFurniture({ type, W, D }) {
-    const pieces = FURNITURE_LAYOUTS[type];
+    const { pieces, sx, sz } = layoutGeneric(type, W, D);
     if (!pieces) return null;
-    const slot = SLOT_SIZE[type] || { width: 2.0, depth: 1.8 };
-    const sx = W / slot.width;
-    const sz = D / slot.depth;
     const clamp = (v, max) => Math.min(Math.max(v, 0.35), max - 0.35);
     return (
         <group>
@@ -957,7 +919,7 @@ function buildHotspots(type, W, D, groups) {
     add('Підлога', [W * 0.6, 0.07, D * 0.68]);
     add('Стіни', busyWalls ? [0.06, 1.7, D * 0.42] : [Math.min(W * 0.92, W - 0.3), 1.55, 0.06]);
     if (type === 'kitchen') {
-        const setW = Math.min(W - 0.3 - (W >= 2.55 ? 0.76 : 0), 3.4);
+        const { setW } = layoutKitchen(W);
         add('Фартух', [0.15 + setW * 0.68, 1.15, 0.09]);
         add('Сантехніка', [0.15 + setW * 0.3, 1.02, 0.5]);
     }

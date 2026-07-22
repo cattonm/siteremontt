@@ -30,6 +30,7 @@
 // але не може заглянути за стіни чи перевернути сцену.
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { Html, OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import { Box, Footprints, Sun, MoonStar } from 'lucide-react';
@@ -361,7 +362,11 @@ function SunLight({ W, D, mood = 'day' }) {
 }
 
 // ====== КОРОБКА КІМНАТИ: підлога + 2 стіни + плінтус + подіум ======
-function Shell({ W, D, floorFill, backFill, leftFill, onSurfaceDown, onFloorUp, onWallUp }) {
+// React.memo (патч 12.1, "build-once" адаптовано під r3f): підкомпоненти
+// сцени ре-рендерились би на КОЖНУ зміну стану-хроми (mood/tapKind/
+// joyKnob-драг), навіть коли їхні власні пропси не змінились. memo
+// пропускає зайве — reconciler r3f бачить той самий JSX і нічого не чіпає.
+const Shell = React.memo(function Shell({ W, D, floorFill, backFill, leftFill, onSurfaceDown, onFloorUp, onWallUp }) {
     return (
         <group>
             {/* Подіум під кімнатою — щоб модель "стояла", як архітектурний макет */}
@@ -422,7 +427,7 @@ function Shell({ W, D, floorFill, backFill, leftFill, onSurfaceDown, onFloorUp, 
             </mesh>
         </group>
     );
-}
+});
 
 // ====== ЗАМИКАННЯ КІМНАТИ (тільки в режимі прогулянки) ======
 // Дві решти стіни + стеля + плінтуси. В орбітальному режимі група прихована,
@@ -438,7 +443,7 @@ function ceilingProps(value) {
 
 const SEAM = 0.035; // тіньовий шов, 3.5 см
 
-function ClosedShell({ W, D, visible, frontFill, rightFill, ceilingValue, shadowSeam }) {
+const ClosedShell = React.memo(function ClosedShell({ W, D, visible, frontFill, rightFill, ceilingValue, shadowSeam }) {
     const cp = ceilingProps(ceilingValue);
     const seam = shadowSeam && ceilingValue === 'Натяжна';
     return (
@@ -499,7 +504,7 @@ function ClosedShell({ W, D, visible, frontFill, rightFill, ceilingValue, shadow
             </mesh>
         </group>
     );
-}
+});
 
 // ====== КОЛАЙДЕРИ МЕБЛІВ ======
 // Повторюють ту саму розкладку, що й рендер — щоб крізь ліжко/гарнітур
@@ -549,6 +554,26 @@ function Exposure({ value }) {
         gl.toneMappingExposure = value;
         invalidate();
     }, [gl, value, invalidate]);
+    /* eslint-enable react-hooks/immutability */
+    return null;
+}
+
+// IBL (патч 12.5): PMREM зі студійної RoomEnvironment (без зовнішніх HDR-файлів,
+// у стилі решти сцени — усе процедурне). Прибирає "плаский" вигляд матеріалів
+// м'якими відблисками; будується ОДИН раз на маунт canvas, не на кожен рендер.
+function IBLEnvironment() {
+    const { gl, scene } = useThree();
+    /* eslint-disable react-hooks/immutability -- налаштування сцени, норма r3f */
+    useEffect(() => {
+        const pmrem = new THREE.PMREMGenerator(gl);
+        const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+        scene.environment = envTex;
+        pmrem.dispose();
+        return () => {
+            scene.environment = null;
+            envTex.dispose();
+        };
+    }, [gl, scene]);
     /* eslint-enable react-hooks/immutability */
     return null;
 }
@@ -632,7 +657,7 @@ function EmissiveStrip({ args, position, rotation }) {
     );
 }
 
-function LightFixtures({ lightArr, W, D, mood = 'day' }) {
+const LightFixtures = React.memo(function LightFixtures({ lightArr, W, D, mood = 'day' }) {
     const has = (name) => lightArr.includes(name);
     const spots = has('Точкове світло');
     const chandelier = has('Люстра');
@@ -705,10 +730,10 @@ function LightFixtures({ lightArr, W, D, mood = 'day' }) {
             )}
         </group>
     );
-}
+});
 
 // ====== КУХОННИЙ ГАРНІТУР (фартух реагує на вибір apron) ======
-function KitchenSet({ W, room }) {
+const KitchenSet = React.memo(function KitchenSet({ W, room }) {
     const { withFridge, fridgeW, setW, x0, cx } = layoutKitchen(W);
 
     const counterFill = surfaceFill('apron', 'Матеріал стільниці', setW, 0.63); // stoneSlab
@@ -760,7 +785,7 @@ function KitchenSet({ W, room }) {
             )}
         </group>
     );
-}
+});
 
 // ====== САНВУЗОЛ: ванна / душ / унітаз / умивальник за вибором ======
 function GlassPane({ args, position }) {
@@ -772,7 +797,7 @@ function GlassPane({ args, position }) {
     );
 }
 
-function BathSet({ W, D, room }) {
+const BathSet = React.memo(function BathSet({ W, D, room }) {
     const {
         hasTray, hasTrap, glassWall, glassDoor, showerAny, S, showerCx,
         tubType, free, tubStartX, tubFits, tubAlt, toiletType,
@@ -881,10 +906,10 @@ function BathSet({ W, D, room }) {
             )}
         </group>
     );
-}
+});
 
 // ====== СИЛУЕТИ МЕБЛІВ для решти типів (той самий підхід, що на плані) ======
-function GenericFurniture({ type, W, D }) {
+const GenericFurniture = React.memo(function GenericFurniture({ type, W, D }) {
     const { pieces, sx, sz } = layoutGeneric(type, W, D);
     if (!pieces) return null;
     const clamp = (v, max) => Math.min(Math.max(v, 0.35), max - 0.35);
@@ -909,7 +934,7 @@ function GenericFurniture({ type, W, D }) {
             })}
         </group>
     );
-}
+});
 
 // ====== ХОТСПОТИ: 3D-якорі за групами, наявними в цього типу кімнати ======
 function buildHotspots(type, W, D, groups) {
@@ -955,9 +980,25 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, onMat
     const wallField = type === 'bath' ? 'wall_tile' : 'walls';
     const wallVal = firstMapped(wallField, room[wallField]);
 
-    const floorFill = surfaceFill('floor', room.floor, W, D, '#ececee', 'screed');
-    const backFill = surfaceFill(wallField, wallVal, W, WALL_H, '#f7f5f0');
-    const leftFill = surfaceFill(wallField, wallVal, D, WALL_H, '#f7f5f0');
+    // 3D-продуктивність (патч 12.1): surfaceFill лише читає з LRU-кешу
+    // (патч 8.3), нових canvas не створює — але й цей кеш-лукап не варто
+    // повторювати на КОЖЕН ре-рендер (mood/tapKind/joyKnob-драг тощо міняють
+    // компонент десятки разів на секунду під час ходи чи озирання).
+    // useMemo тримає ті самі об'єкти {color,texture,roughnessMap}
+    // референційно стабільними — Shell/ClosedShell (і r3f-реконсилер під
+    // ними) бачать незмінні пропси й нічого не перемальовують.
+    const floorFill = useMemo(
+        () => surfaceFill('floor', room.floor, W, D, '#ececee', 'screed'),
+        [room.floor, W, D],
+    );
+    const backFill = useMemo(
+        () => surfaceFill(wallField, wallVal, W, WALL_H, '#f7f5f0'),
+        [wallField, wallVal, W],
+    );
+    const leftFill = useMemo(
+        () => surfaceFill(wallField, wallVal, D, WALL_H, '#f7f5f0'),
+        [wallField, wallVal, D],
+    );
 
     // ====== ТАП ПО ПОВЕРХНІ → ПАЛІТРА (патч 11.1/11.2) ======
     // Свідомо БЕЗ окремого каталогу матеріалів (patches/11 пропонує
@@ -1124,11 +1165,12 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, onMat
                 // Поза в'юпортом (п.8.1) — взагалі не малюємо, незалежно від режиму.
                 frameloop={!canvasVisible ? 'never' : (fp ? 'always' : 'demand')}
                 shadows="soft"
-                gl={{ toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.12 }}
+                gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.12 }}
                 role="img"
                 aria-label={`3D-візуалізація приміщення «${room.name}»${fp ? ' у режимі прогулянки' : ''}`}
             >
                 <InvalidateOnVisible visible={canvasVisible} />
+                <IBLEnvironment />
                 <CameraRig
                     key={`${W.toFixed(1)}x${D.toFixed(1)}`}
                     W={W} D={D} view={view}

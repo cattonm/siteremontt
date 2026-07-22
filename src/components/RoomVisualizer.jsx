@@ -236,6 +236,7 @@ export default function RoomVisualizer() {
                                     room={activeRoom}
                                     activeGroup={openGroup}
                                     onHotspotClick={openGroupFromHotspot}
+                                    onMaterialChange={(fieldId, value) => updateRoom(activeId, { [fieldId]: value })}
                                     ceilingShadow={ceilingShadow}
                                 />
                             )}

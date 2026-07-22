@@ -32,7 +32,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { Html, OrbitControls, PerspectiveCamera } from '@react-three/drei';
-import { Box, Footprints } from 'lucide-react';
+import { Box, Footprints, Sun, MoonStar } from 'lucide-react';
 import { OutlinedBox, OutlinedCylinder, OutlinedSurface } from './three/Outlined';
 import InvalidateOnVisible from './three/InvalidateOnVisible';
 import { getSurfaceKind, getSurfaceColor, getSurfaceTexture, getSurfaceRoughness, repeatsFor } from '../utils/proceduralTextures';
@@ -330,7 +330,7 @@ function WalkController({ active, W, D, colliders, yawRef, pitchRef, keysRef, jo
 // в сцену через <primitive>, інакше three ігнорує його позицію).
 // Ортографічна "камера тіней" накриває кімнату із запасом — інакше тіні
 // обрізаються по краях. mapSize 1024 достатньо для такої маленької сцени.
-function SunLight({ W, D }) {
+function SunLight({ W, D, mood = 'day' }) {
     const target = React.useMemo(() => new THREE.Object3D(), []);
     const R = Math.max(W, D);
     const ext = R * 0.85 + 1.5; // пів-розмір коробки тіней
@@ -342,7 +342,9 @@ function SunLight({ W, D }) {
                 target={target}
                 color="#fff6ea"
                 position={[W / 2 + R * 1.1 + 1.2, R * 1.5 + 4, D / 2 + R * 0.9 + 1]}
-                intensity={2.4}
+                // Вечір (патч 11.5): сонце вимкнене, кімнату освітлюють лише
+                // прибори (LightFixtures) — той самий підхід, що в еталоні.
+                intensity={mood === 'night' ? 0 : 2.4}
                 shadow-mapSize-width={1024}
                 shadow-mapSize-height={1024}
                 shadow-camera-left={-ext}
@@ -359,19 +361,24 @@ function SunLight({ W, D }) {
 }
 
 // ====== КОРОБКА КІМНАТИ: підлога + 2 стіни + плінтус + подіум ======
-function Shell({ W, D, floorFill, backFill, leftFill }) {
+function Shell({ W, D, floorFill, backFill, leftFill, onSurfaceDown, onFloorUp, onWallUp }) {
     return (
         <group>
             {/* Подіум під кімнатою — щоб модель "стояла", як архітектурний макет */}
             <OutlinedBox args={[W + 0.55, 0.12, D + 0.55]} position={[W / 2, -FLOOR_T - 0.06, D / 2]} color="#f4f4f1" />
 
-            {/* Підлога (верхня площина на y=0) */}
+            {/* Підлога (верхня площина на y=0). onPointerDown/Up замість onClick:
+                тап на матеріал має спрацьовувати лише коли курсор майже не
+                зрушив — інакше обертання орбітальної камери по підлозі
+                випадково відкривало б палітру після кожного драга (патч 11.2). */}
             <OutlinedSurface
                 args={[W, FLOOR_T, D]}
                 position={[W / 2, -FLOOR_T / 2, D / 2]}
                 color={floorFill.color}
                 texture={floorFill.texture}
                 roughnessMap={floorFill.roughnessMap}
+                onPointerDown={onSurfaceDown}
+                onPointerUp={onFloorUp}
             />
 
             {/* Задня стіна: тіло + чорна кришка (стиль плану) */}
@@ -381,6 +388,8 @@ function Shell({ W, D, floorFill, backFill, leftFill }) {
                 color={backFill.color}
                 texture={backFill.texture}
                 roughnessMap={backFill.roughnessMap}
+                onPointerDown={onSurfaceDown}
+                onPointerUp={onWallUp}
             />
             <mesh position={[(W - WALL_T) / 2, WALL_H + CAP_H / 2, -WALL_T / 2]} raycast={() => null}>
                 <boxGeometry args={[W + WALL_T + CAP_OVER * 2, CAP_H, WALL_T + CAP_OVER * 2]} />
@@ -394,6 +403,8 @@ function Shell({ W, D, floorFill, backFill, leftFill }) {
                 color={leftFill.color}
                 texture={leftFill.texture}
                 roughnessMap={leftFill.roughnessMap}
+                onPointerDown={onSurfaceDown}
+                onPointerUp={onWallUp}
             />
             <mesh position={[-WALL_T / 2, WALL_H + CAP_H / 2, (D - WALL_T) / 2]} raycast={() => null}>
                 <boxGeometry args={[WALL_T + CAP_OVER * 2, CAP_H, D + WALL_T + CAP_OVER * 2]} />
@@ -621,12 +632,18 @@ function EmissiveStrip({ args, position, rotation }) {
     );
 }
 
-function LightFixtures({ lightArr, W, D }) {
+function LightFixtures({ lightArr, W, D, mood = 'day' }) {
     const has = (name) => lightArr.includes(name);
     const spots = has('Точкове світло');
     const chandelier = has('Люстра');
     const track = has('Трек / Лінія');
     const led = has('LED підсвітка') || has('Декор підсвітка');
+    // Вечір (патч 11.5): сонця нема, тож прибори — єдине джерело світла в
+    // кімнаті й мають світити помітно яскравіше; вдень вони ледь тепліють
+    // проти денного світла з вікна.
+    const night = mood === 'night';
+    const bulbGlow = night ? 2.2 : 0.25;
+    const pointMul = night ? 1.8 : 1;
 
     return (
         <group>
@@ -638,7 +655,7 @@ function LightFixtures({ lightArr, W, D }) {
                     </mesh>
                     <mesh position={[0, -0.018, 0]}>
                         <cylinderGeometry args={[0.055, 0.055, 0.01, 20]} />
-                        <meshStandardMaterial color="#fff2cf" emissive="#ffdf9e" emissiveIntensity={1.82} />
+                        <meshStandardMaterial color="#fff2cf" emissive="#ffdf9e" emissiveIntensity={bulbGlow} />
                     </mesh>
                 </group>
             ))}
@@ -655,9 +672,9 @@ function LightFixtures({ lightArr, W, D }) {
                     </mesh>
                     <mesh position={[0, WALL_H - 0.6, 0]}>
                         <cylinderGeometry args={[0.13, 0.27, 0.24, 22]} />
-                        <meshStandardMaterial color="#f3efe7" emissive="#ffd9a0" emissiveIntensity={0.59} />
+                        <meshStandardMaterial color="#f3efe7" emissive="#ffd9a0" emissiveIntensity={night ? 1.4 : 0.59} />
                     </mesh>
-                    <pointLight position={[0, WALL_H - 0.75, 0]} intensity={10} distance={7} decay={1.8} color="#ffd9a8" />
+                    <pointLight position={[0, WALL_H - 0.75, 0]} intensity={10 * pointMul} distance={7} decay={1.8} color="#ffd9a8" />
                 </group>
             )}
 
@@ -670,7 +687,7 @@ function LightFixtures({ lightArr, W, D }) {
                     {[-0.3, 0, 0.3].map((fz, i) => (
                         <mesh key={i} position={[0, -0.09, fz * Math.max(D * 0.55, 1)]} rotation={[rad(24), 0, 0]}>
                             <cylinderGeometry args={[0.035, 0.045, 0.14, 14]} />
-                            <meshStandardMaterial color="#1d1d21" emissive="#ffe8bf" emissiveIntensity={0.46} />
+                            <meshStandardMaterial color="#1d1d21" emissive="#ffe8bf" emissiveIntensity={night ? 1.6 : 0.46} />
                         </mesh>
                     ))}
                 </group>
@@ -684,7 +701,7 @@ function LightFixtures({ lightArr, W, D }) {
             )}
 
             {(spots || track) && (
-                <pointLight position={[W / 2, WALL_H - 0.35, D / 2]} intensity={6} distance={7} decay={2} color="#fff3da" />
+                <pointLight position={[W / 2, WALL_H - 0.35, D / 2]} intensity={6 * pointMul} distance={7} decay={2} color="#fff3da" />
             )}
         </group>
     );
@@ -916,7 +933,7 @@ function buildHotspots(type, W, D, groups) {
 }
 
 // ====== ГОЛОВНИЙ КОМПОНЕНТ ======
-export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceilingShadow = false }) {
+export default function RoomPreview3D({ room, activeGroup, onHotspotClick, onMaterialChange, ceilingShadow = false }) {
     const { W, D } = roomDims(room);
     const type = room.type;
 
@@ -924,6 +941,8 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
     // Локальний стан (стор не чіпаємо — той самий принцип, що з матеріалами).
     const [view, setView] = useState('orbit');
     const fp = view === 'fp';
+    // День/вечір (патч 11.5) — суто візуальний режим освітлення, у стор не йде.
+    const [mood, setMood] = useState('day');
     // 3D-аудит п.8.1: не малюємо кадри, коли канвас поза в'юпортом (план і
     // прев'ю кімнати рідко видно одночасно на телефоні — лишається один
     // активний WebGL-контекст).
@@ -939,6 +958,40 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
     const floorFill = surfaceFill('floor', room.floor, W, D, '#ececee', 'screed');
     const backFill = surfaceFill(wallField, wallVal, W, WALL_H, '#f7f5f0');
     const leftFill = surfaceFill(wallField, wallVal, D, WALL_H, '#f7f5f0');
+
+    // ====== ТАП ПО ПОВЕРХНІ → ПАЛІТРА (патч 11.1/11.2) ======
+    // Свідомо БЕЗ окремого каталогу матеріалів (patches/11 пропонує
+    // configuratorMaterials.js): опції ті самі, що й у питаннях анкети
+    // (ROOM_QUESTIONS_CONFIG) — одне джерело правди для варіантів і для
+    // самих процедурних текстур (proceduralTextures.js), а вибір одразу
+    // йде в той самий updateRoom, що й акордеон (через onMaterialChange).
+    // Стеля тут не тапається: рендериться лише в ClosedShell (лише fp),
+    // а fp має власний поінтер-капчур для озирання — теж свідоме звуження
+    // обсягу, стелю й далі можна міняти через акордеон «Стеля».
+    const [tapKind, setTapKind] = useState(null); // 'floor' | wallField | null
+    const roomCfg = ROOM_QUESTIONS_CONFIG[type] || [];
+    const tapQuestion = tapKind ? roomCfg.find((q) => q.id === tapKind) : null;
+    const tapStartRef = useRef(null);
+    const onSurfaceDown = (e) => { tapStartRef.current = { x: e.clientX, y: e.clientY }; };
+    const onSurfaceUp = (kind) => (e) => {
+        const start = tapStartRef.current;
+        tapStartRef.current = null;
+        if (!start) return;
+        if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > 8) return; // це був драг камери
+        vibe('light');
+        setTapKind(kind);
+    };
+    const pickMaterial = (opt) => {
+        if (!tapKind || !tapQuestion) return;
+        vibe('medium');
+        const value = tapQuestion.type === 'cards_multiselect' ? [opt.val] : opt.val;
+        onMaterialChange?.(tapKind, value);
+        setTapKind(null);
+    };
+    const isSwatchSelected = (opt) => {
+        const cur = room[tapKind];
+        return Array.isArray(cur) ? cur.includes(opt.val) : cur === opt.val;
+    };
 
     const lightArr = Array.isArray(room.light) ? room.light : (room.light ? [room.light] : []);
 
@@ -1086,13 +1139,16 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
                     W={W} D={D} colliders={colliders}
                     yawRef={yawRef} pitchRef={pitchRef} keysRef={keysRef} joyRef={joyRef}
                 />
-                {/* Під замкненою стелею темніше — піднімаємо експозицію */}
-                <Exposure value={fp ? 1.3 : 1.12} />
+                {/* Під замкненою стелею темніше — піднімаємо експозицію.
+                    Вечір (патч 11.5): без сонця сцена темніша загалом — трохи
+                    нижча експозиція, щоб прибори не "вигорали" на камері. */}
+                <Exposure value={mood === 'night' ? (fp ? 1.0 : 0.92) : (fp ? 1.3 : 1.12)} />
                 {/* Світло двома шарами: hemisphere (м'який градієнт небо/земля,
                     "оживляє" білі поверхні) + directional з тінями (об'єм).
-                    ambient прибрано — його рівень бере на себе hemisphere. */}
-                <hemisphereLight intensity={fp ? 0.95 : 0.65} color="#ffffff" groundColor="#d8d3ca" />
-                <SunLight W={W} D={D} />
+                    ambient прибрано — його рівень бере на себе hemisphere.
+                    Вечір: hemisphere майже вимкнене — світять лише прибори. */}
+                <hemisphereLight intensity={mood === 'night' ? 0.14 : (fp ? 0.95 : 0.65)} color="#ffffff" groundColor="#d8d3ca" />
+                <SunLight W={W} D={D} mood={mood} />
 
                 {/* Невидима площина під подіумом ловить м'яку тінь моделі —
                     "макет" перестає висіти в білому вакуумі */}
@@ -1105,7 +1161,10 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
                     <shadowMaterial transparent opacity={0.16} />
                 </mesh>
 
-                <Shell W={W} D={D} floorFill={floorFill} backFill={backFill} leftFill={leftFill} />
+                <Shell
+                    W={W} D={D} floorFill={floorFill} backFill={backFill} leftFill={leftFill}
+                    onSurfaceDown={onSurfaceDown} onFloorUp={onSurfaceUp('floor')} onWallUp={onSurfaceUp(wallField)}
+                />
                 {/* Решта стін + стеля — лише в прогулянці (керуємо visible) */}
                 <ClosedShell
                     W={W} D={D} visible={fp}
@@ -1127,7 +1186,7 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
 
                 {(type === 'room' || type === 'hallway') && <DecorPanels value={room.decor} />}
 
-                <LightFixtures lightArr={lightArr} W={W} D={D} />
+                <LightFixtures lightArr={lightArr} W={W} D={D} mood={mood} />
 
                 {type === 'kitchen' && <KitchenSet W={W} room={room} />}
                 {type === 'bath' && <BathSet W={W} D={D} room={room} />}
@@ -1152,10 +1211,52 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
                 })}
             </Canvas>
 
-            {/* Сегмент «Макет» / «Зайти в кімнату». stopPropagation — щоб
-                pointer capture озирання не з'їдав клік по кнопці. */}
+            {/* День/вечір (патч 11.5). Іконки БЕЗ підпису — свідомо: з текстом
+                («День»/«Вечір») сегмент був досить широким, щоб на вузькому
+                (350px) канвасі перекритись із сегментом «Макет»/«Зайти в
+                кімнату» праворуч (обидва top, зверху) — тут це й спливло при
+                перевірці. Знизу теж не варто: там може лягти fixed-футер
+                навігації анкети (z-index 101), якщо канвас проскролити так,
+                що його низ збігається з низом в'юпорта. zIndex 45 > 40
+                (zIndexRange хотспотів) про всяк випадок. */}
             <div onPointerDown={(e) => e.stopPropagation()} style={{
-                position: 'absolute', top: '10px', right: '10px', zIndex: 30,
+                position: 'absolute', top: '10px', left: '10px', zIndex: 45,
+                display: 'flex', gap: '4px', padding: '3px', borderRadius: '18px',
+                background: 'var(--stage-badge-bg)', border: '1px solid var(--border-color)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+            }}>
+                {[
+                    { id: 'day', label: 'День', icon: Sun },
+                    { id: 'night', label: 'Вечір', icon: MoonStar },
+                ].map(({ id, label, icon }) => {
+                    const MoodIcon = icon;
+                    const on = mood === id;
+                    return (
+                        <button
+                            key={id}
+                            type="button"
+                            aria-label={label}
+                            onClick={() => { if (!on) { vibe('light'); setMood(id); } }}
+                            style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                width: '26px', height: '26px', borderRadius: '13px', border: 'none',
+                                cursor: on ? 'default' : 'pointer',
+                                background: on ? 'var(--accent)' : 'transparent',
+                                color: on ? '#fff' : 'var(--text-color)',
+                            }}
+                        >
+                            <MoodIcon size={14} aria-hidden="true" />
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* Сегмент «Макет» / «Зайти в кімнату». stopPropagation — щоб
+                pointer capture озирання не з'їдав клік по кнопці. zIndex 45:
+                той самий фікс, що й у сегменту день/вечір (виявлено п.11.5) —
+                хотспот, що спроєктувався в цей кут, міг перехопити клік. */}
+            <div onPointerDown={(e) => e.stopPropagation()} style={{
+                position: 'absolute', top: '10px', right: '10px', zIndex: 45,
                 display: 'flex', gap: '4px', padding: '3px', borderRadius: '18px',
                 background: 'var(--stage-badge-bg)', border: '1px solid var(--border-color)',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
@@ -1215,7 +1316,48 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, ceili
             <div className="r3d-badge">
                 {fp
                     ? 'W A S D — ходити · тягніть — озиратись'
-                    : `${parseFloat(room.measurements?.floor) > 0 ? `${parseFloat(room.measurements.floor)} м² · ` : ''}${W.toFixed(1)}×${D.toFixed(1)} м · покрутити пальцем`}
+                    : tapQuestion
+                        ? 'Тапніть по поверхні ще раз, щоб змінити вибір'
+                        : `${parseFloat(room.measurements?.floor) > 0 ? `${parseFloat(room.measurements.floor)} м² · ` : ''}${W.toFixed(1)}×${D.toFixed(1)} м · тапніть по поверхні, щоб змінити матеріал`}
+            </div>
+
+            {/* Палітра матеріалів (патч 11.2) — з'являється після тапу по
+                підлозі чи стіні. Опції — ROOM_QUESTIONS_CONFIG, той самий
+                каталог, що й у бічному акордеоні. */}
+            <div
+                onPointerDown={(e) => e.stopPropagation()}
+                className={`r3d-palette ${tapQuestion ? 'open' : ''}`}
+            >
+                {tapQuestion && (
+                    <>
+                        <div className="r3d-palette-head">
+                            <span>{tapQuestion.group || tapQuestion.text}</span>
+                            <button type="button" className="btn-reset r3d-palette-close" aria-label="Закрити палітру" onClick={() => setTapKind(null)}>✕</button>
+                        </div>
+                        <div className="r3d-palette-row">
+                            {tapQuestion.options.filter((o) => o.val !== 'Не обладнувати' && o.val !== 'Ні').map((opt) => {
+                                const kind = getSurfaceKind(tapKind, opt.val);
+                                const selected = isSwatchSelected(opt);
+                                return (
+                                    <button
+                                        key={opt.val}
+                                        type="button"
+                                        className={`r3d-swatch ${selected ? 'active' : ''}`}
+                                        onClick={() => pickMaterial(opt)}
+                                    >
+                                        <span
+                                            className="r3d-swatch-sq"
+                                            style={opt.img
+                                                ? { backgroundImage: `url(${opt.img})` }
+                                                : { background: kind ? getSurfaceColor(kind) : '#d9d9dd' }}
+                                        />
+                                        <span className="r3d-swatch-nm">{opt.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );

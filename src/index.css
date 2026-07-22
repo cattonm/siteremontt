@@ -230,6 +230,42 @@ input:focus, select:focus { border-color: var(--link-color); box-shadow: 0 0 0 3
     padding: 4px 10px; pointer-events: none;
 }
 
+/* ==== Палітра матеріалів у 3D-прев'ю (патч 11.2) ====
+   Той самий патерн, що в еталоні: стрічка знизу, поза кадром, коли закрита
+   (translateY), не перекриває модель, поки не тапнули по поверхні. */
+.r3d-palette {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 26;
+    background: linear-gradient(transparent, var(--stage-bg) 55%);
+    padding: 22px 10px 8px;
+    transform: translateY(105%);
+    transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.r3d-palette.open { transform: none; }
+.r3d-palette-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 0 4px 6px;
+    font-size: 11px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--hint-color);
+}
+.r3d-palette-close { font-size: 15px; color: var(--hint-color); padding: 2px 6px; cursor: pointer; }
+.r3d-palette-row {
+    display: flex; gap: 7px; overflow-x: auto; padding: 2px 4px 4px;
+    scrollbar-width: none;
+}
+.r3d-palette-row::-webkit-scrollbar { display: none; }
+.r3d-swatch {
+    flex: none; width: 64px;
+    border: 1.5px solid var(--border-color); background: var(--card-bg);
+    border-radius: 12px; padding: 5px; cursor: pointer; text-align: center;
+}
+.r3d-swatch-sq {
+    display: block; width: 100%; aspect-ratio: 1; border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.08); background-size: cover; background-position: center;
+}
+.r3d-swatch-nm { display: block; font-size: 9.5px; font-weight: 700; margin-top: 4px; line-height: 1.15; color: var(--text-color); }
+.r3d-swatch.active { border-color: var(--accent); }
+.r3d-swatch.active .r3d-swatch-nm { color: var(--accent); }
+
 /* ==== Двоколонковий режим візуалізатора на широких екранах ==== */
 @media (min-width: 900px) {
     .visualizer-split { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; align-items: start; }

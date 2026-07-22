@@ -59,7 +59,7 @@ export function OutlinedCylinder({ args, position = [0, 0, 0], rotation, color, 
 // давав би подвійну "жирну" тінь.
 const DIM_TINT = '#9a978f'; // множник для приглушення невибраних зон плану
 
-export function OutlinedSurface({ args, position = [0, 0, 0], color, texture, roughnessMap = null, dim = false, onClick, castShadow = true, receiveShadow = true }) {
+export function OutlinedSurface({ args, position = [0, 0, 0], color, texture, roughnessMap = null, dim = false, onClick, onPointerDown, onPointerUp, castShadow = true, receiveShadow = true }) {
     const [w, h, d] = args;
     // З текстурою колір матеріалу множиться на map: '#ffffff' = без змін,
     // DIM_TINT = приглушено. Без текстури множимо саму заливку.
@@ -68,7 +68,7 @@ export function OutlinedSurface({ args, position = [0, 0, 0], color, texture, ro
         : (texture ? '#ffffff' : color);
     return (
         <group position={position}>
-            <mesh onClick={onClick} castShadow={castShadow} receiveShadow={receiveShadow}>
+            <mesh onClick={onClick} onPointerDown={onPointerDown} onPointerUp={onPointerUp} castShadow={castShadow} receiveShadow={receiveShadow}>
                 <boxGeometry args={args} />
                 <meshStandardMaterial
                     key={`${texture ? texture.uuid : color}|${roughnessMap ? roughnessMap.uuid : ''}|${dim ? 'd' : ''}`}

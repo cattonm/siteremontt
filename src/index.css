@@ -272,6 +272,11 @@ input:focus, select:focus { border-color: var(--link-color); box-shadow: 0 0 0 3
     .visualizer-preview-col { position: sticky; top: 16px; }
 }
 
+/* ==== Галерея «Наші роботи» (патч 10.2): 2 колонки телефон / 3 планшет ==== */
+@media (min-width: 700px) {
+    .portfolio-grid { grid-template-columns: repeat(3, 1fr) !important; }
+}
+
 /* ==== ШАПКА-СТЕПЕР (патч 6.1) ==== */
 /* Телефон: ← / назва зони + крок / ⋯ . Планшет: заголовок + TierSwitch,
    а нижче — хлібні крихти зон замість бургер-меню. */

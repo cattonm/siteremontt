@@ -6,7 +6,7 @@
 // Показуємо різний текст для менеджера і для гостя (публічний калькулятор):
 // у них різна мотивація — менеджеру важлива швидкість, гостю — «скільки
 // коштуватиме мій ремонт і чи не змусять платити».
-import { Boxes, SlidersHorizontal, Receipt, ArrowRight, Clock } from 'lucide-react';
+import { Boxes, SlidersHorizontal, Receipt, ArrowRight, Clock, Images } from 'lucide-react';
 import { vibe } from '../utils/telegram';
 
 const STEPS = [
@@ -27,7 +27,7 @@ const STEPS = [
     },
 ];
 
-export default function Onboarding({ isGuest, onStart }) {
+export default function Onboarding({ isGuest, onStart, onOpenPortfolio }) {
     return (
         <div style={{ padding: '30px 22px 24px', animation: 'fadeIn 0.35s ease' }}>
             <h1 style={{ fontSize: '26px', fontWeight: 800, margin: '0 0 8px', lineHeight: 1.2 }}>
@@ -85,6 +85,21 @@ export default function Onboarding({ isGuest, onStart }) {
             >
                 Почати <ArrowRight size={18} aria-hidden="true" />
             </button>
+
+            {onOpenPortfolio && (
+                <button
+                    type="button"
+                    onClick={() => { vibe('light'); onOpenPortfolio(); }}
+                    style={{
+                        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                        background: 'var(--secondary-bg)', color: 'var(--text-color)', border: '1px solid var(--border-color)',
+                        padding: '14px', borderRadius: '14px', fontWeight: 700, fontSize: '15px', cursor: 'pointer',
+                        marginTop: '10px',
+                    }}
+                >
+                    <Images size={18} aria-hidden="true" /> Наші роботи
+                </button>
+            )}
 
             {isGuest && (
                 <p style={{ textAlign: 'center', color: 'var(--hint-color)', fontSize: '12.5px', marginTop: '14px', lineHeight: 1.4 }}>

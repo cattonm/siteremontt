@@ -2,36 +2,10 @@ import React, { useState } from 'react';
 import AnimatedPrice from './AnimatedPrice';
 import useStore from '../store/useStore';
 import { ROOM_QUESTIONS_CONFIG } from '../data/questions';
-import { vibe } from '../utils/telegram';
-import { ChevronDown, ChevronUp, User, Home, Settings, Wrench, Edit3, CheckCircle2 } from 'lucide-react';
-
-// Значення, які означають «нічого не робимо» — у підсумку їх не показуємо,
-// щоб список кімнати містив лише реальні роботи.
-const SKIP_VALUES = new Set(['Ні', 'ні', 'Без змін', 'Не потребується', 'Не обладнувати']);
-
-// Людський підпис значення питання кімнати (val → label з опцій, tier-об'єкти,
-// словники «Інше»). null = рядок не показуємо.
-function formatRoomValue(q, val) {
-    const optLabel = (v) => (q.options?.find((o) => o.val === v)?.label) ?? v;
-    if (val === undefined || val === null || val === '') return null;
-    if (q.type === 'cards_with_tier') {
-        if (!val?.type || SKIP_VALUES.has(val.type)) return null;
-        return `${optLabel(val.type)}${val.tier && val.tier !== '-' ? ` (${val.tier})` : ''}`;
-    }
-    if (Array.isArray(val)) {
-        const items = val.filter((v) => !SKIP_VALUES.has(v)).map(optLabel);
-        return items.length ? items.join(', ') : null;
-    }
-    if (typeof val === 'object') {
-        const parts = Object.entries(val)
-            .filter(([k, v]) => v && v !== 0 && !SKIP_VALUES.has(k))
-            .map(([k, v]) => (v === 'Так' ? k : `${k} (${v})`));
-        return parts.length ? parts.join(', ') : null;
-    }
-    if (SKIP_VALUES.has(val)) return null;
-    if (q.type === 'input_number') return parseFloat(val) > 0 ? `${val} шт` : null;
-    return String(optLabel(val));
-}
+import { vibe, tg } from '../utils/telegram';
+import { formatRoomValue } from '../utils/formatRoomValue';
+import { buildShareUrl } from '../utils/shareLink';
+import { ChevronDown, ChevronUp, User, Home, Settings, Wrench, Edit3, CheckCircle2, Share2 } from 'lucide-react';
 
 export default function Summary({ client, setClient, answers, finalQuestions, shouldSkip, editStep, totals, isGuest = false }) {
     const [openZones, setOpenZones] = useState({ "👤 ІНФОРМАЦІЯ ПРО ОБ'ЄКТ": true, "🏠 ПРИМІЩЕННЯ": true });
@@ -43,6 +17,26 @@ export default function Summary({ client, setClient, answers, finalQuestions, sh
     const toggleZone = (zoneName) => {
         vibe('light');
         setOpenZones(prev => ({ ...prev, [zoneName]: !prev[zoneName] }));
+    };
+
+    // Шер кошторису посиланням (патч 10.3). Без бекенду — снапшот кодується
+    // в URL (utils/shareLink.js), тому телефон клієнта туди свідомо НЕ йде
+    // (лише площа й тип об'єкта) — посилання можуть переслати далі.
+    const [shareCopied, setShareCopied] = useState(false);
+    const handleShare = () => {
+        vibe('medium');
+        const snapshot = {
+            v: 1,
+            client: { area: client.area, object_type: client.object_type },
+            rooms, answers, totals,
+        };
+        const url = buildShareUrl(snapshot);
+        if (tg?.shareURL) { tg.shareURL(url, 'Мій кошторис ремонту'); return; }
+        if (navigator.share) { navigator.share({ title: 'Кошторис ремонту', url }).catch(() => {}); return; }
+        navigator.clipboard?.writeText(url).then(() => {
+            setShareCopied(true);
+            setTimeout(() => setShareCopied(false), 2500);
+        });
     };
 
     const grouped = {};
@@ -277,6 +271,12 @@ export default function Summary({ client, setClient, answers, finalQuestions, sh
                         <div style={{ fontWeight: 800, fontSize: '18px', color: 'var(--text-color)' }}><AnimatedPrice value={totals.mat_min} /> ₴</div>
                     </div>
                 </div>
+                <button
+                    type="button" onClick={handleShare}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', marginTop: '14px', padding: '10px', borderRadius: '10px', border: '1px solid var(--money)', background: 'transparent', color: 'var(--money)', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer' }}
+                >
+                    <Share2 size={15} aria-hidden="true" /> {shareCopied ? 'Посилання скопійовано!' : 'Поділитися кошторисом'}
+                </button>
             </div>
 
             {/* ФОРМА КОНТАКТУ ДЛЯ ГОСТЯ — у самому кінці, коли людина вже

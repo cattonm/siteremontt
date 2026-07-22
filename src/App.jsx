@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import useStore from './store/useStore'; 
 import ClientForm from './components/ClientForm';
 import Onboarding from './components/Onboarding';
+import Portfolio from './components/Portfolio';
 import TierSwitch from './components/TierSwitch';
 // ЛІНИВІ імпорти: Login/Dashboard — суто менеджерський функціонал (панель,
 // таблиця заявок, адмінка), гостю чи клієнту в Telegram ці ~50 КБ коду не
@@ -28,6 +29,8 @@ import ImageModal from './components/modals/ImageModal';
 import CartSheet from './components/modals/CartSheet';
 import SideMenu from './components/modals/SideMenu';
 import ThanksScreen from './components/modals/ThanksScreen';
+import SharedEstimateView from './components/SharedEstimateView';
+import { readShareSnapshot } from './utils/shareLink';
 import { Menu, Moon, Sun, ArrowLeft, Send, Loader2 } from 'lucide-react';
 
 // ЛІНИВИЙ імпорт: RoomVisualizer тягне за собою three.js + drei (~850 КБ
@@ -62,6 +65,11 @@ export default function App() {
         rooms, resetDraftSilent: storeResetDraft,
         editingOrderId
     } = useStore();
+
+    // Шер-посилання (патч 10.3) — знімок кошторису прямо в URL-хеші, без
+    // бекенду. Перевіряється ДО будь-якої іншої логіки: той, хто відкрив
+    // таке посилання, може взагалі не мати своєї сесії чи чернетки.
+    const [sharedSnapshot, setSharedSnapshot] = useState(() => readShareSnapshot());
 
     // === 2. ЛОКАЛЬНІ СТАНИ UI (Не йдуть на сервер) ===
     // edit_id відомий ще ДО першого рендера — спінер вмикаємо одразу,
@@ -408,6 +416,18 @@ export default function App() {
     }, [activeRoomId, liveBreakdown, rooms]);
 
     // === 7. ВІДМАЛЬОВКА ІНТЕРФЕЙСУ ===
+    if (sharedSnapshot) {
+        return (
+            <SharedEstimateView
+                snapshot={sharedSnapshot}
+                onStartOwn={() => {
+                    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+                    setSharedSnapshot(null);
+                }}
+            />
+        );
+    }
+
     if (isLoadingEdit) {
         return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-color)', color: 'var(--link-color)' }}>
@@ -446,6 +466,19 @@ export default function App() {
         );
     }
 
+    // Галерея «Наші роботи» (патч 10.2) — статика, без бекенду.
+    if (view === 'portfolio') {
+        return (
+            <Portfolio
+                onBack={() => setView('calc')}
+                onStartSurvey={(tier) => {
+                    if (tier) setAnswers((prev) => ({ ...prev, global_tier: tier }));
+                    setView('calc');
+                }}
+            />
+        );
+    }
+
     // ЕКРАН ПОДЯКИ — окремий повноекранний крок. Раніше він малювався
     // ВСЕРЕДИНІ анкети, тому знизу лишалася її кнопка «Далі»: натиснувши,
     // людина отримувала «Вкажіть площу об'єкта!» на вже надісланій заявці.
@@ -467,6 +500,7 @@ export default function App() {
                         // об'єкта, без якої кошторис не рахується взагалі.
                         // Контакти в тій формі для гостя приховані (isGuest).
                     }}
+                    onOpenPortfolio={() => setView('portfolio')}
                 />
                 {/* Вхід для своїх. Свідомо непомітний: клієнту він ні до чого,
                     а менеджер знає, куди тиснути. */}
@@ -628,6 +662,7 @@ export default function App() {
                 panelLabel={(session || role === 'manager' || role === 'admin') ? 'Кабінет менеджера' : 'Вхід для менеджерів'}
                 onJumpToStep={jumpToMenuStep}
                 onOpenPanel={() => { vibe('medium'); setIsMenuOpen(false); setView((session || role === 'manager' || role === 'admin') ? 'dashboard' : 'login'); }}
+                onOpenPortfolio={() => { vibe('light'); setIsMenuOpen(false); setView('portfolio'); }}
                 onResetDraft={resetDraft}
             />
 

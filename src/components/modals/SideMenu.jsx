@@ -3,9 +3,9 @@
 // (доступні ЗАВЖДИ — раніше посилання жило лише на екрані онбордингу,
 // а той показується один раз: після першого проходження кнопка ставала
 // недосяжною).
-import { ShieldCheck, Trash2 } from 'lucide-react';
+import { ShieldCheck, Images, Trash2 } from 'lucide-react';
 
-export default function SideMenu({ open, trapRef, zones, panelLabel, onJumpToStep, onOpenPanel, onResetDraft }) {
+export default function SideMenu({ open, trapRef, zones, panelLabel, onJumpToStep, onOpenPanel, onOpenPortfolio, onResetDraft }) {
     return (
         <div id="side-menu" ref={trapRef} className={open ? 'open' : ''} role="dialog" aria-modal={open} aria-label="Розділи анкети">
             <div className="menu-header">📋 Розділи анкети</div>
@@ -13,10 +13,21 @@ export default function SideMenu({ open, trapRef, zones, panelLabel, onJumpToSte
                 <button key={i} type="button" className="btn-reset menu-item" style={{ display: 'block', width: '100%' }} onClick={() => onJumpToStep(z.step)}> {z.name} </button>
             ))}
 
+            {onOpenPortfolio && (
+                <button
+                    type="button"
+                    className="btn-reset menu-item"
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px', width: '100%', borderTop: '1px solid var(--border-color)' }}
+                    onClick={onOpenPortfolio}
+                >
+                    <Images size={18} aria-hidden="true" /> Наші роботи
+                </button>
+            )}
+
             <button
                 type="button"
                 className="btn-reset menu-item"
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '20px', width: '100%', borderTop: '1px solid var(--border-color)', color: 'var(--link-color)', fontWeight: 600 }}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: onOpenPortfolio ? 0 : '20px', width: '100%', borderTop: onOpenPortfolio ? 'none' : '1px solid var(--border-color)', color: 'var(--link-color)', fontWeight: 600 }}
                 onClick={onOpenPanel}
             >
                 <ShieldCheck size={18} aria-hidden="true" /> {panelLabel}

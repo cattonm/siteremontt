@@ -122,6 +122,38 @@ function surfaceFill(fieldId, value, widthM, heightM, fallback = '#efeeeb', fall
     };
 }
 
+// ====== ДЕФОЛТНЕ ПРЕВ'Ю ПО ТИПУ ПРИМІЩЕННЯ (патч 13.1 / 13.5) ======
+// Проблема патча 13: поки клієнт нічого не обрав, кімната стартувала голою —
+// підлога "чорнова стяжка", стіни пласка сіра заливка. Виглядало недоробленим,
+// хоча прототип (room-configurator-prototype.html) живий з першого кадру:
+// у нього `sel` засіджений дефолтами.
+//
+// Тут — те саме, але АДАПТОВАНО під наявну архітектуру, а не портом прототипу:
+//  - Використовуємо ІСНУЮЧІ види текстур (KINDS у proceduralTextures.js) —
+//    те саме єдине джерело правди, що й свотчі анкети. Свідомо НЕ додаємо
+//    паралельний каталог прототипу (subway/slats/panel + «Плитка кабанчик»,
+//    «Рейкова алюм.» тощо): ці матеріали не існують як опції в анкеті, тож
+//    клієнт бачив би в прев'ю те, чого не може обрати свотчем — і другий
+//    каталог дублював би систему матеріалів.
+//  - Дефолт залежить від типу: санвузол/кухня стартують плиткою, а не паркетом
+//    (Definition of done патча 13).
+//  - Це ЛИШЕ візуальне прев'ю (fallbackKind): у `room` нічого не пишеться,
+//    кошторис лишається 0, а пункт акордеону — «рекомендовано», поки клієнт
+//    свідомо не тапне свотч (розділення прев'ю/анкети, патч 13.2 — уже
+//    закладене архітектурно: компонент читає з пропса `room` і ніколи не
+//    мутує стор, вибір іде тільки через onMaterialChange).
+const PREVIEW_DEFAULTS = {
+    room: { floor: 'herringbone', wall: 'paint' },      // паркет-ялинка + тепла фарба
+    kitchen: { floor: 'tile60', wall: 'plaster' },      // керамограніт + декор. штукатурка
+    bath: { floor: 'tile12060', wall: 'tile12060' },    // плитка на підлозі й стінах
+    hallway: { floor: 'tile60', wall: 'plaster' },
+    balcony: { floor: 'tile60', wall: 'plaster' },
+    wardrobe: { floor: 'laminate', wall: 'paint' },     // ламінат-дуб + тепла фарба
+    basement: { floor: 'tile60', wall: 'plaster' },
+    attic: { floor: 'laminate', wall: 'plaster' },
+};
+const previewDefault = (type) => PREVIEW_DEFAULTS[type] || PREVIEW_DEFAULTS.room;
+
 // ====== КАМЕРА: обмежений орбіт + режим «зайти в кімнату» ======
 // key на компоненті (у батька) перезбирає камеру, коли міняється площа.
 // view: 'orbit' — зовнішній огляд макета; 'fp' — погляд зсередини (look-around).
@@ -980,6 +1012,12 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, onMat
     const wallField = type === 'bath' ? 'wall_tile' : 'walls';
     const wallVal = firstMapped(wallField, room[wallField]);
 
+    // Дефолтне прев'ю по типу приміщення (патч 13.1/13.5): поки клієнт нічого
+    // не обрав — показуємо завершений матеріал, доречний для типу (плитка в
+    // санвузлі, паркет у кімнаті), а не голу стяжку/пласку заливку. Це ЛИШЕ
+    // fallbackKind: у стор нічого не пишеться, кошторис = 0 (патч 13.2).
+    const def = previewDefault(type);
+
     // 3D-продуктивність (патч 12.1): surfaceFill лише читає з LRU-кешу
     // (патч 8.3), нових canvas не створює — але й цей кеш-лукап не варто
     // повторювати на КОЖЕН ре-рендер (mood/tapKind/joyKnob-драг тощо міняють
@@ -988,16 +1026,16 @@ export default function RoomPreview3D({ room, activeGroup, onHotspotClick, onMat
     // референційно стабільними — Shell/ClosedShell (і r3f-реконсилер під
     // ними) бачать незмінні пропси й нічого не перемальовують.
     const floorFill = useMemo(
-        () => surfaceFill('floor', room.floor, W, D, '#ececee', 'screed'),
-        [room.floor, W, D],
+        () => surfaceFill('floor', room.floor, W, D, '#ececee', def.floor),
+        [room.floor, W, D, def.floor],
     );
     const backFill = useMemo(
-        () => surfaceFill(wallField, wallVal, W, WALL_H, '#f7f5f0'),
-        [wallField, wallVal, W],
+        () => surfaceFill(wallField, wallVal, W, WALL_H, '#f7f5f0', def.wall),
+        [wallField, wallVal, W, def.wall],
     );
     const leftFill = useMemo(
-        () => surfaceFill(wallField, wallVal, D, WALL_H, '#f7f5f0'),
-        [wallField, wallVal, D],
+        () => surfaceFill(wallField, wallVal, D, WALL_H, '#f7f5f0', def.wall),
+        [wallField, wallVal, D, def.wall],
     );
 
     // ====== ТАП ПО ПОВЕРХНІ → ПАЛІТРА (патч 11.1/11.2) ======
